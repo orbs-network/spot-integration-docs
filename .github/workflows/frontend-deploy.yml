@@ -13,6 +13,7 @@ on:
       - "next.config.ts"
       - "tsconfig.json"
       - "eslint.config.mjs"
+      - "vercel.json"
       - ".github/workflows/frontend-deploy.yml"
   workflow_dispatch:
 
