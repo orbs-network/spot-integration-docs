@@ -24,6 +24,7 @@ jobs:
   deploy:
     name: Deploy frontend
     runs-on: ubuntu-latest
+    environment: production
     permissions:
       contents: read
     env:
@@ -54,34 +55,53 @@ jobs:
         run: yarn build
 
       - name: Install Vercel CLI
-        run: yarn global add vercel@latest
-
-      - name: Add Yarn global bin to PATH
-        run: echo "$(yarn global bin)" >> "$GITHUB_PATH"
+        run: npm install --global vercel@latest
 
       - name: Validate Vercel configuration
         run: |
+          set -euo pipefail
           if [ -z "$VERCEL_TOKEN" ]; then
-            echo "::error::Missing VERCEL_TOKEN secret"
+            echo "Missing Vercel token secret: VERCEL_TOKEN" >&2
             exit 1
           fi
           if [ -z "$VERCEL_ORG_ID" ]; then
-            echo "::error::Missing VERCEL_ORG_ID"
+            echo "Missing VERCEL_ORG_ID" >&2
             exit 1
           fi
           if [ -z "$VERCEL_PROJECT_ID" ]; then
-            echo "::error::Missing VERCEL_PROJECT_ID"
+            echo "Missing VERCEL_PROJECT_ID" >&2
             exit 1
           fi
 
-      - name: Reset Vercel link metadata
-        run: rm -rf .vercel
+      - name: Prepare git metadata for Vercel
+        env:
+          SERVICE_NAME: Orbs Deploy Bot
+          SERVICE_EMAIL: perps@orbs.com
+          BRANCH_NAME: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
 
-      - name: Pull Vercel environment
-        run: vercel pull --yes --environment=production --token="$VERCEL_TOKEN"
+          git checkout -B "$BRANCH_NAME" "${GITHUB_SHA}"
 
-      - name: Build Vercel output
-        run: vercel build --prod --token="$VERCEL_TOKEN"
+          original_subject="$(git log -1 --pretty=%s)"
 
-      - name: Deploy to Vercel
-        run: vercel deploy --prebuilt --prod --token="$VERCEL_TOKEN"
+          git config user.name "$SERVICE_NAME"
+          git config user.email "$SERVICE_EMAIL"
+          git commit --allow-empty -m "$original_subject" --no-verify
+
+          echo "Branch: $(git rev-parse --abbrev-ref HEAD)"
+          echo "Commit: $(git rev-parse --short HEAD)"
+          echo "Author: $(git log -1 --pretty='%an <%ae>')"
+          echo "Subject: $(git log -1 --pretty=%s)"
+
+      - name: Build and deploy to Vercel
+        run: |
+          set -euo pipefail
+          echo "Pulling Vercel production environment"
+          vercel pull --yes --environment=production --token="$VERCEL_TOKEN"
+
+          echo "Building Vercel output"
+          vercel build --prod --token="$VERCEL_TOKEN"
+
+          echo "Deploying prebuilt Vercel output"
+          vercel deploy --prebuilt --prod --archive=tgz --token="$VERCEL_TOKEN"
