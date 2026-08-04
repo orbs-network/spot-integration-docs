@@ -18,8 +18,11 @@
 
 html {
   background: var(--background);
+  overflow-x: hidden;
   overflow-y: scroll;
   scrollbar-gutter: stable;
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
 }
 
 body {
@@ -27,6 +30,8 @@ body {
   background: var(--background);
   color: var(--text);
   font-family: Arial, Helvetica, sans-serif;
+  min-width: 320px;
+  overflow-x: hidden;
 }
 
 a {
@@ -38,18 +43,18 @@ button {
 }
 
 .guide-shell {
-  min-height: 100vh;
+  min-height: 100dvh;
   background: var(--background);
 }
 
 .guide-layout {
   display: grid;
-  grid-template-columns: 360px 900px;
+  grid-template-columns: minmax(300px, 360px) minmax(0, 900px);
   gap: 24px;
   width: min(1340px, 100%);
   justify-content: center;
   margin: 0 auto;
-  padding: 28px;
+  padding: clamp(18px, 3vw, 28px);
 }
 
 .guide-sidebar {
@@ -61,6 +66,7 @@ button {
   border: 1px solid var(--border);
   border-radius: 8px;
   background: var(--panel);
+  overscroll-behavior: contain;
   padding: 14px;
 }
 
@@ -83,6 +89,7 @@ button {
   display: flex;
   flex-direction: column;
   gap: 4px;
+  min-width: 0;
 }
 
 .step-tab {
@@ -91,6 +98,7 @@ button {
   align-items: center;
   gap: 10px;
   width: 100%;
+  min-height: 44px;
   border: 0;
   border-radius: 6px;
   background: transparent;
@@ -100,6 +108,7 @@ button {
   line-height: 1.25;
   padding: 8px;
   text-align: left;
+  touch-action: manipulation;
 }
 
 .step-tab:hover,
@@ -138,6 +147,11 @@ button {
   align-items: center;
   justify-content: space-between;
   gap: 16px;
+  min-width: 0;
+}
+
+.guide-topbar > div:first-child {
+  min-width: 0;
 }
 
 .step-count {
@@ -148,8 +162,9 @@ button {
 
 .step-heading {
   margin: 4px 0 0;
-  font-size: clamp(22px, 2.4vw, 32px);
+  font-size: 30px;
   line-height: 1.15;
+  overflow-wrap: anywhere;
 }
 
 .nav-buttons {
@@ -168,7 +183,10 @@ button {
   background: var(--panel);
   color: var(--text);
   cursor: pointer;
+  min-width: 44px;
   padding: 0 14px;
+  touch-action: manipulation;
+  user-select: none;
 }
 
 .nav-button-icon {
@@ -197,6 +215,7 @@ button {
 
 .markdown-card {
   width: 100%;
+  min-width: 0;
   border: 1px solid var(--border);
   border-radius: 8px;
   background: var(--panel);
@@ -207,6 +226,8 @@ button {
   display: flex;
   flex-direction: column;
   gap: 18px;
+  max-width: 100%;
+  min-width: 0;
 }
 
 .markdown-content h3 {
@@ -221,6 +242,9 @@ button {
   color: var(--muted);
   font-size: 15px;
   line-height: 1.7;
+  hyphens: auto;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .markdown-content p,
@@ -239,23 +263,37 @@ button {
 }
 
 .inline-code {
+  display: inline-block;
+  max-width: 100%;
+  vertical-align: text-bottom;
   border-radius: 4px;
   background: var(--panel-strong);
   color: var(--muted-strong);
   font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
   font-size: 0.92em;
+  overflow-wrap: anywhere;
   padding: 2px 5px;
+  white-space: normal;
+  word-break: break-all;
+  box-decoration-break: clone;
+  -webkit-box-decoration-break: clone;
 }
 
 .markdown-link {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
   color: var(--accent);
+  overflow-wrap: anywhere;
   text-underline-offset: 4px;
+  word-break: break-word;
+}
+
+.markdown-link-icon {
+  display: inline-block;
+  margin-left: 4px;
+  vertical-align: -2px;
 }
 
 .code-block {
+  max-width: 100%;
   overflow: hidden;
   border: 1px solid var(--border);
   border-radius: 8px;
@@ -272,8 +310,11 @@ button {
 
 .code-block pre {
   margin: 0;
+  max-width: 100%;
   overflow-x: auto;
+  overscroll-behavior-x: contain;
   padding: 16px;
+  -webkit-overflow-scrolling: touch;
 }
 
 .code-block code {
@@ -284,9 +325,12 @@ button {
 }
 
 .table-wrap {
+  max-width: 100%;
   overflow-x: auto;
+  overscroll-behavior-x: contain;
   border: 1px solid var(--border);
   border-radius: 8px;
+  -webkit-overflow-scrolling: touch;
 }
 
 table {
@@ -314,6 +358,7 @@ td {
   color: var(--muted);
   font-size: 14px;
   line-height: 1.55;
+  overflow-wrap: anywhere;
 }
 
 tr:last-child td {
@@ -338,6 +383,7 @@ tr:last-child td {
 @media (max-width: 860px) {
   .guide-layout {
     grid-template-columns: 1fr;
+    gap: 18px;
     padding: 18px;
   }
 
@@ -346,20 +392,230 @@ tr:last-child td {
     max-height: none;
   }
 
+  .guide-main {
+    max-width: none;
+  }
+
   .guide-topbar {
-    align-items: flex-start;
-    flex-direction: column;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: start;
   }
 
   .nav-buttons {
-    width: 100%;
+    width: auto;
   }
 
   .nav-button-icon {
-    flex: 1;
+    flex: 0 0 auto;
+    width: 44px;
+    min-height: 44px;
   }
 
   .markdown-card {
     padding: 18px;
+  }
+}
+
+@media (max-width: 640px) {
+  .guide-layout {
+    gap: 0;
+    padding: 0 0 max(14px, env(safe-area-inset-bottom));
+  }
+
+  .guide-sidebar {
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    max-height: none;
+    overflow: hidden;
+    border-top: 0;
+    border-right: 0;
+    border-left: 0;
+    border-radius: 0 0 8px 8px;
+    padding: max(10px, env(safe-area-inset-top)) 10px 10px;
+  }
+
+  .guide-kicker {
+    margin-bottom: 2px;
+    font-size: 11px;
+  }
+
+  .guide-title {
+    margin-bottom: 10px;
+    font-size: 18px;
+  }
+
+  .step-list {
+    flex-direction: row;
+    gap: 8px;
+    margin: 0 -10px;
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+    padding: 0 10px 2px;
+    scroll-snap-type: x proximity;
+    scrollbar-width: none;
+  }
+
+  .step-list::-webkit-scrollbar {
+    display: none;
+  }
+
+  .step-tab {
+    flex: 0 0 auto;
+    grid-template-columns: 24px minmax(0, 1fr);
+    min-width: 132px;
+    max-width: 188px;
+    padding: 8px 10px;
+    scroll-snap-align: start;
+  }
+
+  .step-number {
+    width: 24px;
+    height: 24px;
+    font-size: 11px;
+  }
+
+  .step-label {
+    white-space: nowrap;
+    text-overflow: ellipsis;
+  }
+
+  .guide-topbar {
+    gap: 12px;
+  }
+
+  .guide-main {
+    padding: 14px 10px 0;
+  }
+
+  .step-heading {
+    font-size: 22px;
+    line-height: 1.18;
+  }
+
+  .progress-track {
+    margin: 14px 0;
+  }
+
+  .markdown-card {
+    padding: 14px;
+  }
+
+  .markdown-content {
+    gap: 15px;
+  }
+
+  .markdown-content h3 {
+    font-size: 18px;
+  }
+
+  .markdown-content p,
+  .markdown-content li {
+    font-size: 14px;
+    line-height: 1.65;
+  }
+
+  .markdown-content ul,
+  .markdown-content ol {
+    padding-left: 20px;
+  }
+
+  .code-language {
+    padding: 8px 10px;
+  }
+
+  .code-block pre {
+    padding: 12px;
+  }
+
+  .code-block code {
+    font-size: 12px;
+  }
+
+  table {
+    min-width: 560px;
+  }
+
+  th,
+  td {
+    padding: 10px 12px;
+  }
+
+  .guide-footer {
+    gap: 10px;
+  }
+
+  .guide-footer .nav-button {
+    flex: 1;
+  }
+}
+
+@media (max-width: 480px) {
+  .guide-sidebar {
+    padding-right: 8px;
+    padding-left: 8px;
+  }
+
+  .guide-title {
+    font-size: 16px;
+  }
+
+  .step-list {
+    margin: 0 -8px;
+    padding-right: 8px;
+    padding-left: 8px;
+  }
+
+  .step-tab {
+    gap: 8px;
+    min-width: 112px;
+    max-width: 152px;
+    padding: 8px;
+  }
+
+  .step-label {
+    font-size: 12px;
+  }
+
+  .guide-main {
+    padding: 12px 8px 0;
+  }
+
+  .step-heading {
+    font-size: 20px;
+  }
+
+  .markdown-card {
+    border-radius: 6px;
+    padding: 12px;
+  }
+
+  .markdown-content h3 {
+    font-size: 17px;
+  }
+
+  .inline-code {
+    font-size: 0.88em;
+  }
+
+  table {
+    min-width: 520px;
+  }
+
+  .guide-footer {
+    position: sticky;
+    bottom: 0;
+    z-index: 5;
+    margin: 16px -8px -14px;
+    border-top: 1px solid var(--border);
+    background: rgba(8, 9, 13, 0.96);
+    padding: 8px max(8px, env(safe-area-inset-left))
+      max(8px, env(safe-area-inset-bottom)) max(8px, env(safe-area-inset-left));
+  }
+
+  .guide-footer .nav-button {
+    min-width: 0;
+    padding: 0 10px;
   }
 }

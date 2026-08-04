@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { ChevronLeft, ChevronRight, ExternalLink } from "lucide-react";
 
 export type ReadmeStep = {
@@ -47,7 +47,7 @@ function renderInline(text: string) {
           className="markdown-link"
         >
           {link[1]}
-          <ExternalLink size={13} />
+          <ExternalLink className="markdown-link-icon" size={13} />
         </a>,
       );
     } else if (code) {
@@ -247,9 +247,18 @@ function MarkdownContent({ markdown }: { markdown: string }) {
 
 export function ReadmeSteps({ title, steps }: Props) {
   const [stepIndex, setStepIndex] = useState(0);
+  const stepTabsRef = useRef<(HTMLButtonElement | null)[]>([]);
   const step = steps[stepIndex];
   const isFirst = stepIndex === 0;
   const isLast = stepIndex === steps.length - 1;
+
+  useEffect(() => {
+    stepTabsRef.current[stepIndex]?.scrollIntoView({
+      behavior: "smooth",
+      block: "nearest",
+      inline: "center",
+    });
+  }, [stepIndex]);
 
   const goToStep = (nextIndex: number) => {
     setStepIndex(Math.max(0, Math.min(steps.length - 1, nextIndex)));
@@ -268,6 +277,10 @@ export function ReadmeSteps({ title, steps }: Props) {
                 key={item.title}
                 type="button"
                 className={`step-tab ${index === stepIndex ? "step-tab-active" : ""}`}
+                aria-current={index === stepIndex ? "step" : undefined}
+                ref={(element) => {
+                  stepTabsRef.current[index] = element;
+                }}
                 onClick={() => goToStep(index)}
               >
                 <span className="step-number">{index + 1}</span>

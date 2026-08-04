@@ -4,7 +4,7 @@
   "private": true,
   "packageManager": "yarn@1.22.22",
   "scripts": {
-    "dev": "next dev --port 3005",
+    "dev": "next dev --port 3004",
     "build": "next build",
     "start": "next start",
     "lint": "eslint"
