@@ -3,11 +3,11 @@
 This guide is for teams that want to create Spot orders from any application or service.
 The integration has five core operations:
 
-1. Build a RePermit EIP-712 order with `buildRePermitOrderData`.
+1. Build a RePermit EIP-712 order.
 2. Ask the user, wallet, or custody system to sign that EIP-712 typed data.
-3. Submit the signed order to Order Sink with `submitOrder`, or POST the same payload directly.
-4. Fetch orders from Order Sink by `swapper`, `chainId`, and `config.adapter`.
-5. Cancel an order on-chain by calling RePermit `cancel(bytes32[])` with `metadata.repermitDigest`.
+3. Submit the signed order to Order Sink.
+4. Fetch orders from Order Sink for the swapper, chain ID, and adapter.
+5. Cancel an order on-chain when needed.
 
 ## Concepts
 
@@ -22,7 +22,6 @@ The integration has five core operations:
 ## Integration Examples
 
 - [Live demo](https://orbs-spot.vercel.app/?tab=twap)
-- [spot-ui web app](https://github.com/orbs-network/spot-ui/blob/master/apps/web)
 - [orbs-network/orbs-spot](https://github.com/orbs-network/orbs-spot)
 
 ## Function Contracts
