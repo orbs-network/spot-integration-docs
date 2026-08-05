@@ -3,11 +3,11 @@
 This guide is for integrating Spot order creation, submission, fetching, and cancellation into Ginco Wallet.
 The integration has five core operations:
 
-1. Build a RePermit EIP-712 order with `buildRePermitOrderData`.
+1. Build a RePermit EIP-712 order.
 2. Ask the user, wallet, or custody system to sign that EIP-712 typed data.
-3. Submit the signed order to Order Sink with `submitOrder`, or POST the same payload directly.
-4. Fetch orders from Order Sink by `swapper`, `chainId`, and the Ginco adapter.
-5. Cancel an order on-chain by calling RePermit `cancel(bytes32[])` with `metadata.repermitDigest`.
+3. Submit the signed order to Order Sink.
+4. Fetch orders from Order Sink for the swapper, chain ID, and adapter.
+5. Cancel an order on-chain when needed.
 
 ## Concepts
 
