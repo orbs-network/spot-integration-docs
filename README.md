@@ -1,12 +1,12 @@
-# Spot Integration
+# Spot Integration for Ginco Wallet
 
-This guide is for teams that want to create Spot orders from any application or service.
+This guide is for integrating Spot order creation, submission, fetching, and cancellation into Ginco Wallet.
 The integration has five core operations:
 
 1. Build a RePermit EIP-712 order with `buildRePermitOrderData`.
 2. Ask the user, wallet, or custody system to sign that EIP-712 typed data.
 3. Submit the signed order to Order Sink with `submitOrder`, or POST the same payload directly.
-4. Fetch orders from Order Sink by `swapper`, `chainId`, and `config.adapter`.
+4. Fetch orders from Order Sink by `swapper`, `chainId`, and the Ginco adapter.
 5. Cancel an order on-chain by calling RePermit `cancel(bytes32[])` with `metadata.repermitDigest`.
 
 ## Concepts
@@ -21,7 +21,7 @@ The integration has five core operations:
 
 ## Integration Examples
 
-- [Live demo](https://orbs-spot.vercel.app/?tab=twap)
+- [Live demo](https://ginco-spot.vercel.app/)
 - [spot-ui web app](https://github.com/orbs-network/spot-ui/blob/master/apps/web)
 - [orbs-network/orbs-spot](https://github.com/orbs-network/orbs-spot)
 
@@ -50,9 +50,9 @@ This document describes the behavior of two functions. Your implementation can b
 
 Your integration must know the RePermit contract, reactor, executor, exchange adapter, and fee reference addresses for the relevant partner and chain.
 
-## Partner Chain Config
+## Partner Config
 
-Every integration must provide a partner-chain config before building orders. These values are not discovered from Order Sink at submit time; they must be supplied by the integrating team for the chain and partner they support.
+Every integration must provide a partner config before building orders. These values are not discovered from Order Sink at submit time; they must be supplied by the integrating team for the chain and partner they support.
 
 | Config value | Used in signed payload | Meaning |
 | --- | --- | --- |
@@ -62,16 +62,21 @@ Every integration must provide a partner-chain config before building orders. Th
 | `adapter` | `order.witness.exchange.adapter` | Exchange adapter address for the partner integration. |
 | `fee` | `order.witness.exchange.ref` | Fee or referral reference address encoded into the signed exchange metadata. |
 
-Example config object:
+Ginco config object:
 
-```json
-{
-  "repermit": "0xRePermit...",
-  "reactor": "0xReactor...",
-  "executor": "0xExecutor...",
-  "adapter": "0xAdapter...",
-  "fee": "0xFeeReference..."
-}
+```ts
+const config = {
+  wm: "0x0005d5cE0dB57e5BE3b2b8b6FeB75f0ccd015000",
+  repermit: "0x00002a9C4D9497df5Bd31768eC5d30eEf5405000",
+  cosigner: "0x000ECFa392ecDEfEE6e2a5C095d39B7A32f1E000",
+  reactor: "0x000000b33fE4fB9d999Dd684F79b110731c3d000",
+  executor: "0x000642A0966d9bd49870D9519f76b5cf823f3000",
+  refinery: "0x000E474c0D7084EAA35A501035E73269f4b009A5",
+  adapter: "0x96604C3E846BBa75c43B5518bd076851e5484197",
+  type: "universal",
+  fee: "0xCf2eB80A89A69aB17e295aeF033Ffe9564736155",
+  partner: "ginco",
+};
 ```
 
 The config must match the `chainId` in both `domain.chainId` and `order.witness.chainid`. A mismatched config can produce a signature that Order Sink rejects or an order that cannot execute.
@@ -91,7 +96,7 @@ Before signing and submitting:
 
 `buildRePermitOrderData` should return the EIP-712 payload the user signs:
 
-The contract addresses in the generated payload come from the partner-chain config: `domain.verifyingContract` from `config.repermit`; `order.spender` and `order.witness.reactor` from `config.reactor`; `order.witness.executor` from `config.executor`; `order.witness.exchange.adapter` from `config.adapter`; and `order.witness.exchange.ref` from `config.fee`.
+The contract addresses in the generated payload come from the partner config: `domain.verifyingContract` from `config.repermit`; `order.spender` and `order.witness.reactor` from `config.reactor`; `order.witness.executor` from `config.executor`; `order.witness.exchange.adapter` from `config.adapter`; and `order.witness.exchange.ref` from `config.fee`.
 
 ```js
 {
@@ -99,7 +104,7 @@ The contract addresses in the generated payload come from the partner-chain conf
     "name": "RePermit",
     "version": "1",
     "chainId": 137,
-    "verifyingContract": "0xRePermit..." // from config.repermit
+    "verifyingContract": "0x00002a9C4D9497df5Bd31768eC5d30eEf5405000" // from config.repermit
   },
   "types": { "...": "see EIP712_TYPES below" },
   "primaryType": "RePermitWitnessTransferFrom",
@@ -108,15 +113,15 @@ The contract addresses in the generated payload come from the partner-chain conf
       "token": "0xSourceToken...",
       "amount": "1000000000000000000"
     },
-    "spender": "0xReactor...", // from config.reactor
+    "spender": "0x000000b33fE4fB9d999Dd684F79b110731c3d000", // from config.reactor
     "nonce": "1785273600000",
     "deadline": "1785878400",
     "witness": {
-      "reactor": "0xReactor...", // from config.reactor
-      "executor": "0xExecutor...", // from config.executor
+      "reactor": "0x000000b33fE4fB9d999Dd684F79b110731c3d000", // from config.reactor
+      "executor": "0x000642A0966d9bd49870D9519f76b5cf823f3000", // from config.executor
       "exchange": {
-        "adapter": "0xAdapter...", // from config.adapter
-        "ref": "0xFeeReference...", // from config.fee
+        "adapter": "0x96604C3E846BBa75c43B5518bd076851e5484197", // from config.adapter
+        "ref": "0xCf2eB80A89A69aB17e295aeF033Ffe9564736155", // from config.fee
         "share": 0,
         "data": "0x"
       },
@@ -176,7 +181,6 @@ function buildRePermitOrderData({
   srcAmountPerTrade,
   dstMinAmountPerTrade = "0",
   triggerAmountPerTrade = "0",
-  config,
   module,
   freshnessSeconds = 60,
 }) {
@@ -196,15 +200,15 @@ function buildRePermitOrderData({
       token: srcToken,
       amount: srcAmount,
     },
-    spender: config.reactor, // from config.reactor
+    spender: "0x000000b33fE4fB9d999Dd684F79b110731c3d000", // from config.reactor
     nonce,
     deadline,
     witness: {
-      reactor: config.reactor, // from config.reactor
-      executor: config.executor, // from config.executor
+      reactor: "0x000000b33fE4fB9d999Dd684F79b110731c3d000", // from config.reactor
+      executor: "0x000642A0966d9bd49870D9519f76b5cf823f3000", // from config.executor
       exchange: {
-        adapter: config.adapter, // from config.adapter
-        ref: config.fee, // from config.fee
+        adapter: "0x96604C3E846BBa75c43B5518bd076851e5484197", // from config.adapter
+        ref: "0xCf2eB80A89A69aB17e295aeF033Ffe9564736155", // from config.fee
         share: 0,
         data: "0x",
       },
@@ -237,7 +241,7 @@ function buildRePermitOrderData({
       name: "RePermit",
       version: "1",
       chainId,
-      verifyingContract: config.repermit, // from config.repermit
+      verifyingContract: "0x00002a9C4D9497df5Bd31768eC5d30eEf5405000", // from config.repermit
     },
     types: EIP712_TYPES,
     primaryType: REPERMIT_PRIMARY_TYPE,
@@ -396,49 +400,33 @@ The user signs the returned EIP-712 payload with their wallet, custody system, o
 
 The signed message must be exactly `order`, using the returned `domain`, `types`, and `primaryType`. The signer address must match `order.witness.swapper`.
 
-Order Sink expects the signature as `{ v, r, s }`, not as a single signature string. If your signing library already returns those components, use them directly. Otherwise split the hex signature:
+Order Sink expects the signature as an object with hex `v`, `r`, and `s` fields, not as a single signature string:
 
-```text
-standard 65-byte hex signature:
-  r = first 32 bytes
-  s = next 32 bytes
-  v = final byte, encoded as hex such as "0x1b" or "0x1c"
-
-compact EIP-2098 64-byte hex signature:
-  r = first 32 bytes
-  recover v from the high bit of s
-  clear the high bit from s before sending it
+```json
+{
+  "v": "0x1b",
+  "r": "0x...",
+  "s": "0x..."
+}
 ```
 
-Example signing helper:
+For a standard 65-byte ECDSA signature, send:
+
+```text
+r: first 32 bytes
+s: next 32 bytes
+v: final byte, encoded as hex such as "0x1b" or "0x1c"
+```
+
+For a compact EIP-2098 64-byte signature, recover `v` from the high bit of `s`, then clear that high bit from `s` before sending the signature to Order Sink.
+
+Example signing flow:
 
 ```js
-function splitSignature(signatureHex) {
-  const raw = signatureHex.replace(/^0x/, "");
-
-  if (raw.length === 128) {
-    const r = `0x${raw.slice(0, 64)}`;
-    const sHigh = parseInt(raw.charAt(64), 16);
-    const v = (sHigh >> 3) + 27;
-    const s = `0x${(sHigh & 0x7).toString(16)}${raw.slice(65, 128)}`;
-    return { v: `0x${v.toString(16)}`, r, s };
-  }
-
-  if (raw.length !== 130) {
-    throw new Error(`Unsupported signature length: ${raw.length / 2} bytes`);
-  }
-
-  return {
-    r: `0x${raw.slice(0, 64)}`,
-    s: `0x${raw.slice(64, 128)}`,
-    v: `0x${Number.parseInt(raw.slice(128, 130), 16).toString(16)}`,
-  };
-}
-
 async function signOrder({ signer, orderInput }) {
   const orderData = buildRePermitOrderData(orderInput);
 
-  const signatureHex = await signer.signTypedData({
+  const signature = await signer.signTypedData({
     domain: orderData.domain,
     types: orderData.types,
     primaryType: orderData.primaryType,
@@ -447,7 +435,7 @@ async function signOrder({ signer, orderInput }) {
 
   return {
     orderData,
-    signature: splitSignature(signatureHex),
+    signature,
   };
 }
 ```
@@ -485,10 +473,8 @@ A successful response contains `success: true` and a `signedOrder` object. Treat
 Example submit helper:
 
 ```js
-const ORDER_SINK_URL = "https://order-sink-v2.orbs.network";
-
 async function submitOrder({ order, signature }) {
-  const response = await fetch(`${ORDER_SINK_URL}/orders/new`, {
+  const response = await fetch("https://order-sink-v2.orbs.network/orders/new", {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -520,7 +506,7 @@ async function signAndSubmitOrder({ signer, orderInput }) {
 }
 ```
 
-`orderInput` is the object your backend or application passes to `buildRePermitOrderData`. It includes the partner-chain `config` and the signed order values such as swapper, tokens, amounts, deadline, slippage, limits, and triggers. Do not send `orderInput` to Order Sink; only send the generated `orderData.order` with the user signature.
+`orderInput` is the object your backend or application passes to `buildRePermitOrderData`. It includes the partner `config` and the signed order values such as swapper, tokens, amounts, deadline, slippage, limits, and triggers. Do not send `orderInput` to Order Sink; only send the generated `orderData.order` with the user signature.
 
 Successful response shape:
 
@@ -554,34 +540,25 @@ Order submission is not an on-chain transaction from the user. The user signs of
 
 ## Fetch Order Sink Orders
 
-Fetch RePermit orders from Order Sink with the swapper address, chain ID, and exchange adapter from config. The `swapper` query value is the order owner address, matching `order.witness.swapper`. The `exchange` query value should be `config.adapter`.
+Fetch RePermit orders from Order Sink with the swapper address, chain ID, and Ginco exchange adapter. The `swapper` query value is the order owner address, matching `order.witness.swapper`. The `exchange` query value should be the Ginco `config.adapter`.
 
 ```text
-GET https://order-sink-v2.orbs.network/orders?swapper=0xUserAddress...&chainId=137&exchange=<config.adapter>
+GET https://order-sink-v2.orbs.network/orders?swapper=0xUserAddress...&chainId=137&exchange=0x96604C3E846BBa75c43B5518bd076851e5484197
 Accept: application/json
 ```
 
 Example fetch helper:
 
 ```js
-const ORDER_SINK_URL = "https://order-sink-v2.orbs.network";
-
-async function fetchOrderSinkOrders({ swapper, chainId, config }) {
-  const query = new URLSearchParams({
-    swapper,
-    chainId: String(chainId),
-    exchange: config.adapter, // from config.adapter
-  });
-
-  const response = await fetch(`${ORDER_SINK_URL}/orders?${query.toString()}`, {
-    headers: { Accept: "application/json" },
-  });
+async function fetchOrderSinkOrders({ swapper, chainId }) {
+  const response = await fetch(
+    `https://order-sink-v2.orbs.network/orders?swapper=${swapper}&chainId=${chainId}&exchange=0x96604C3E846BBa75c43B5518bd076851e5484197`,
+    {
+      headers: { Accept: "application/json" },
+    },
+  );
 
   const payload = await response.json().catch(() => ({}));
-
-  if (!response.ok || !Array.isArray(payload.orders)) {
-    throw new Error(payload.message || response.statusText || "Order fetch failed");
-  }
 
   return payload.orders;
 }
@@ -630,7 +607,7 @@ Cancelling a RePermit order is an on-chain transaction. Do not send a cancel req
 Contract:
 
 ```text
-address: config.repermit
+address: 0x00002a9C4D9497df5Bd31768eC5d30eEf5405000
 function: cancel(bytes32[] digests)
 digests: [metadata.repermitDigest]
 ```
@@ -668,7 +645,7 @@ const REPERMIT_CANCEL_ABI = [
   },
 ];
 
-async function cancelOrder({ contractClient, config, orderSinkOrder, signer }) {
+async function cancelOrder({ contractClient, orderSinkOrder, signer }) {
   const repermitDigest = orderSinkOrder.metadata?.repermitDigest;
 
   if (!repermitDigest) {
@@ -676,7 +653,7 @@ async function cancelOrder({ contractClient, config, orderSinkOrder, signer }) {
   }
 
   return contractClient.writeContract({
-    address: config.repermit, // from config.repermit
+    address: "0x00002a9C4D9497df5Bd31768eC5d30eEf5405000", // from config.repermit
     abi: REPERMIT_CANCEL_ABI,
     functionName: "cancel",
     args: [[repermitDigest]],

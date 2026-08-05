@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useSyncExternalStore } from "react";
 import { ChevronLeft, ChevronRight, ExternalLink } from "lucide-react";
 
 export type ReadmeStep = {
@@ -24,6 +24,42 @@ type MarkdownBlock =
 const tokenPattern = /(\[[^\]]+\]\([^)]+\)|`[^`]+`)/g;
 const linkPattern = /^\[([^\]]+)\]\(([^)]+)\)$/;
 const codePattern = /^`([^`]+)`$/;
+const stepQueryParamEvent = "readme-step-query-param-change";
+
+function clampStepIndex(index: number, stepCount: number) {
+  return Math.max(0, Math.min(stepCount - 1, index));
+}
+
+function readStepIndexFromUrl(stepCount: number) {
+  const step = new URLSearchParams(window.location.search).get("step");
+  if (!step) return undefined;
+
+  const stepNumber = Number.parseInt(step, 10);
+  if (Number.isNaN(stepNumber)) return undefined;
+
+  return clampStepIndex(stepNumber - 1, stepCount);
+}
+
+function writeStepIndexToUrl(index: number) {
+  const url = new URL(window.location.href);
+  url.searchParams.set("step", String(index + 1));
+  window.history.replaceState(
+    null,
+    "",
+    `${url.pathname}${url.search}${url.hash}`,
+  );
+  window.dispatchEvent(new Event(stepQueryParamEvent));
+}
+
+function subscribeToStepChanges(onStoreChange: () => void) {
+  window.addEventListener("popstate", onStoreChange);
+  window.addEventListener(stepQueryParamEvent, onStoreChange);
+
+  return () => {
+    window.removeEventListener("popstate", onStoreChange);
+    window.removeEventListener(stepQueryParamEvent, onStoreChange);
+  };
+}
 
 function renderInline(text: string) {
   const parts: React.ReactNode[] = [];
@@ -246,7 +282,11 @@ function MarkdownContent({ markdown }: { markdown: string }) {
 }
 
 export function ReadmeSteps({ title, steps }: Props) {
-  const [stepIndex, setStepIndex] = useState(0);
+  const stepIndex = useSyncExternalStore(
+    subscribeToStepChanges,
+    () => readStepIndexFromUrl(steps.length) ?? 0,
+    () => 0,
+  );
   const stepTabsRef = useRef<(HTMLButtonElement | null)[]>([]);
   const step = steps[stepIndex];
   const isFirst = stepIndex === 0;
@@ -261,7 +301,8 @@ export function ReadmeSteps({ title, steps }: Props) {
   }, [stepIndex]);
 
   const goToStep = (nextIndex: number) => {
-    setStepIndex(Math.max(0, Math.min(steps.length - 1, nextIndex)));
+    const nextStepIndex = clampStepIndex(nextIndex, steps.length);
+    writeStepIndexToUrl(nextStepIndex);
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
