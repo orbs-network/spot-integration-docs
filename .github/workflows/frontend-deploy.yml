@@ -16,22 +16,69 @@ on:
       - "vercel.json"
       - ".github/workflows/frontend-deploy.yml"
   workflow_dispatch:
+    inputs:
+      partner:
+        description: "Frontend partner to deploy"
+        required: true
+        type: choice
+        default: default
+        options:
+          - default
+          - ginco
 
 concurrency:
   group: frontend-deploy-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
+  resolve-targets:
+    name: Resolve frontend deploy targets
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.targets.outputs.matrix }}
+    steps:
+      - id: targets
+        name: Build target matrix
+        env:
+          FRONTEND_PARTNER: ${{ github.event_name == 'workflow_dispatch' && inputs.partner || 'all' }}
+        run: |
+          set -euo pipefail
+          default_target='{"partner":"default","name":"default","vercelProjectId":"prj_uMBZSztD2z9Oaoi0n4gMmznXj2cl"}'
+          ginco_target='{"partner":"ginco","name":"VERCEL_PARTNER_GINCO","vercelProjectId":"prj_9dhhB8NSbG2OUQruJ5b2PRntvbrB"}'
+
+          case "$FRONTEND_PARTNER" in
+            default)
+              matrix="{\"target\":[$default_target]}"
+              ;;
+            ginco)
+              matrix="{\"target\":[$ginco_target]}"
+              ;;
+            all)
+              matrix="{\"target\":[$default_target,$ginco_target]}"
+              ;;
+            *)
+              echo "Unsupported frontend partner: $FRONTEND_PARTNER" >&2
+              exit 1
+              ;;
+          esac
+
+          echo "matrix=$matrix" >> "$GITHUB_OUTPUT"
+
   deploy:
-    name: Deploy frontend
+    name: Deploy frontend (${{ matrix.target.partner }})
+    needs: resolve-targets
     runs-on: ubuntu-latest
     environment: production
     permissions:
       contents: read
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJSON(needs.resolve-targets.outputs.matrix) }}
     env:
       VERCEL_ORG_ID: team_t6YZC010wIUd8yFGN6mkglL9
-      VERCEL_PROJECT_ID: prj_uMBZSztD2z9Oaoi0n4gMmznXj2cl
+      VERCEL_PROJECT_ID: ${{ matrix.target.vercelProjectId }}
       VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+      VERCEL_TARGET_NAME: ${{ matrix.target.name }}
 
     steps:
       - name: Checkout
@@ -98,11 +145,11 @@ jobs:
       - name: Build and deploy to Vercel
         run: |
           set -euo pipefail
-          echo "Pulling Vercel production environment"
+          echo "Pulling Vercel production environment for $VERCEL_TARGET_NAME"
           vercel pull --yes --environment=production --token="$VERCEL_TOKEN"
 
-          echo "Building Vercel output"
+          echo "Building Vercel output for $VERCEL_TARGET_NAME"
           vercel build --prod --token="$VERCEL_TOKEN"
 
-          echo "Deploying prebuilt Vercel output"
+          echo "Deploying prebuilt Vercel output for $VERCEL_TARGET_NAME"
           vercel deploy --prebuilt --prod --archive=tgz --token="$VERCEL_TOKEN"
