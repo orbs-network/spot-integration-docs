@@ -1,6 +1,6 @@
-# Spot Integration
+# Spot Integration for Katana
 
-This guide is for teams that want to create Spot orders from any application or service.
+This guide is for integrating Spot order creation, submission, fetching, and cancellation into Katana.
 The integration has five core operations:
 
 1. Build a RePermit EIP-712 order.
@@ -21,7 +21,6 @@ The integration has five core operations:
 
 ## Integration Examples
 
-- [Live demo](https://orbs-spot.vercel.app/?tab=twap)
 - [spot-ui web app](https://github.com/orbs-network/spot-ui/blob/master/apps/web)
 - [orbs-network/orbs-spot](https://github.com/orbs-network/orbs-spot)
 
@@ -48,11 +47,11 @@ This document describes the behavior of two functions. Your implementation can b
 }
 ```
 
-Your integration must know the RePermit contract, reactor, executor, exchange adapter, and fee reference addresses for the relevant partner and chain.
+Your integration must use the Katana RePermit contract, reactor, executor, exchange adapter, and fee reference addresses supplied below.
 
-## Partner Chain Config
+## Katana Config
 
-Before implementation begins, the Spot team should provide the integrating team with a partner-chain config for each supported chain. These values are not discovered from Order Sink at submit time, so the integrating team must use the supplied config when building orders.
+Before implementation begins, the Spot team should provide the integrating team with the config for each supported chain. These values are not discovered from Order Sink at submit time. Use the following Katana config when building orders:
 
 | Config value | Used in signed payload | Meaning |
 | --- | --- | --- |
@@ -62,19 +61,24 @@ Before implementation begins, the Spot team should provide the integrating team 
 | `adapter` | `order.witness.exchange.adapter` | Exchange adapter address for the partner integration. |
 | `fee` | `order.witness.exchange.ref` | Fee or referral reference address encoded into the signed exchange metadata. |
 
-Example config object:
+Katana config object:
 
-```json
-{
-  "repermit": "0xRePermit...",
-  "reactor": "0xReactor...",
-  "executor": "0xExecutor...",
-  "adapter": "0xAdapter...",
-  "fee": "0xFeeReference..."
-}
+```js
+const KATANA_CONFIG = {
+  wm: "0x0005d5cE0dB57e5BE3b2b8b6FeB75f0ccd015000",
+  repermit: "0x00002a9C4D9497df5Bd31768eC5d30eEf5405000",
+  cosigner: "0x000ECFa392ecDEfEE6e2a5C095d39B7A32f1E000",
+  reactor: "0x000000b33fE4fB9d999Dd684F79b110731c3d000",
+  executor: "0x000642A0966d9bd49870D9519f76b5cf823f3000",
+  refinery: "0x000E474c0D7084EAA35A501035E73269f4b009A5",
+  adapter: "0xe7505d43AdF7d44AB11d7eEAF353a85F8169bE6a",
+  type: "universal",
+  fee: "0x7a76704765D366ac2A559e1A1fc1273b834B2cA8",
+  partner: "katana",
+};
 ```
 
-The config must match the `chainId` in both `domain.chainId` and `order.witness.chainid`. A mismatched config can produce a signature that Order Sink rejects or an order that cannot execute.
+Pass `KATANA_CONFIG` as the builder's `config` value. The config must match the `chainId` in both `domain.chainId` and `order.witness.chainid`. A mismatched config can produce a signature that Order Sink rejects or an order that cannot execute.
 
 ## Prerequisites
 
@@ -91,7 +95,7 @@ Before signing and submitting:
 
 `buildRePermitOrderData` should return the EIP-712 payload the user signs:
 
-The contract addresses in the generated payload come from the partner-chain config: `domain.verifyingContract` from `config.repermit`; `order.spender` and `order.witness.reactor` from `config.reactor`; `order.witness.executor` from `config.executor`; `order.witness.exchange.adapter` from `config.adapter`; and `order.witness.exchange.ref` from `config.fee`.
+The contract addresses in the generated payload come from the Katana config: `domain.verifyingContract` from `config.repermit`; `order.spender` and `order.witness.reactor` from `config.reactor`; `order.witness.executor` from `config.executor`; `order.witness.exchange.adapter` from `config.adapter`; and `order.witness.exchange.ref` from `config.fee`.
 
 ```js
 {
@@ -99,7 +103,7 @@ The contract addresses in the generated payload come from the partner-chain conf
     "name": "RePermit",
     "version": "1",
     "chainId": 137,
-    "verifyingContract": "0xRePermit..." // from config.repermit
+    "verifyingContract": "0x00002a9C4D9497df5Bd31768eC5d30eEf5405000" // from config.repermit
   },
   "types": { "...": "see EIP712_TYPES below" },
   "primaryType": "RePermitWitnessTransferFrom",
@@ -108,15 +112,15 @@ The contract addresses in the generated payload come from the partner-chain conf
       "token": "0xSourceToken...",
       "amount": "1000000000000000000"
     },
-    "spender": "0xReactor...", // from config.reactor
+    "spender": "0x000000b33fE4fB9d999Dd684F79b110731c3d000", // from config.reactor
     "nonce": "1785273600000",
     "deadline": "1785878400",
     "witness": {
-      "reactor": "0xReactor...", // from config.reactor
-      "executor": "0xExecutor...", // from config.executor
+      "reactor": "0x000000b33fE4fB9d999Dd684F79b110731c3d000", // from config.reactor
+      "executor": "0x000642A0966d9bd49870D9519f76b5cf823f3000", // from config.executor
       "exchange": {
-        "adapter": "0xAdapter...", // from config.adapter
-        "ref": "0xFeeReference...", // from config.fee
+        "adapter": "0xe7505d43AdF7d44AB11d7eEAF353a85F8169bE6a", // from config.adapter
+        "ref": "0x7a76704765D366ac2A559e1A1fc1273b834B2cA8", // from config.fee
         "share": 0,
         "data": "0x"
       },
@@ -520,7 +524,7 @@ async function signAndSubmitOrder({ signer, orderInput }) {
 }
 ```
 
-`orderInput` is the object your backend or application passes to `buildRePermitOrderData`. It includes the partner-chain `config` and the signed order values such as swapper, tokens, amounts, deadline, slippage, limits, and triggers. Do not send `orderInput` to Order Sink; only send the generated `orderData.order` with the user signature.
+`orderInput` is the object your backend or application passes to `buildRePermitOrderData`. It includes `KATANA_CONFIG` as `config` and the signed order values such as swapper, tokens, amounts, deadline, slippage, limits, and triggers. Do not send `orderInput` to Order Sink; only send the generated `orderData.order` with the user signature.
 
 Successful response shape:
 
@@ -554,10 +558,10 @@ Order submission is not an on-chain transaction from the user. The user signs of
 
 ## Fetch Order Sink Orders
 
-Fetch RePermit orders from Order Sink with the swapper address, chain ID, and exchange adapter from config. The `swapper` query value is the order owner address, matching `order.witness.swapper`. The `exchange` query value should be `config.adapter`.
+Fetch RePermit orders from Order Sink with the swapper address, chain ID, and Katana exchange adapter. The `swapper` query value is the order owner address, matching `order.witness.swapper`. The `exchange` query value should be `KATANA_CONFIG.adapter`.
 
 ```text
-GET https://order-sink-v2.orbs.network/orders?swapper=0xUserAddress...&chainId=137&exchange=<config.adapter>
+GET https://order-sink-v2.orbs.network/orders?swapper=0xUserAddress...&chainId=137&exchange=0xe7505d43AdF7d44AB11d7eEAF353a85F8169bE6a
 Accept: application/json
 ```
 
