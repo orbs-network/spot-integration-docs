@@ -30,7 +30,7 @@ jobs:
       contents: read
     env:
       VERCEL_ORG_ID: team_t6YZC010wIUd8yFGN6mkglL9
-      VERCEL_PROJECT_ID: ${{ vars.VERCEL_PROJECT_ID_KATANA }}
+      VERCEL_PROJECT_ID: prj_nzSej5ScRhLPS3qPACCAz4ntfYCD
       VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
 
     steps:
@@ -70,7 +70,7 @@ jobs:
             exit 1
           fi
           if [ -z "$VERCEL_PROJECT_ID" ]; then
-            echo "Missing GitHub Actions variable: VERCEL_PROJECT_ID_KATANA" >&2
+            echo "Missing VERCEL_PROJECT_ID" >&2
             exit 1
           fi
 
