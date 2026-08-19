@@ -22,6 +22,7 @@ The integration has five core operations:
 ## Integration Examples
 
 - [Live demo](https://orbs-spot.vercel.app/?tab=twap)
+- [spot-ui web app](https://github.com/orbs-network/spot-ui/blob/master/apps/web)
 - [orbs-network/orbs-spot](https://github.com/orbs-network/orbs-spot)
 
 ## Function Contracts
@@ -51,7 +52,7 @@ Your integration must know the RePermit contract, reactor, executor, exchange ad
 
 ## Partner Chain Config
 
-Every integration must provide a partner-chain config before building orders. These values are not discovered from Order Sink at submit time; they must be supplied by the integrating team for the chain and partner they support.
+Before implementation begins, the Spot team should provide the integrating team with a partner-chain config for each supported chain. These values are not discovered from Order Sink at submit time, so the integrating team must use the supplied config when building orders.
 
 | Config value | Used in signed payload | Meaning |
 | --- | --- | --- |
