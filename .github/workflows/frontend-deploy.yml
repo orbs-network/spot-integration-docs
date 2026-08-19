@@ -1,9 +1,9 @@
-name: Deploy frontend
+name: Deploy Katana frontend
 
 on:
   push:
     branches:
-      - main
+      - katana
     paths:
       - "app/**"
       - "components/**"
@@ -23,14 +23,14 @@ concurrency:
 
 jobs:
   deploy:
-    name: Deploy frontend
+    name: Deploy Katana frontend
     runs-on: ubuntu-latest
     environment: production
     permissions:
       contents: read
     env:
       VERCEL_ORG_ID: team_t6YZC010wIUd8yFGN6mkglL9
-      VERCEL_PROJECT_ID: prj_uMBZSztD2z9Oaoi0n4gMmznXj2cl
+      VERCEL_PROJECT_ID: ${{ vars.VERCEL_PROJECT_ID_KATANA }}
       VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
 
     steps:
@@ -70,7 +70,7 @@ jobs:
             exit 1
           fi
           if [ -z "$VERCEL_PROJECT_ID" ]; then
-            echo "Missing VERCEL_PROJECT_ID" >&2
+            echo "Missing GitHub Actions variable: VERCEL_PROJECT_ID_KATANA" >&2
             exit 1
           fi
 
@@ -98,11 +98,11 @@ jobs:
       - name: Build and deploy to Vercel
         run: |
           set -euo pipefail
-          echo "Pulling Vercel production environment"
+          echo "Pulling Katana Vercel production environment"
           vercel pull --yes --environment=production --token="$VERCEL_TOKEN"
 
-          echo "Building Vercel output"
+          echo "Building Katana Vercel output"
           vercel build --prod --token="$VERCEL_TOKEN"
 
-          echo "Deploying prebuilt Vercel output"
+          echo "Deploying prebuilt Katana Vercel output"
           vercel deploy --prebuilt --prod --archive=tgz --token="$VERCEL_TOKEN"
