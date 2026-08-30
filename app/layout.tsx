@@ -3,12 +3,14 @@ import "./globals.css";
 
 export const metadata: Metadata = {
   title: "Spot Integration Docs",
-  description: "Step-by-step integration documentation for Spot Order Sink",
+  description:
+    "Integration documentation for Orbs Liquidity Hub and Spot advanced orders",
 };
 
 export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
+  themeColor: "#08090d",
 };
 
 export default function RootLayout({

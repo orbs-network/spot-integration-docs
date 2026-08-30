@@ -1,13 +1,14 @@
-# Spot Integration
+# Advanced Orders Integration
 
-This guide is for teams that want to create Spot orders from any application or service.
-The integration has five core operations:
+This guide is for teams that want to create Spot advanced orders from any application or service.
+The integration has six core operations:
 
-1. Build a RePermit EIP-712 order.
-2. Ask the user, wallet, or custody system to sign that EIP-712 typed data.
-3. Submit the signed order to Order Sink.
-4. Fetch orders from Order Sink for the swapper, chain ID, and adapter.
-5. Cancel an order on-chain when needed.
+1. Fetch the partner-and-chain RePermit configuration from Order Sink.
+2. Build a RePermit EIP-712 order from that server-provided template.
+3. Ask the user, wallet, or custody system to sign that EIP-712 typed data.
+4. Submit the signed order to Order Sink.
+5. Fetch orders from Order Sink for the swapper, chain ID, and adapter.
+6. Cancel an order on-chain when needed.
 
 ## Concepts
 
@@ -19,62 +20,99 @@ The integration has five core operations:
 | Swapper | User address that owns the order. This must be the EIP-712 signer and is stored at `order.witness.swapper`. |
 | RePermit digest | Order cancellation digest returned by Order Sink as `metadata.repermitDigest`. This is passed to the RePermit `cancel(bytes32[])` function. |
 
-## Integration Examples
+## Integration Resources
 
-- [Live demo](https://orbs-spot.vercel.app/?tab=twap)
-- [spot-ui web app](https://github.com/orbs-network/spot-ui/blob/master/apps/web)
-- [orbs-network/orbs-spot](https://github.com/orbs-network/orbs-spot)
+- [UI](https://orbs-spot.vercel.app/?tab=twap)
+- [Code](https://github.com/orbs-network/orbs-spot/blob/main/components/advanced-order/spot-provider-shell.tsx)
+- [Integration Skill](https://github.com/orbs-network/spot-ui/tree/master/skills/spot-react-integration)
 
 ## Function Contracts
 
-This document describes the behavior of two functions. Your implementation can be in Java, Python, TypeScript, Go, or any other stack.
+This document describes the behavior of three functions. Your implementation can be in Java, Python, TypeScript, Go, or any other stack.
+
+The JavaScript signing and transaction examples use Viem `WalletClient` and `PublicClient` methods directly; they do not require React.
+
+`fetchRePermitData(partner, chainId)` fetches the server-controlled EIP-712 domain, types, primary type, and order template for one partner and chain.
 
 `buildRePermitOrderData(...)` builds the EIP-712 payload the user signs. It returns:
 
 | Field | Purpose |
 | --- | --- |
-| `domain` | EIP-712 domain. Uses `name: "RePermit"`, `version: "1"`, the order chain ID, and the RePermit contract as `verifyingContract`. |
-| `types` | EIP-712 type definitions for the RePermit witness order. |
-| `primaryType` | Always `"RePermitWitnessTransferFrom"`. |
+| `domain` | EIP-712 domain returned by the config API. Pass it through unchanged. |
+| `types` | EIP-712 type definitions returned by the config API. Pass them through unchanged. |
+| `primaryType` | EIP-712 primary type returned by the config API. Currently `"RePermitWitnessTransferFrom"`. |
 | `order` | The message the user signs and the same order object later sent to Order Sink. |
 
 `submitOrder(order, signature)` sends the signed order to Order Sink. It posts:
 
 ```json
 {
-  "signature": { "v": "0x1b", "r": "0x...", "s": "0x..." },
+  "signature": "0xWalletSignature...",
   "order": { "...": "the signed RePermitOrder" },
   "status": "pending"
 }
 ```
 
-Your integration must know the RePermit contract, reactor, executor, exchange adapter, and fee reference addresses for the relevant partner and chain.
+The RePermit contract, reactor, executor, exchange adapter, and fee reference addresses come from the fetched partner configuration. Do not hardcode them in the integration.
 
-## Partner Chain Config
+## Fetch Partner Config
 
-Before implementation begins, the Spot team should provide the integrating team with a partner-chain config for each supported chain. These values are not discovered from Order Sink at submit time, so the integrating team must use the supplied config when building orders.
+Fetch the configuration before building an order. The production endpoint is:
 
-| Config value | Used in signed payload | Meaning |
-| --- | --- | --- |
-| `repermit` | `domain.verifyingContract` | RePermit contract address. Users approve this contract for ERC-20 allowance, and cancellations are sent to this contract. |
-| `reactor` | `order.spender`, `order.witness.reactor` | Reactor contract address. This is the signed permit spender and the reactor encoded in the Spot witness. |
-| `executor` | `order.witness.executor` | Executor address authorized for order execution. |
-| `adapter` | `order.witness.exchange.adapter` | Exchange adapter address for the partner integration. |
-| `fee` | `order.witness.exchange.ref` | Fee or referral reference address encoded into the signed exchange metadata. |
+```text
+GET https://order-sink-v2.orbs.network/config?partner=<partner>&chain=<chainId>
+Accept: application/json
+```
 
-Example config object:
+Use the partner identifier provided by Orbs. If Orbs has not provided one, send the exact value `"unknown"`; do not derive or invent a partner identifier from the application name.
 
-```json
-{
-  "repermit": "0xRePermit...",
-  "reactor": "0xReactor...",
-  "executor": "0xExecutor...",
-  "adapter": "0xAdapter...",
-  "fee": "0xFeeReference..."
+This framework-independent production helper follows the current `spot-ui` request shape:
+
+```js
+const ORDER_SINK_URL = "https://order-sink-v2.orbs.network";
+
+async function fetchRePermitData(partner, chainId) {
+  const query = new URLSearchParams({
+    partner,
+    chain: String(chainId),
+  });
+  const response = await fetch(`${ORDER_SINK_URL}/config?${query.toString()}`, {
+    headers: { Accept: "application/json" },
+  });
+
+  if (!response.ok) {
+    const message = await response.text();
+    throw new Error(
+      `Failed to fetch RePermit data for partner "${partner}" on chain ${chainId}: ${response.status}${message ? ` ${message}` : ""}`,
+    );
+  }
+
+  return response.json();
 }
 ```
 
-The config must match the `chainId` in both `domain.chainId` and `order.witness.chainid`. A mismatched config can produce a signature that Order Sink rejects or an order that cannot execute.
+The response is a `RePermitData` template:
+
+| Response field | Purpose |
+| --- | --- |
+| `domain` | EIP-712 domain, including the chain ID and RePermit contract at `verifyingContract`. |
+| `types` | Complete EIP-712 type definitions. Pass these through unchanged. |
+| `primaryType` | EIP-712 primary type. Pass it through unchanged. |
+| `order` | Partner-and-chain order template containing the reactor, executor, exchange adapter, fee reference, and default fields. |
+| `partner` | Optional server-side partner label. |
+
+The integration-owned fields are filled into a copy of `permitData.order`; server-controlled contract and exchange fields remain unchanged:
+
+| API response path | Used for |
+| --- | --- |
+| `domain.verifyingContract` | RePermit allowance spender and cancellation contract. |
+| `order.spender` | Signed RePermit spender. |
+| `order.witness.reactor` | Reactor encoded in the signed witness. |
+| `order.witness.executor` | Authorized executor. |
+| `order.witness.exchange.adapter` | Partner exchange adapter and order-history filter. |
+| `order.witness.exchange.ref` | Fee or referral reference. |
+
+Cache the response by `partner` and `chainId` if desired. Fetch a different template whenever either value changes. Before signing, confirm that both `permitData.domain.chainId` and `permitData.order.witness.chainid` equal the active `chainId`.
 
 ## Prerequisites
 
@@ -83,15 +121,15 @@ Before signing and submitting:
 - The user must be on the same `chainId` used in the order.
 - Token amounts must be integer decimal strings in token base units, not human-readable decimals. For example, `1.5` tokens with 18 decimals is `"1500000000000000000"`.
 - The signed source token must be an ERC-20 address. If the user starts with a native asset, wrap it first and use the wrapped token address in the signed order.
-- The user must approve the signed source token for the RePermit contract with allowance at least `order.permitted.amount`.
+- The user must approve the signed source token for `permitData.domain.verifyingContract` with allowance at least `order.permitted.amount`.
 - Do not confuse token allowance with the signed permit spender: ERC-20 allowance is granted to the RePermit contract, while `order.spender` is the reactor.
 - The EIP-712 signer must match `order.witness.swapper`.
 
 ## Build the Order
 
-`buildRePermitOrderData` should return the EIP-712 payload the user signs:
+`buildRePermitOrderData` returns the EIP-712 payload the user signs. Start with the fetched `permitData` template and replace only the integration-owned order values.
 
-The contract addresses in the generated payload come from the partner-chain config: `domain.verifyingContract` from `config.repermit`; `order.spender` and `order.witness.reactor` from `config.reactor`; `order.witness.executor` from `config.executor`; `order.witness.exchange.adapter` from `config.adapter`; and `order.witness.exchange.ref` from `config.fee`.
+The generated payload keeps `permitData.domain`, `permitData.types`, `permitData.primaryType`, `permitData.order.spender`, and the server-provided reactor, executor, and exchange fields unchanged.
 
 ```js
 {
@@ -99,24 +137,24 @@ The contract addresses in the generated payload come from the partner-chain conf
     "name": "RePermit",
     "version": "1",
     "chainId": 137,
-    "verifyingContract": "0xRePermit..." // from config.repermit
+    "verifyingContract": "0xRePermit..." // from permitData.domain
   },
-  "types": { "...": "see EIP712_TYPES below" },
+  "types": { "...": "from permitData.types" },
   "primaryType": "RePermitWitnessTransferFrom",
   "order": {
     "permitted": {
       "token": "0xSourceToken...",
       "amount": "1000000000000000000"
     },
-    "spender": "0xReactor...", // from config.reactor
+    "spender": "0xReactor...", // from permitData.order
     "nonce": "1785273600000",
     "deadline": "1785878400",
     "witness": {
-      "reactor": "0xReactor...", // from config.reactor
-      "executor": "0xExecutor...", // from config.executor
+      "reactor": "0xReactor...", // from permitData.order.witness
+      "executor": "0xExecutor...", // from permitData.order.witness
       "exchange": {
-        "adapter": "0xAdapter...", // from config.adapter
-        "ref": "0xFeeReference...", // from config.fee
+        "adapter": "0xAdapter...", // from permitData.order.witness.exchange
+        "ref": "0xFeeReference...", // from permitData.order.witness.exchange
         "share": 0,
         "data": "0x"
       },
@@ -149,8 +187,6 @@ The contract addresses in the generated payload come from the partner-chain conf
 Example implementation adapted from `spot-ui`'s `buildRePermitOrderData`:
 
 ```js
-const REPERMIT_PRIMARY_TYPE = "RePermitWitnessTransferFrom";
-
 const ORDER_MODULE = {
   STOP_LOSS: "STOP_LOSS",
   TAKE_PROFIT: "TAKE_PROFIT",
@@ -171,20 +207,32 @@ function buildRePermitOrderData({
   srcAmount,
   deadlineMillis,
   fillDelayMillis,
-  slippage,
+  totalTrades,
+  slippageBps,
   account,
   srcAmountPerTrade,
   dstMinAmountPerTrade = "0",
   triggerAmountPerTrade = "0",
-  config,
+  permitData,
   module,
   freshnessSeconds = 60,
 }) {
-  const nonce = Date.now().toString();
-  const epoch = Number.parseInt((fillDelayMillis / 1000).toFixed(0), 10);
+  if (
+    permitData.domain.chainId !== chainId ||
+    permitData.order.witness.chainid !== chainId
+  ) {
+    throw new Error("Partner config does not match the active chain");
+  }
+
+  const currentTimeMillis = Date.now();
+  const nonce = currentTimeMillis.toString();
+  const epoch =
+    !totalTrades || totalTrades === 1
+      ? 0
+      : Number.parseInt((fillDelayMillis / 1000).toFixed(0), 10);
   const deadline = toIntegerString(deadlineMillis / 1000);
   const freshness = freshnessSeconds;
-  const start = Math.floor(Date.now() / 1000).toString();
+  const start = Math.floor(currentTimeMillis / 1000).toString();
   const limit = dstMinAmountPerTrade;
   const triggerLower =
     module === ORDER_MODULE.STOP_LOSS ? triggerAmountPerTrade : "0";
@@ -192,37 +240,31 @@ function buildRePermitOrderData({
     module === ORDER_MODULE.TAKE_PROFIT ? triggerAmountPerTrade : "0";
 
   const order = {
+    ...permitData.order,
     permitted: {
+      ...permitData.order.permitted,
       token: srcToken,
       amount: srcAmount,
     },
-    spender: config.reactor, // from config.reactor
     nonce,
     deadline,
     witness: {
-      reactor: config.reactor, // from config.reactor
-      executor: config.executor, // from config.executor
-      exchange: {
-        adapter: config.adapter, // from config.adapter
-        ref: config.fee, // from config.fee
-        share: 0,
-        data: "0x",
-      },
+      ...permitData.order.witness,
       swapper: account,
       nonce,
       start,
       deadline,
-      chainid: chainId,
-      exclusivity: 0,
       epoch,
-      slippage,
+      slippage: slippageBps,
       freshness,
       input: {
+        ...permitData.order.witness.input,
         token: srcToken,
         amount: srcAmountPerTrade,
         maxAmount: srcAmount,
       },
       output: {
+        ...permitData.order.witness.output,
         token: dstToken,
         limit: String(limit || "0"),
         triggerLower: String(triggerLower || "0"),
@@ -233,72 +275,15 @@ function buildRePermitOrderData({
   };
 
   return {
-    domain: {
-      name: "RePermit",
-      version: "1",
-      chainId,
-      verifyingContract: config.repermit, // from config.repermit
-    },
-    types: EIP712_TYPES,
-    primaryType: REPERMIT_PRIMARY_TYPE,
+    ...permitData,
     order,
   };
 }
 ```
 
-The `types` value returned by the builder should be this exact `EIP712_TYPES` object:
+Do not recreate the EIP-712 domain or type definitions locally. Return `domain`, `types`, and `primaryType` from the API response unchanged.
 
-```json
-{
-  "RePermitWitnessTransferFrom": [
-    { "name": "permitted", "type": "TokenPermissions" },
-    { "name": "spender", "type": "address" },
-    { "name": "nonce", "type": "uint256" },
-    { "name": "deadline", "type": "uint256" },
-    { "name": "witness", "type": "Order" }
-  ],
-  "Exchange": [
-    { "name": "adapter", "type": "address" },
-    { "name": "ref", "type": "address" },
-    { "name": "share", "type": "uint32" },
-    { "name": "data", "type": "bytes" }
-  ],
-  "Input": [
-    { "name": "token", "type": "address" },
-    { "name": "amount", "type": "uint256" },
-    { "name": "maxAmount", "type": "uint256" }
-  ],
-  "Order": [
-    { "name": "reactor", "type": "address" },
-    { "name": "executor", "type": "address" },
-    { "name": "exchange", "type": "Exchange" },
-    { "name": "swapper", "type": "address" },
-    { "name": "nonce", "type": "uint256" },
-    { "name": "start", "type": "uint256" },
-    { "name": "deadline", "type": "uint256" },
-    { "name": "chainid", "type": "uint256" },
-    { "name": "exclusivity", "type": "uint32" },
-    { "name": "epoch", "type": "uint32" },
-    { "name": "slippage", "type": "uint32" },
-    { "name": "freshness", "type": "uint32" },
-    { "name": "input", "type": "Input" },
-    { "name": "output", "type": "Output" }
-  ],
-  "Output": [
-    { "name": "token", "type": "address" },
-    { "name": "limit", "type": "uint256" },
-    { "name": "triggerLower", "type": "uint256" },
-    { "name": "triggerUpper", "type": "uint256" },
-    { "name": "recipient", "type": "address" }
-  ],
-  "TokenPermissions": [
-    { "name": "token", "type": "address" },
-    { "name": "amount", "type": "uint256" }
-  ]
-}
-```
-
-`deadlineMillis`, `fillDelayMillis`, and `module` are builder inputs only. They are converted into the signed `deadline`, `epoch`, `triggerLower`, and `triggerUpper` fields; they are not sent as separate fields to Order Sink.
+`deadlineMillis`, `fillDelayMillis`, `totalTrades`, and `module` are builder inputs only. They are converted into the signed `deadline`, `epoch`, `triggerLower`, and `triggerUpper` fields; they are not sent as separate fields to Order Sink. For a single-fill order, `epoch` is `0`.
 
 Do not mutate `order`, `domain`, `types`, or `primaryType` after signing. Any field change changes the signed digest.
 
@@ -310,8 +295,8 @@ Signed domain values:
 
 | Signed value | Meaning |
 | --- | --- |
-| `domain.name` | Constant: `"RePermit"`. |
-| `domain.version` | Constant: `"1"`. |
+| `domain.name` | Server-provided EIP-712 domain name. Currently `"RePermit"`. |
+| `domain.version` | Server-provided EIP-712 domain version. Currently `"1"`. |
 | `domain.chainId` | The chain where the order is valid. |
 | `domain.verifyingContract` | The RePermit contract address. |
 
@@ -347,14 +332,14 @@ The returned `order` is a `RePermitOrder`. This is the object signed by the user
 | `witness.executor` | Executor address authorized for order execution. |
 | `witness.exchange.adapter` | Exchange adapter address. This tells the execution system which adapter/integration should be used for routing fills. |
 | `witness.exchange.ref` | Fee or referral reference address. It is part of the signed exchange metadata. |
-| `witness.exchange.share` | Fee share encoded in the signed exchange metadata. The current builder sets this to `0`. |
-| `witness.exchange.data` | Extra adapter data bytes. The current builder sets this to `"0x"`, meaning no additional adapter data. |
+| `witness.exchange.share` | Fee share supplied by `permitData.order.witness.exchange` and preserved by the builder. |
+| `witness.exchange.data` | Extra adapter data bytes supplied by `permitData.order.witness.exchange` and preserved by the builder. |
 | `witness.swapper` | User address that owns the order. This must match the EIP-712 signer. |
 | `witness.nonce` | Same nonce value as top-level `nonce`. Keeping both values equal ties the Spot witness to the RePermit permit. |
 | `witness.start` | Earliest order start time as a Unix timestamp in seconds, serialized as a decimal string. The current builder uses the current time when the order is built. |
 | `witness.deadline` | Same expiry timestamp as top-level `deadline`, in seconds as a decimal string. |
 | `witness.chainid` | EVM chain ID where the order is valid. This must match the EIP-712 domain chain. |
-| `witness.exclusivity` | Exclusivity setting for execution. The current builder sets this to `0`. |
+| `witness.exclusivity` | Server-provided exclusivity setting preserved from `permitData.order.witness`. |
 | `witness.epoch` | Minimum delay between fills, in seconds. For a one-fill order this is usually `0`. |
 | `witness.slippage` | Slippage tolerance in basis points. For example, `50` means `0.5%` and `100` means `1%`. |
 | `witness.freshness` | Quote/oracle freshness window in seconds. Defaults to `60` unless Orbs explicitly gives the integration a different value. |
@@ -396,49 +381,16 @@ The user signs the returned EIP-712 payload with their wallet, custody system, o
 
 The signed message must be exactly `order`, using the returned `domain`, `types`, and `primaryType`. The signer address must match `order.witness.swapper`.
 
-Order Sink expects the signature as `{ v, r, s }`, not as a single signature string. If your signing library already returns those components, use them directly. Otherwise split the hex signature:
-
-```text
-standard 65-byte hex signature:
-  r = first 32 bytes
-  s = next 32 bytes
-  v = final byte, encoded as hex such as "0x1b" or "0x1c"
-
-compact EIP-2098 64-byte hex signature:
-  r = first 32 bytes
-  recover v from the high bit of s
-  clear the high bit from s before sending it
-```
+Order Sink expects the complete `0x`-prefixed hex signature returned by the wallet. Do not split it into `{ v, r, s }` fields.
 
 Example signing helper:
 
 ```js
-function splitSignature(signatureHex) {
-  const raw = signatureHex.replace(/^0x/, "");
-
-  if (raw.length === 128) {
-    const r = `0x${raw.slice(0, 64)}`;
-    const sHigh = parseInt(raw.charAt(64), 16);
-    const v = (sHigh >> 3) + 27;
-    const s = `0x${(sHigh & 0x7).toString(16)}${raw.slice(65, 128)}`;
-    return { v: `0x${v.toString(16)}`, r, s };
-  }
-
-  if (raw.length !== 130) {
-    throw new Error(`Unsupported signature length: ${raw.length / 2} bytes`);
-  }
-
-  return {
-    r: `0x${raw.slice(0, 64)}`,
-    s: `0x${raw.slice(64, 128)}`,
-    v: `0x${Number.parseInt(raw.slice(128, 130), 16).toString(16)}`,
-  };
-}
-
-async function signOrder({ signer, orderInput }) {
+async function signOrder({ walletClient, account, orderInput }) {
   const orderData = buildRePermitOrderData(orderInput);
 
-  const signatureHex = await signer.signTypedData({
+  const signature = await walletClient.signTypedData({
+    account,
     domain: orderData.domain,
     types: orderData.types,
     primaryType: orderData.primaryType,
@@ -447,7 +399,7 @@ async function signOrder({ signer, orderInput }) {
 
   return {
     orderData,
-    signature: splitSignature(signatureHex),
+    signature,
   };
 }
 ```
@@ -460,7 +412,7 @@ async function signOrder({ signer, orderInput }) {
 
 ```json
 {
-  "signature": { "v": "0x1b", "r": "0x...", "s": "0x..." },
+  "signature": "0xWalletSignature...",
   "order": { "...": "the signed RePermitOrder" },
   "status": "pending"
 }
@@ -474,7 +426,7 @@ Content-Type: application/json
 Accept: application/json
 
 {
-  "signature": { "v": "0x1b", "r": "0x...", "s": "0x..." },
+  "signature": "0xWalletSignature...",
   "order": { "...": "the signed RePermitOrder" },
   "status": "pending"
 }
@@ -510,8 +462,24 @@ async function submitOrder({ order, signature }) {
   return payload.signedOrder;
 }
 
-async function signAndSubmitOrder({ signer, orderInput }) {
-  const { orderData, signature } = await signOrder({ signer, orderInput });
+async function signAndSubmitOrder({
+  partner,
+  chainId,
+  walletClient,
+  account,
+  orderInput,
+}) {
+  const permitData = await fetchRePermitData(partner, chainId);
+  const { orderData, signature } = await signOrder({
+    walletClient,
+    account,
+    orderInput: {
+      ...orderInput,
+      account,
+      chainId,
+      permitData,
+    },
+  });
 
   return submitOrder({
     order: orderData.order,
@@ -520,7 +488,7 @@ async function signAndSubmitOrder({ signer, orderInput }) {
 }
 ```
 
-`orderInput` is the object your backend or application passes to `buildRePermitOrderData`. It includes the partner-chain `config` and the signed order values such as swapper, tokens, amounts, deadline, slippage, limits, and triggers. Do not send `orderInput` to Order Sink; only send the generated `orderData.order` with the user signature.
+`orderInput` contains the integration-owned values such as swapper, tokens, amounts, deadline, slippage in basis points, limits, and triggers. Add the `permitData` returned by the config API before calling `buildRePermitOrderData`. Do not send `orderInput` or the untouched template to Order Sink; send only the generated `orderData.order` with the user signature.
 
 Successful response shape:
 
@@ -542,10 +510,10 @@ Successful response shape:
 
 Submit flow:
 
-1. Build the EIP-712 payload.
-2. Get the user signature over exactly that payload.
-3. Split the signature into `{ v, r, s }` if needed.
-4. POST `{ signature, order, status: "pending" }` to `/orders/new`.
+1. Fetch `permitData` for the partner and chain.
+2. Build the EIP-712 payload from that template.
+3. Get the user signature over exactly that payload.
+4. POST the complete hex signature with `{ signature, order, status: "pending" }` to `/orders/new`.
 5. Store the returned `signedOrder.hash` for tracking.
 6. Store `signedOrder.metadata.repermitDigest` if present; this is the value used for cancellation.
 7. Fetch the order from the Order Sink endpoint when you need the latest status, fills, or cancellation digest.
@@ -554,10 +522,10 @@ Order submission is not an on-chain transaction from the user. The user signs of
 
 ## Fetch Order Sink Orders
 
-Fetch RePermit orders from Order Sink with the swapper address, chain ID, and exchange adapter from config. The `swapper` query value is the order owner address, matching `order.witness.swapper`. The `exchange` query value should be `config.adapter`.
+Fetch RePermit orders from Order Sink with the swapper address, chain ID, and exchange adapter from the fetched template. The `swapper` query value is the order owner address, matching `order.witness.swapper`. The `exchange` query value should be `permitData.order.witness.exchange.adapter`.
 
 ```text
-GET https://order-sink-v2.orbs.network/orders?swapper=0xUserAddress...&chainId=137&exchange=<config.adapter>
+GET https://order-sink-v2.orbs.network/orders?swapper=0xUserAddress...&chainId=137&exchange=<permitData.order.witness.exchange.adapter>
 Accept: application/json
 ```
 
@@ -566,11 +534,11 @@ Example fetch helper:
 ```js
 const ORDER_SINK_URL = "https://order-sink-v2.orbs.network";
 
-async function fetchOrderSinkOrders({ swapper, chainId, config }) {
+async function fetchOrderSinkOrders({ swapper, chainId, permitData }) {
   const query = new URLSearchParams({
     swapper,
     chainId: String(chainId),
-    exchange: config.adapter, // from config.adapter
+    exchange: permitData.order.witness.exchange.adapter,
   });
 
   const response = await fetch(`${ORDER_SINK_URL}/orders?${query.toString()}`, {
@@ -630,7 +598,7 @@ Cancelling a RePermit order is an on-chain transaction. Do not send a cancel req
 Contract:
 
 ```text
-address: config.repermit
+address: permitData.domain.verifyingContract
 function: cancel(bytes32[] digests)
 digests: [metadata.repermitDigest]
 ```
@@ -668,24 +636,37 @@ const REPERMIT_CANCEL_ABI = [
   },
 ];
 
-async function cancelOrder({ contractClient, config, orderSinkOrder, signer }) {
+async function cancelOrder({
+  publicClient,
+  walletClient,
+  permitData,
+  orderSinkOrder,
+  account,
+}) {
   const repermitDigest = orderSinkOrder.metadata?.repermitDigest;
 
   if (!repermitDigest) {
     throw new Error("Missing metadata.repermitDigest on Order Sink order");
   }
 
-  return contractClient.writeContract({
-    address: config.repermit, // from config.repermit
+  const hash = await walletClient.writeContract({
+    address: permitData.domain.verifyingContract,
     abi: REPERMIT_CANCEL_ABI,
     functionName: "cancel",
     args: [[repermitDigest]],
-    account: signer,
+    account,
   });
+
+  const receipt = await publicClient.waitForTransactionReceipt({ hash });
+  if (receipt.status !== "success") {
+    throw new Error("Order cancellation reverted");
+  }
+
+  return hash;
 }
 ```
 
-`orderSinkOrder` is one item from the submitted or fetched Order Sink response. The cancellation digest comes from `orderSinkOrder.metadata.repermitDigest`. Do not use the Order Sink `hash` as the cancel digest.
+`orderSinkOrder` is one item from the submitted or fetched Order Sink response. The cancellation digest comes from `orderSinkOrder.metadata.repermitDigest`. Do not use the Order Sink `hash` as the cancel digest. Use the same `permitData.domain.verifyingContract` that was fetched for the order; retain that address with local order metadata if cancellation may happen later.
 
 Cancellation flow:
 
@@ -700,11 +681,15 @@ The transaction sender should be the same address that signed the original order
 
 ## Operational Checklist
 
+- Fetch `permitData` from `/config` for the active partner and chain; use `"unknown"` if Orbs did not provide a partner identifier, and do not hardcode contract or exchange addresses.
+- Confirm `permitData.domain.chainId` and `permitData.order.witness.chainid` match the connected chain.
+- Preserve the API-provided domain, types, primary type, spender, reactor, executor, and exchange fields.
 - Build the order close to signing time so `nonce`, `start`, and `deadline` are fresh.
 - Use the exact same `order` object for signing and submission.
-- Confirm allowance owner is the signer, spender is the RePermit contract, and allowance is at least `order.permitted.amount`.
+- Confirm allowance owner is the signer, spender is `permitData.domain.verifyingContract`, and allowance is at least `order.permitted.amount`.
 - Confirm `witness.swapper` and the EIP-712 signer are the same address.
 - Confirm all amounts are integer base-unit strings.
 - Confirm `deadline` is in the future and `chainId` matches the connected chain.
 - Store the returned order ID/hash from Order Sink for tracking and cancellation flows.
+- Retain the fetched adapter and RePermit contract address with local order metadata for later history and cancellation operations.
 - Store `metadata.repermitDigest` from fetched orders; it is the digest passed to `cancel(bytes32[])`.

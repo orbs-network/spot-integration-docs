@@ -42,6 +42,26 @@ button {
   font: inherit;
 }
 
+.skip-link {
+  position: fixed;
+  top: 10px;
+  left: 10px;
+  z-index: 100;
+  border: 1px solid var(--accent);
+  border-radius: 6px;
+  background: var(--panel-strong);
+  color: var(--text);
+  padding: 10px 14px;
+  text-decoration: none;
+  transform: translateY(calc(-100% - 20px));
+}
+
+.skip-link:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  transform: translateY(0);
+}
+
 .guide-shell {
   min-height: 100dvh;
   background: var(--background);
@@ -79,10 +99,75 @@ button {
   text-transform: uppercase;
 }
 
+.site-title {
+  margin: 0 0 14px;
+  font-size: 21px;
+  line-height: 1.2;
+  text-wrap: balance;
+}
+
+.guide-section-list {
+  display: grid;
+  gap: 6px;
+}
+
+.guide-section-link {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-height: 58px;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  color: var(--muted);
+  padding: 10px 11px;
+  text-decoration: none;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: var(--accent-soft);
+}
+
+.guide-section-link:hover,
+.guide-section-link-active {
+  border-color: var(--border);
+  background: var(--panel-strong);
+  color: var(--text);
+}
+
+.guide-section-link-active {
+  box-shadow: inset 3px 0 0 var(--accent);
+}
+
+.guide-section-name {
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 1.25;
+}
+
+.guide-section-description {
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+.sidebar-divider {
+  height: 1px;
+  background: var(--border);
+  margin: 14px 0;
+}
+
+.current-guide-label {
+  margin: 0 0 4px;
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
 .guide-title {
   margin: 0 0 16px;
   font-size: 18px;
   line-height: 1.25;
+  text-wrap: balance;
 }
 
 .step-list {
@@ -108,7 +193,9 @@ button {
   line-height: 1.25;
   padding: 8px;
   text-align: left;
+  text-decoration: none;
   touch-action: manipulation;
+  -webkit-tap-highlight-color: var(--accent-soft);
 }
 
 .step-tab:hover,
@@ -158,6 +245,7 @@ button {
   margin: 0;
   color: var(--muted);
   font-size: 14px;
+  font-variant-numeric: tabular-nums;
 }
 
 .step-heading {
@@ -165,6 +253,7 @@ button {
   font-size: 30px;
   line-height: 1.15;
   overflow-wrap: anywhere;
+  text-wrap: balance;
 }
 
 .nav-buttons {
@@ -185,8 +274,10 @@ button {
   cursor: pointer;
   min-width: 44px;
   padding: 0 14px;
+  text-decoration: none;
   touch-action: manipulation;
   user-select: none;
+  -webkit-tap-highlight-color: var(--accent-soft);
 }
 
 .nav-button-icon {
@@ -194,9 +285,28 @@ button {
   padding: 0;
 }
 
-.nav-button:disabled {
+.nav-button:hover {
+  border-color: #3a3f4d;
+  background: var(--panel-strong);
+}
+
+.nav-button:disabled,
+.nav-button-disabled {
   cursor: not-allowed;
   opacity: 0.45;
+}
+
+.guide-section-link:focus-visible,
+.step-tab:focus-visible,
+.nav-button:focus-visible,
+.markdown-link:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.guide-main:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 4px;
 }
 
 .progress-track {
@@ -235,6 +345,7 @@ button {
   color: var(--text);
   font-size: 20px;
   line-height: 1.25;
+  text-wrap: balance;
 }
 
 .markdown-content p,
@@ -442,9 +553,37 @@ tr:last-child td {
     font-size: 11px;
   }
 
-  .guide-title {
-    margin-bottom: 10px;
+  .site-title {
+    margin-bottom: 8px;
     font-size: 16px;
+  }
+
+  .guide-section-list {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 6px;
+  }
+
+  .guide-section-link {
+    justify-content: center;
+    min-height: 44px;
+    padding: 8px 10px;
+  }
+
+  .guide-section-description {
+    display: none;
+  }
+
+  .sidebar-divider {
+    margin: 9px 0 7px;
+  }
+
+  .current-guide-label {
+    display: none;
+  }
+
+  .guide-title {
+    margin-bottom: 8px;
+    font-size: 15px;
   }
 
   .step-list {
@@ -558,6 +697,7 @@ tr:last-child td {
     padding-left: 8px;
   }
 
+  .site-title,
   .guide-title {
     font-size: 14px;
   }
@@ -618,5 +758,12 @@ tr:last-child td {
   .guide-footer .nav-button {
     min-width: 0;
     padding: 0 10px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .progress-fill,
+  .skip-link {
+    transition: none;
   }
 }
