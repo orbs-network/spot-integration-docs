@@ -1,26 +1,30 @@
 import type { Metadata, Viewport } from "next";
+
 import "./globals.css";
 
 export const metadata: Metadata = {
+  applicationName: "Spot Integration Docs",
   title: "Spot Integration Docs",
   description:
-    "Integration documentation for Orbs Liquidity Hub and Spot advanced orders",
+    "Integration guides for Orbs Liquidity Hub and Advanced Orders.",
 };
 
 export const viewport: Viewport = {
-  width: "device-width",
+  colorScheme: "dark",
   initialScale: 1,
-  themeColor: "#08090d",
+  themeColor: "#09090b",
+  width: "device-width",
 };
 
-export default function RootLayout({
-  children,
-}: Readonly<{
-  children: React.ReactNode;
-}>) {
+export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
-    <html lang="en">
-      <body>{children}</body>
+    <html data-scroll-behavior="smooth" lang="en">
+      <body>
+        <a className="skip-link" href="#guide-content">
+          Skip to main content
+        </a>
+        {children}
+      </body>
     </html>
   );
 }

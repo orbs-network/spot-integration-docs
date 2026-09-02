@@ -1,17 +1,19 @@
 {
   "name": "spot-integration-docs",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
   "packageManager": "yarn@1.22.22",
   "scripts": {
     "dev": "next dev --port 3004",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "lucide-react": "^0.555.0",
     "next": "^16.1.0",
+    "prism-react-renderer": "^2.4.1",
     "react": "19.2.0",
     "react-dom": "19.2.0"
   },
