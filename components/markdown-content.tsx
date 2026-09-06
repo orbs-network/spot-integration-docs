@@ -1,24 +1,9 @@
 "use client";
 
-import {
-  Check,
-  Clipboard,
-  Code2,
-  ExternalLink,
-  Maximize2,
-  Minimize2,
-} from "lucide-react";
-import { Highlight, themes, type Language } from "prism-react-renderer";
-import {
-  Children,
-  type ReactNode,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-} from "react";
+import { ExternalLink } from "lucide-react";
+import { type ReactNode, useMemo } from "react";
 
-import { useContainedWheelScroll } from "@/lib/use-contained-wheel-scroll";
+import { CodeBlock } from "@/components/code-viewer";
 
 type MarkdownBlock =
   | { code: string; language: string; type: "code" }
@@ -31,14 +16,6 @@ type MarkdownBlock =
 const TOKEN_PATTERN = /(\[[^\]]+\]\([^)]+\)|`[^`]+`)/g;
 const LINK_PATTERN = /^\[([^\]]+)\]\(([^)]+)\)$/;
 const CODE_PATTERN = /^`([^`]+)`$/;
-const LANGUAGE_ALIASES: Readonly<Record<string, Language>> = {
-  js: "javascript",
-  sh: "bash",
-  shell: "bash",
-  text: "plain",
-  ts: "typescript",
-};
-
 function parseTableRow(row: string): string[] {
   return row
     .trim()
@@ -228,143 +205,20 @@ function renderInline(text: string, highlightQuery?: string): ReactNode[] {
   return parts;
 }
 
-function CodeBlock({ code, language }: { code: string; language: string }) {
-  const containerRef = useRef<HTMLDivElement>(null);
-  const codeScrollRef = useContainedWheelScroll<HTMLPreElement>();
-  const [copyStatus, setCopyStatus] = useState<"idle" | "copied" | "failed">("idle");
-  const [isFullscreen, setIsFullscreen] = useState(false);
-  const syntaxLanguage = LANGUAGE_ALIASES[language] ?? language;
-
-  useEffect(() => {
-    const onFullscreenChange = () => {
-      setIsFullscreen(document.fullscreenElement === containerRef.current);
-    };
-    document.addEventListener("fullscreenchange", onFullscreenChange);
-    return () => document.removeEventListener("fullscreenchange", onFullscreenChange);
-  }, []);
-
-  useEffect(() => {
-    if (copyStatus === "idle") return;
-    const timeout = window.setTimeout(() => setCopyStatus("idle"), 1800);
-    return () => window.clearTimeout(timeout);
-  }, [copyStatus]);
-
-  const copyCode = async () => {
-    try {
-      await navigator.clipboard.writeText(code);
-      setCopyStatus("copied");
-    } catch {
-      setCopyStatus("failed");
-    }
-  };
-
-  const toggleFullscreen = async () => {
-    if (!containerRef.current) return;
-    if (document.fullscreenElement) {
-      await document.exitFullscreen();
-      return;
-    }
-    await containerRef.current.requestFullscreen();
-  };
-
-  return (
-    <div className="code-block" ref={containerRef}>
-      <div className="code-toolbar">
-        <span className="code-language">
-          <Code2 aria-hidden="true" size={15} />
-          {language}
-        </span>
-        <span className="code-actions">
-          <button aria-label="Copy code" className="code-action" onClick={copyCode} type="button">
-            {copyStatus === "copied" ? <Check aria-hidden="true" size={14} /> : <Clipboard aria-hidden="true" size={14} />}
-            {copyStatus === "copied" ? "Copied" : copyStatus === "failed" ? "Retry" : "Copy"}
-          </button>
-          <button
-            aria-label={isFullscreen ? "Exit full screen" : "Open code in full screen"}
-            className="code-action"
-            onClick={() => void toggleFullscreen()}
-            type="button"
-          >
-            {isFullscreen ? <Minimize2 aria-hidden="true" size={14} /> : <Maximize2 aria-hidden="true" size={14} />}
-            <span className="desktop-only">{isFullscreen ? "Exit" : "Full Screen"}</span>
-          </button>
-        </span>
-      </div>
-      <Highlight code={code} language={syntaxLanguage} theme={themes.oneDark}>
-        {({ className, getLineProps, getTokenProps, style, tokens }) => (
-          <pre
-            className={className}
-            ref={codeScrollRef}
-            style={{ ...style, background: "transparent" }}
-            tabIndex={0}
-          >
-            <code translate="no">
-              {Children.toArray(
-                tokens.map((line, lineIndex) => {
-                  const lineProps = getLineProps({ line });
-                  return (
-                    <span
-                      className={lineProps.className}
-                      key={`line-${lineIndex}`}
-                      style={lineProps.style}
-                    >
-                      <span aria-hidden="true" className="line-number">{lineIndex + 1}</span>
-                      <span className="code-line">
-                        {Children.toArray(
-                          line.map((token, tokenIndex) => {
-                            const tokenProps = getTokenProps({ token });
-                            return (
-                              <span
-                                className={tokenProps.className}
-                                key={`token-${lineIndex}-${tokenIndex}`}
-                                style={tokenProps.style}
-                              >
-                                {token.content}
-                              </span>
-                            );
-                          }),
-                        )}
-                      </span>
-                    </span>
-                  );
-                }),
-              )}
-            </code>
-          </pre>
-        )}
-      </Highlight>
-      <span aria-live="polite" className="sr-only">
-        {copyStatus === "copied" ? "Code copied" : copyStatus === "failed" ? "Code could not be copied" : ""}
-      </span>
-    </div>
-  );
-}
-
 export function MarkdownContent({
-  codeBlocksFirst = false,
   highlightQuery,
   markdown,
 }: {
-  codeBlocksFirst?: boolean;
   highlightQuery?: string;
   markdown: string;
 }) {
   const blocks = useMemo(() => parseBlocks(markdown), [markdown]);
-  const firstCodeIndex = blocks.findIndex((block) => block.type === "code");
-  const orderedBlocks =
-    codeBlocksFirst && firstCodeIndex > 0
-      ? [
-          blocks[firstCodeIndex],
-          ...blocks.slice(0, firstCodeIndex),
-          ...blocks.slice(firstCodeIndex + 1),
-        ]
-      : blocks;
 
   return (
     <div className="markdown-content">
-      {orderedBlocks.map((block, index) => {
+      {blocks.map((block, index) => {
         if (block.type === "heading") {
-          const Heading = block.level >= 4 ? "h4" : "h3";
+          const Heading = block.level >= 4 ? "h3" : "h2";
           return <Heading key={index}>{renderInline(block.text, highlightQuery)}</Heading>;
         }
 

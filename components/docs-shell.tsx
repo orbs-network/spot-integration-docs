@@ -1,7 +1,9 @@
 "use client";
 
 import Image from "next/image";
+import dynamic from "next/dynamic";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import {
   ArrowRight,
   BookOpen,
@@ -13,6 +15,7 @@ import {
 } from "lucide-react";
 import {
   type FormEvent,
+  type KeyboardEvent,
   type MouseEvent,
   useDeferredValue,
   useEffect,
@@ -21,9 +24,29 @@ import {
   useSyncExternalStore,
 } from "react";
 
-import { InteractiveReference } from "@/components/interactive-reference";
 import { HighlightedText, MarkdownContent } from "@/components/markdown-content";
-import type { Guide, GuideId, GuideStep } from "@/lib/guides";
+import { PageActions } from "@/components/page-actions";
+import type {
+  Guide,
+  GuideId,
+  GuideSearchEntry,
+  GuideStep,
+  GuideSummary,
+} from "@/lib/guides";
+import { hasReferenceExample } from "@/lib/reference-keys";
+
+const InteractiveReference = dynamic(() =>
+  import("@/components/interactive-reference").then(
+    (module) => module.InteractiveReference,
+  ),
+  {
+    loading: () => (
+      <p aria-live="polite" className="reference-loading">
+        Loading code example…
+      </p>
+    ),
+  },
+);
 
 const LOCATION_EVENT = "spot-docs-location-change";
 
@@ -32,21 +55,20 @@ const RESOURCES: Record<
   { primaryHref: string; primaryLabel: string; sourceHref: string }
 > = {
   "liquidity-hub": {
-    primaryHref: "https://orbs-spot.vercel.app",
-    primaryLabel: "Open Live Liquidity Hub UI",
+    primaryHref: "https://orbs-spot.vercel.app/?devMode=true",
+    primaryLabel: "Open Interactive Example",
     sourceHref:
       "https://github.com/orbs-network/orbs-spot/blob/main/components/best-trade-form.tsx",
   },
   "advanced-orders-direct": {
-    primaryHref: "https://github.com/orbs-network/spot-integration-docs",
-    primaryLabel: "Open Direct API Reference",
+    primaryHref: "https://orbs-spot.vercel.app/?devMode=true",
+    primaryLabel: "Open Interactive Example",
     sourceHref:
       "https://github.com/orbs-network/spot-ui/tree/master/packages/spot-ui",
   },
   "advanced-orders-react": {
-    primaryHref:
-      "https://github.com/orbs-network/orbs-spot/blob/main/components/advanced-order/spot-provider-shell.tsx",
-    primaryLabel: "Open React Integration",
+    primaryHref: "https://orbs-spot.vercel.app/?devMode=true&tab=twap",
+    primaryLabel: "Open Interactive Example",
     sourceHref:
       "https://github.com/orbs-network/spot-ui/tree/master/packages/spot-react",
   },
@@ -89,21 +111,10 @@ function isModifiedClick(event: MouseEvent<HTMLAnchorElement>): boolean {
   );
 }
 
-function getSearchText(step: GuideStep, supplementalContent = ""): string {
-  return `${step.title} ${supplementalContent} ${step.content}`
-    .replace(/```[\w-]*\n?/g, " ")
-    .replace(/[`#|*_[\]()]/g, " ")
-    .replace(/https?:\/\/\S+/g, " ")
-    .replace(/\s+/g, " ")
-    .trim();
-}
-
 function getSearchExcerpt(
-  step: GuideStep,
+  text: string,
   query: string,
-  supplementalContent = "",
 ): string {
-  const text = getSearchText(step, supplementalContent);
   const matchIndex = text.toLowerCase().indexOf(query);
   if (matchIndex < 0) return text.slice(0, 120);
   const start = Math.max(0, matchIndex - 42);
@@ -111,7 +122,13 @@ function getSearchExcerpt(
   return `${start > 0 ? "…" : ""}${text.slice(start, end)}${end < text.length ? "…" : ""}`;
 }
 
-function GuideNavigation({ activeGuide, guides }: { activeGuide: Guide; guides: Guide[] }) {
+function GuideNavigation({
+  activeGuide,
+  guides,
+}: {
+  activeGuide: Guide;
+  guides: GuideSummary[];
+}) {
   const liquidityHubGuide = guides.find((guide) => guide.id === "liquidity-hub");
   const advancedOrdersGuide = guides.find(
     (guide) => guide.id === "advanced-orders-direct",
@@ -162,7 +179,7 @@ function AdvancedOrdersVariantNavigation({
   guides,
 }: {
   activeGuide: Guide;
-  guides: Guide[];
+  guides: GuideSummary[];
 }) {
   const variants = guides.filter((guide) => guide.id !== "liquidity-hub");
 
@@ -269,13 +286,15 @@ function StepFooter({
 }
 
 export function DocsShell({
-  activeGuideId,
+  activeGuide,
   guides,
+  searchIndex,
 }: {
-  activeGuideId: GuideId;
-  guides: Guide[];
+  activeGuide: Guide;
+  guides: GuideSummary[];
+  searchIndex: GuideSearchEntry[];
 }) {
-  const activeGuide = guides.find((guide) => guide.id === activeGuideId) ?? guides[0];
+  const router = useRouter();
   const hash = useSyncExternalStore(
     subscribeToLocation,
     getHashSnapshot,
@@ -288,18 +307,28 @@ export function DocsShell({
   const contentRef = useRef<HTMLElement>(null);
   const stepRefs = useRef<(HTMLAnchorElement | null)[]>([]);
   const mobileStepRefs = useRef<(HTMLAnchorElement | null)[]>([]);
+  const searchInputRef = useRef<HTMLInputElement>(null);
+  const searchResultRefs = useRef<(HTMLAnchorElement | null)[]>([]);
   const [search, setSearch] = useState("");
   const [highlightQuery, setHighlightQuery] = useState("");
   const deferredSearch = useDeferredValue(search.trim().toLowerCase());
   const introduction = `${activeGuide.intro}\n\n${activeGuide.introReference}`.trim();
-  const searchResults = deferredSearch
-    ? activeGuide.steps.filter((step, index) =>
-        getSearchText(step, index === 0 ? introduction : "")
-          .toLowerCase()
-          .includes(deferredSearch),
-      )
+  const matchingSearchResults = deferredSearch
+    ? searchIndex
+        .filter((entry) => entry.searchText.toLowerCase().includes(deferredSearch))
     : [];
+  const searchResults = matchingSearchResults.slice(0, 10);
   const resources = RESOURCES[activeGuide.id];
+  const hasInteractiveReference = hasReferenceExample(
+    activeGuide.id,
+    activeStep.id,
+  );
+  const updatedAt = new Intl.DateTimeFormat("en", {
+    day: "numeric",
+    month: "short",
+    timeZone: "UTC",
+    year: "numeric",
+  }).format(new Date(`${activeGuide.updatedAt}T00:00:00Z`));
 
   const openStep = (step: GuideStep, query = "") => {
     setHighlightQuery(query);
@@ -329,10 +358,61 @@ export function DocsShell({
     openStep(step);
   };
 
+  const openSearchResult = (result: GuideSearchEntry) => {
+    if (result.guideId !== activeGuide.id) {
+      setHighlightQuery("");
+      setSearch("");
+      router.push(`${result.route}#${result.stepId}`);
+      return;
+    }
+
+    const step = activeGuide.steps.find((candidate) => candidate.id === result.stepId);
+    if (step) openStep(step, deferredSearch);
+  };
+
   const submitSearch = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    if (searchResults[0]) openStep(searchResults[0], deferredSearch);
+    if (searchResults[0]) openSearchResult(searchResults[0]);
   };
+
+  const navigateSearchResults = (
+    event: KeyboardEvent<HTMLAnchorElement>,
+    index: number,
+  ) => {
+    if (event.key === "Escape") {
+      event.preventDefault();
+      setSearch("");
+      searchInputRef.current?.focus();
+      return;
+    }
+
+    if (event.key !== "ArrowDown" && event.key !== "ArrowUp") return;
+    event.preventDefault();
+    const direction = event.key === "ArrowDown" ? 1 : -1;
+    const nextIndex = (index + direction + searchResults.length) % searchResults.length;
+    searchResultRefs.current[nextIndex]?.focus();
+  };
+
+  useEffect(() => {
+    const focusSearch = (event: globalThis.KeyboardEvent) => {
+      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "k") {
+        event.preventDefault();
+        const searchInput = searchInputRef.current;
+        if (!searchInput) return;
+
+        searchInput.scrollIntoView({
+          behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches
+            ? "auto"
+            : "smooth",
+          block: "center",
+        });
+        searchInput.focus({ preventScroll: true });
+        searchInput.select();
+      }
+    };
+    window.addEventListener("keydown", focusSearch);
+    return () => window.removeEventListener("keydown", focusSearch);
+  }, []);
 
   useEffect(() => {
     const activeLink = stepRefs.current[activeStepIndex];
@@ -457,12 +537,18 @@ export function DocsShell({
               {activeGuide.label} · Step {activeStepIndex + 1} of {activeGuide.steps.length}
             </p>
             <div className="guide-title-row">
-              <h1 id="guide-step-title">
-                <HighlightedText query={highlightQuery} text={activeStep.title} />
-              </h1>
+              <div className="guide-heading-row">
+                <h1 id="guide-step-title">
+                  <HighlightedText query={highlightQuery} text={activeStep.title} />
+                </h1>
+                <PageActions
+                  markdownPath={`${activeGuide.route}.md`}
+                  pagePath={activeGuide.route}
+                />
+              </div>
               <form className="guide-search" onSubmit={submitSearch} role="search">
                 <label>
-                  <span className="sr-only">Search this integration guide</span>
+                  <span className="sr-only">Search all integration documentation</span>
                   <Search aria-hidden="true" size={16} />
                   <input
                     aria-controls="guide-search-results"
@@ -473,43 +559,56 @@ export function DocsShell({
                       setHighlightQuery("");
                     }}
                     onKeyDown={(event) => {
-                      if (event.key === "Escape") setSearch("");
+                      if (event.key === "Escape") {
+                        setSearch("");
+                        return;
+                      }
+                      if (event.key === "ArrowDown" && searchResults.length) {
+                        event.preventDefault();
+                        searchResultRefs.current[0]?.focus();
+                      }
                     }}
-                    placeholder="Search this guide…"
+                    placeholder="Search all docs…"
+                    ref={searchInputRef}
                     type="search"
                     value={search}
                   />
+                  <kbd aria-hidden="true">⌘K</kbd>
                 </label>
                 {deferredSearch ? (
                   <div className="search-results" id="guide-search-results">
                     <p aria-live="polite">
-                      {searchResults.length} {searchResults.length === 1 ? "section" : "sections"} found
+                      {matchingSearchResults.length} {matchingSearchResults.length === 1 ? "section" : "sections"} found across all guides
+                      {matchingSearchResults.length > searchResults.length
+                        ? ` · showing first ${searchResults.length}`
+                        : ""}
                     </p>
                     {searchResults.length ? (
                       <ul>
-                        {searchResults.map((step) => {
-                          const index = activeGuide.steps.findIndex((item) => item.id === step.id);
+                        {searchResults.map((result, resultIndex) => {
                           return (
-                            <li key={step.id}>
+                            <li key={`${result.guideId}-${result.stepId}`}>
                               <a
-                                href={`${activeGuide.route}#${step.id}`}
+                                aria-label={`${result.title}, ${result.guideLabel}`}
+                                href={`${result.route}#${result.stepId}`}
                                 onClick={(event) => {
                                   if (isModifiedClick(event)) return;
                                   event.preventDefault();
-                                  openStep(step, deferredSearch);
+                                  openSearchResult(result);
+                                }}
+                                onKeyDown={(event) => navigateSearchResults(event, resultIndex)}
+                                ref={(element) => {
+                                  searchResultRefs.current[resultIndex] = element;
                                 }}
                               >
-                                <span>{index + 1}</span>
+                                <span>{result.stepIndex + 1}</span>
                                 <span>
-                                  <strong><HighlightedText query={deferredSearch} text={step.title} /></strong>
+                                  <strong><HighlightedText query={deferredSearch} text={result.title} /></strong>
+                                  <em>{result.guideLabel}</em>
                                   <small>
                                     <HighlightedText
                                       query={deferredSearch}
-                                      text={getSearchExcerpt(
-                                        step,
-                                        deferredSearch,
-                                        index === 0 ? introduction : "",
-                                      )}
+                                      text={getSearchExcerpt(result.searchText, deferredSearch)}
                                     />
                                   </small>
                                 </span>
@@ -528,7 +627,7 @@ export function DocsShell({
             <p className="guide-name">{activeGuide.title}</p>
             <div className="metadata-row">
               <span>Tested: {activeGuide.metadata}</span>
-              <span>Updated Sep 1, 2026</span>
+              <span>Updated {updatedAt}</span>
               <span>Sample addresses are illustrative</span>
             </div>
           </header>
@@ -545,12 +644,13 @@ export function DocsShell({
           </div>
 
           <article className="guide-article" id={activeStep.id}>
-            <InteractiveReference
-              guideId={activeGuide.id}
-              stepId={activeStep.id}
-            />
+            {hasInteractiveReference ? (
+              <InteractiveReference
+                guideId={activeGuide.id}
+                stepId={activeStep.id}
+              />
+            ) : null}
             <MarkdownContent
-              codeBlocksFirst
               highlightQuery={highlightQuery}
               markdown={activeStep.content}
             />

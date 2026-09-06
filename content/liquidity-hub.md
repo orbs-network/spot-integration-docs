@@ -141,37 +141,7 @@ Important `eip712` fields:
 
 For the number shown as the Liquidity Hub output in the host UI, the reference integration uses `outAmount + (gasAmountOut || "0")` in destination-token base units. Keep route selection on `minAmountOut`; do not compare or execute on the display amount.
 
-If the current DEX minimum output is already available, pass it as `dexMinAmountOut`. If both routes must start at the same time, pass `"-1"` and compare the 2 protected outputs after both settle:
-
-```ts
-const [dexResult, liquidityHubResult] = await Promise.allSettled([
-  getDexQuote({ fromToken, toToken, inAmount, slippage }),
-  liquidityHub.getQuote({
-    fromToken,
-    toToken,
-    inAmount,
-    dexMinAmountOut: "-1",
-    slippage,
-    account,
-    inAmountUsd,
-    signal,
-  }),
-]);
-
-const dexQuote = dexResult.status === "fulfilled" ? dexResult.value : undefined;
-const liquidityHubQuote =
-  liquidityHubResult.status === "fulfilled"
-    ? liquidityHubResult.value
-    : undefined;
-
-const selectedRoute =
-  liquidityHubQuote &&
-  (!dexQuote || BigInt(liquidityHubQuote.minAmountOut) > BigInt(dexQuote.minAmountOut))
-    ? { type: "liquidity-hub", quote: liquidityHubQuote }
-    : dexQuote
-      ? { type: "dex", quote: dexQuote }
-      : undefined;
-```
+If the current DEX minimum output is already available, pass it as `dexMinAmountOut`. If both routes must start at the same time, pass `"-1"` and compare the 2 protected outputs after both settle.
 
 If the host executes the DEX route, call `liquidityHub.analytics.dexSwap(...)` after its transaction succeeds. Do not report an attempted or reverted DEX transaction as a successful fallback.
 

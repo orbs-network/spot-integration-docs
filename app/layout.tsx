@@ -1,12 +1,39 @@
 import type { Metadata, Viewport } from "next";
 
+import { getSiteUrl, SITE_DESCRIPTION, SITE_NAME } from "@/lib/site";
+
 import "./globals.css";
 
 export const metadata: Metadata = {
-  applicationName: "Spot Integration Docs",
-  title: "Spot Integration Docs",
-  description:
-    "Integration guides for Orbs Liquidity Hub and Advanced Orders.",
+  applicationName: SITE_NAME,
+  authors: [{ name: "Orbs" }],
+  category: "technology",
+  creator: "Orbs",
+  description: SITE_DESCRIPTION,
+  keywords: [
+    "Orbs",
+    "Liquidity Hub",
+    "Advanced Orders",
+    "DEX integration",
+    "DeFi",
+  ],
+  metadataBase: getSiteUrl(),
+  openGraph: {
+    description: SITE_DESCRIPTION,
+    siteName: SITE_NAME,
+    title: SITE_NAME,
+    type: "website",
+  },
+  publisher: "Orbs",
+  title: {
+    default: SITE_NAME,
+    template: `%s — ${SITE_NAME}`,
+  },
+  twitter: {
+    card: "summary_large_image",
+    description: SITE_DESCRIPTION,
+    title: SITE_NAME,
+  },
 };
 
 export const viewport: Viewport = {

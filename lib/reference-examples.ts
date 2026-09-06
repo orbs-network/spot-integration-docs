@@ -185,3 +185,5 @@ export const REFERENCE_EXAMPLES = {
     "title": "Advanced Orders Provider"
   }
 } as const satisfies Record<string, ReferenceExample>;
+
+export type ReferenceExampleKey = keyof typeof REFERENCE_EXAMPLES;

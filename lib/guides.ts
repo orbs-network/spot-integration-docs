@@ -23,6 +23,22 @@ export interface Guide {
   route: string;
   steps: GuideStep[];
   title: string;
+  updatedAt: string;
+}
+
+export type GuideSummary = Pick<
+  Guide,
+  "description" | "id" | "label" | "route" | "title"
+>;
+
+export interface GuideSearchEntry {
+  guideId: GuideId;
+  guideLabel: string;
+  route: string;
+  searchText: string;
+  stepId: string;
+  stepIndex: number;
+  title: string;
 }
 
 interface GuideSource {
@@ -36,6 +52,7 @@ interface GuideSource {
   route: string;
   segments: readonly string[];
   stepOrder: readonly string[];
+  updatedAt: string;
 }
 
 export const GUIDE_SOURCES = [
@@ -59,6 +76,7 @@ export const GUIDE_SOURCES = [
     route: "/liquidity-hub",
     segments: ["liquidity-hub"],
     stepOrder: [],
+    updatedAt: "2026-09-01",
   },
   {
     description: "Direct HTTP + EIP-712 integration",
@@ -92,6 +110,7 @@ export const GUIDE_SOURCES = [
       "cancel-order-sink-orders",
       "operational-checklist",
     ],
+    updatedAt: "2026-09-01",
   },
   {
     description: "Provider + hooks for React",
@@ -122,6 +141,7 @@ export const GUIDE_SOURCES = [
     route: "/advanced-orders/react",
     segments: ["advanced-orders", "react"],
     stepOrder: [],
+    updatedAt: "2026-09-01",
   },
 ] as const satisfies readonly GuideSource[];
 
@@ -205,8 +225,59 @@ export function loadGuides(): Guide[] {
       route: source.route,
       steps: parsed.steps,
       title: parsed.title,
+      updatedAt: source.updatedAt,
     };
   });
+}
+
+export function createGuideSummaries(guides: readonly Guide[]): GuideSummary[] {
+  return guides.map(({ description, id, label, route, title }) => ({
+    description,
+    id,
+    label,
+    route,
+    title,
+  }));
+}
+
+function normalizeSearchText(markdown: string): string {
+  return markdown
+    .replace(/```[\s\S]*?```/g, " ")
+    .replace(/\[([^\]]+)\]\([^)]+\)/g, "$1")
+    .replace(/[`#|*_[\]()]/g, " ")
+    .replace(/https?:\/\/\S+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+export function createGuideSearchIndex(
+  guides: readonly Guide[],
+): GuideSearchEntry[] {
+  return guides.flatMap((guide) => {
+    const introduction = `${guide.intro}\n\n${guide.introReference}`.trim();
+
+    return guide.steps.map((step, stepIndex) => ({
+      guideId: guide.id,
+      guideLabel: guide.label,
+      route: guide.route,
+      searchText: normalizeSearchText(
+        `${step.title}\n${stepIndex === 0 ? introduction : ""}\n${step.content}`,
+      ),
+      stepId: step.id,
+      stepIndex,
+      title: step.title,
+    }));
+  });
+}
+
+export function loadGuideMarkdown(guideId: GuideId): string {
+  const source = GUIDE_SOURCES.find((candidate) => candidate.id === guideId);
+  if (!source) return "";
+
+  return fs.readFileSync(
+    path.join(process.cwd(), "content", source.fileName),
+    "utf8",
+  );
 }
 
 export function getGuideIdFromSegments(segments: readonly string[]): GuideId | undefined {

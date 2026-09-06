@@ -26,3 +26,11 @@ yarn build
 ```
 
 Guide content lives in `content/`. Each level-2 Markdown heading becomes a navigable step with a stable hash link.
+
+## Documentation endpoints
+
+- `/llms.txt` returns the complete documentation corpus as Markdown for AI tools.
+- Append `.md` to a guide URL to open its raw Markdown source, for example `/liquidity-hub.md`.
+- `/sitemap.xml` and `/robots.txt` are generated from the guide configuration.
+
+Set `NEXT_PUBLIC_SITE_URL` to the canonical production origin when it differs from the Vercel production URL.
