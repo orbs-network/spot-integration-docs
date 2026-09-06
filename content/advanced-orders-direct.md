@@ -57,7 +57,7 @@ Use this section as the language-independent HTTP contract. The reference at the
 | Fetch history | `GET https://order-sink-v2.orbs.network/orders?swapper={account}&chainId={chainId}&exchange={adapter}`. The adapter comes from the configuration response. |
 | Cancel | Send the on-chain transaction `cancel([metadata.repermitDigest])` to `domain.verifyingContract`; cancellation is not an Order Sink HTTP request. |
 
-`GET /config` returns `domain`, `types`, `primaryType`, and an `order` template. Preserve the domain and types unchanged. Reject the response when `domain.verifyingContract` or `order.witness.exchange.adapter` is missing or the zero address, or when either signed chain ID differs from the connected chain. Encode the partner as a query value and cache a valid response for the lifetime of that partner/chain selection.
+`GET /config` returns `domain`, `types`, `primaryType`, and an `order` template. Preserve the domain and types unchanged. Reject the response when `domain.verifyingContract` or `order.witness.exchange.adapter` is missing or the zero address, or when either signed chain ID differs from the connected chain. Encode the partner as a query value and fetch the current template when preparing an order.
 
 ## Strategy Recipes
 
@@ -74,12 +74,12 @@ Build the order close to signing time. The live Spot builder generates one nonce
 
 ## Create Order
 
-The optional Wagmi v3 reference at the top contains the complete package-free flow. The default `create-order-flow.ts` tab reads current swap values from the host's `useDerivedData()` hook, fetches permit data, prepares funds, builds `signTypedDataArgs` inline, signs, and submits. `order-types.ts` contains the shared contracts. Replace the example hook import with the DEX's existing derived swap-data hook.
+The optional Wagmi v3 reference at the top contains the complete package-free flow. The default `create-order-flow.ts` tab prepares funds and calls `useSignOrder()` without arguments. The `build-order.ts` tab fetches the default permit data and builds the complete order from the host's `useDerivedData()` values; `use-sign-order.ts` signs that result. `order-types.ts` contains the shared contracts. Replace the example hook imports with the DEX's existing derived swap-data and wrapped-token hooks.
 
-1. Fetch the trusted partner and active-chain permit template.
+1. Fetch the default partner and active-chain permit template.
 2. Check allowance, wrap native input when needed, and approve RePermit for `order.permitted.amount` when allowance is insufficient. This Direct API reference uses an exact allowance; use a maximum allowance only as an explicit host security decision.
-3. Build `signTypedDataArgs` inline from the template, connected account, and values returned by `useDerivedData()`, then pass it directly to `walletClient.signTypedData`.
-4. Submit `signTypedDataArgs.message` unchanged as `{ signature, order, status: "pending" }` to `POST /orders/new`.
+3. Call `useSignOrder()` without passing permit data. It reads the current derived values, fetches the default template, builds `signTypedDataArgs`, and signs the resulting order.
+4. Submit the returned `order` unchanged as `{ signature, order, status: "pending" }` to `POST /orders/new`.
 5. Require HTTP and API success, then keep the returned `signedOrder` for progress, history, fills, and cancellation.
 
 Use the partner identifier provided by Orbs. If none was provided, send the exact value `"unknown"`. Token amounts must be integer strings in base units, the signer must match `order.witness.swapper`, and the active chain must match both the EIP-712 domain and witness chain IDs.
