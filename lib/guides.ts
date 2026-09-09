@@ -3,8 +3,12 @@ import path from "node:path";
 
 export type GuideId =
   | "liquidity-hub"
+  | "liquidity-hub-direct"
   | "advanced-orders-direct"
+  | "advanced-orders-sdk"
   | "advanced-orders-react";
+
+export type GuideProductId = "liquidity-hub" | "advanced-orders";
 
 export interface GuideStep {
   content: string;
@@ -19,16 +23,23 @@ export interface Guide {
   intro: string;
   introReference: string;
   label: string;
-  metadata: string;
+  product: GuideProductId;
   route: string;
   steps: GuideStep[];
   title: string;
   updatedAt: string;
+  variantLabel: string;
 }
 
 export type GuideSummary = Pick<
   Guide,
-  "description" | "id" | "label" | "route" | "title"
+  | "description"
+  | "id"
+  | "label"
+  | "product"
+  | "route"
+  | "title"
+  | "variantLabel"
 >;
 
 export interface GuideSearchEntry {
@@ -48,11 +59,12 @@ interface GuideSource {
   id: GuideId;
   introSections: readonly string[];
   label: string;
-  metadata: string;
+  product: GuideProductId;
   route: string;
   segments: readonly string[];
   stepOrder: readonly string[];
   updatedAt: string;
+  variantLabel: string;
 }
 
 export const GUIDE_SOURCES = [
@@ -60,88 +72,155 @@ export const GUIDE_SOURCES = [
     description: "Best-price routing for swaps",
     fileName: "liquidity-hub.md",
     hashAliases: {
-      "end-to-end-flow": "execute-the-full-flow",
-      "execute-swap": "execute-the-full-flow",
-      "execute-and-confirm": "execute-the-full-flow",
+      "end-to-end-flow": "submit-swap",
+      "execute-swap": "submit-swap",
+      "execute-and-confirm": "submit-swap",
+      "execute-the-full-flow": "submit-swap",
       "fallback-and-errors": "errors-and-recovery",
-      "fetch-quote": "request-quotes",
-      "refresh-and-sign": "execute-the-full-flow",
-      "wrap-and-approve": "execute-the-full-flow",
+      "request-quotes": "fetch-quote",
+      "react-wagmi-full-flow": "submit-swap",
+      "refresh-and-sign": "submit-swap",
+      "wrap-and-approve": "submit-swap",
       overview: "install-and-initialize",
     },
     id: "liquidity-hub",
     introSections: ["Concepts", "Integration Resources"],
-    label: "Liquidity Hub",
-    metadata: "SDK 1.0.97",
+    label: "Liquidity Hub · TypeScript SDK",
+    product: "liquidity-hub",
     route: "/liquidity-hub",
     segments: ["liquidity-hub"],
     stepOrder: [],
-    updatedAt: "2026-09-01",
+    updatedAt: "2026-09-08",
+    variantLabel: "TypeScript SDK",
   },
   {
-    description: "Direct HTTP + EIP-712 integration",
+    description: "Direct Liquidity Hub HTTP integration",
+    fileName: "liquidity-hub-direct.md",
+    hashAliases: {
+      endpoint: "quickstart",
+      "api-endpoint": "quickstart",
+      "choose-the-api-endpoint": "quickstart",
+      "fetch-a-liquidity-hub-quote": "fetch-quote",
+      quote: "fetch-quote",
+      compare: "fetch-quote",
+      "compare-with-a-dex-router": "fetch-quote",
+      "optional-compare-with-a-dex-router": "fetch-quote",
+      sign: "submit-swap",
+      submit: "submit-swap",
+      status: "submit-swap",
+      confirmation: "submit-swap",
+      "submit-and-poll-the-swap": "submit-swap",
+      "submit-poll-and-confirm-the-swap": "submit-swap",
+      "prepare-funds-and-sign": "submit-swap",
+      "confirm-the-transaction": "submit-swap",
+      overview: "quickstart",
+    },
+    id: "liquidity-hub-direct",
+    introSections: ["Concepts", "Integration Resources"],
+    label: "Liquidity Hub · Direct API",
+    product: "liquidity-hub",
+    route: "/liquidity-hub/direct",
+    segments: ["liquidity-hub", "direct"],
+    stepOrder: [],
+    updatedAt: "2026-09-08",
+    variantLabel: "Direct API",
+  },
+  {
+    description: "Package-free HTTP + EIP-712 integration",
     fileName: "advanced-orders-direct.md",
     hashAliases: {
       allowance: "create-order",
       "cancel-order": "cancel-order-sink-orders",
-      "core-setup": "fetch-partner-config",
+      "core-setup": "create-order",
       "end-to-end": "create-order",
       "fetch-orders": "fetch-order-sink-orders",
       "build-the-order": "create-order",
       "generated-order-fields": "create-order",
-      overview: "fetch-partner-config",
+      "fetch-partner-config": "create-order",
+      overview: "quickstart",
+      prerequisites: "quickstart",
       "output-limit-and-trigger-rules": "create-order",
-      "protocol-reference": "fetch-partner-config",
+      "protocol-reference": "create-order",
       sign: "create-order",
       submit: "create-order",
       "witness-fields": "create-order",
     },
     id: "advanced-orders-direct",
     introSections: ["Concepts", "Integration Resources"],
-    label: "Advanced Orders · Direct API",
-    metadata: "Order Sink v2",
+    label: "Advanced Orders · API Only",
+    product: "advanced-orders",
     route: "/advanced-orders/direct",
     segments: ["advanced-orders", "direct"],
     stepOrder: [
-      "fetch-partner-config",
+      "quickstart",
       "strategy-recipes",
       "create-order",
       "fetch-order-sink-orders",
       "cancel-order-sink-orders",
       "operational-checklist",
     ],
-    updatedAt: "2026-09-01",
+    updatedAt: "2026-09-08",
+    variantLabel: "API Only",
+  },
+  {
+    description: "Framework-neutral TypeScript SDK integration",
+    fileName: "advanced-orders-sdk.md",
+    hashAliases: {
+      calculate: "calculate-the-order-form",
+      client: "initialize-the-client",
+      create: "prepare-and-submit-an-order",
+      history: "fetch-and-cancel-orders",
+      install: "install-the-typescript-sdk",
+      orders: "fetch-and-cancel-orders",
+      "choose-the-right-integration": "quickstart",
+      overview: "quickstart",
+      submit: "prepare-and-submit-an-order",
+    },
+    id: "advanced-orders-sdk",
+    introSections: ["Concepts", "Integration Resources"],
+    label: "Advanced Orders · TypeScript SDK",
+    product: "advanced-orders",
+    route: "/advanced-orders/typescript",
+    segments: ["advanced-orders", "typescript"],
+    stepOrder: [],
+    updatedAt: "2026-09-08",
+    variantLabel: "TypeScript SDK",
   },
   {
     description: "Provider + hooks for React",
     fileName: "advanced-orders-react.md",
     hashAliases: {
-      callbacks: "submit-modal-and-lifecycle",
-      history: "order-history",
+      callbacks: "submit-and-track-execution",
+      history: "order-history-and-cancellation",
       install: "install-the-react-sdk",
       "install-the-react-package": "install-the-react-sdk",
       "install-the-react-packages": "install-the-react-sdk",
-      "integration-model": "advanced-orders-provider",
-      "lifecycle-and-reset": "submit-modal-and-lifecycle",
-      "order-history-and-cancellation": "order-history",
-      "order-history-details-fills-and-cancellation": "order-history",
-      overview: "prerequisites",
-      "package-guardrails-and-escape-hatches": "order-history",
-      "connect-spotprovider": "advanced-orders-provider",
-      "adapt-wallet-interactions": "advanced-orders-provider",
-      provider: "advanced-orders-provider",
-      submit: "submit-modal-and-lifecycle",
-      "submit-and-show-progress": "submit-modal-and-lifecycle",
-      wallet: "advanced-orders-provider",
+      "integration-model": "configure-spotprovider",
+      "lifecycle-and-reset": "submit-and-track-execution",
+      "order-history": "order-history-and-cancellation",
+      "order-history-details-fills-and-cancellation": "order-history-and-cancellation",
+      overview: "quickstart",
+      prerequisites: "quickstart",
+      "package-guardrails-and-escape-hatches": "order-history-and-cancellation",
+      "advanced-orders-provider": "configure-spotprovider",
+      "connect-spotprovider": "configure-spotprovider",
+      "adapt-wallet-interactions": "implement-wallet-interactions",
+      provider: "configure-spotprovider",
+      submit: "submit-and-track-execution",
+      "submit-and-show-progress": "submit-and-track-execution",
+      "submit-modal-and-lifecycle": "submit-and-track-execution",
+      "build-the-form-with-usespot": "build-with-focused-hooks",
+      wallet: "implement-wallet-interactions",
     },
     id: "advanced-orders-react",
     introSections: ["Integration Resources"],
     label: "Advanced Orders · React SDK",
-    metadata: "spot-react 1.1.45",
+    product: "advanced-orders",
     route: "/advanced-orders/react",
     segments: ["advanced-orders", "react"],
     stepOrder: [],
-    updatedAt: "2026-09-01",
+    updatedAt: "2026-09-08",
+    variantLabel: "React SDK",
   },
 ] as const satisfies readonly GuideSource[];
 
@@ -221,22 +300,25 @@ export function loadGuides(): Guide[] {
       intro: parsed.intro,
       introReference: parsed.introReference,
       label: source.label,
-      metadata: source.metadata,
+      product: source.product,
       route: source.route,
       steps: parsed.steps,
       title: parsed.title,
       updatedAt: source.updatedAt,
+      variantLabel: source.variantLabel,
     };
   });
 }
 
 export function createGuideSummaries(guides: readonly Guide[]): GuideSummary[] {
-  return guides.map(({ description, id, label, route, title }) => ({
+  return guides.map(({ description, id, label, product, route, title, variantLabel }) => ({
     description,
     id,
     label,
+    product,
     route,
     title,
+    variantLabel,
   }));
 }
 

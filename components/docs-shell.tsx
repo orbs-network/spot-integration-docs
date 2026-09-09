@@ -1,6 +1,5 @@
 "use client";
 
-import Image from "next/image";
 import dynamic from "next/dynamic";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -17,6 +16,7 @@ import {
   type FormEvent,
   type KeyboardEvent,
   type MouseEvent,
+  Suspense,
   useDeferredValue,
   useEffect,
   useRef,
@@ -24,8 +24,21 @@ import {
   useSyncExternalStore,
 } from "react";
 
+import { AppHeader } from "@/components/app-header";
 import { HighlightedText, MarkdownContent } from "@/components/markdown-content";
 import { PageActions } from "@/components/page-actions";
+import {
+  usePartnerDocumentation,
+  type PartnerDocumentationState,
+} from "@/features/partner-documentation/use-partner-documentation";
+import {
+  createPartnerDocumentationHref,
+} from "@/features/partner-documentation/query-state";
+import {
+  personalizeDocumentationMarkdown,
+  type PartnerDocumentationConfig,
+  type PartnerDocumentationRequest,
+} from "@/features/partner-documentation/partner-documentation";
 import type {
   Guide,
   GuideId,
@@ -58,10 +71,22 @@ const RESOURCES: Record<
     primaryHref: "https://orbs-spot.vercel.app/?devMode=true",
     primaryLabel: "Open Interactive Example",
     sourceHref:
-      "https://github.com/orbs-network/orbs-spot/blob/main/components/best-trade-form.tsx",
+      "https://github.com/orbs-network/spot-ui/tree/master/packages/liquidity-hub-ui",
+  },
+  "liquidity-hub-direct": {
+    primaryHref: "https://orbs-spot.vercel.app/?devMode=true",
+    primaryLabel: "Open Interactive Example",
+    sourceHref:
+      "https://github.com/orbs-network/spot-ui/tree/master/packages/liquidity-hub-ui/src/lib",
   },
   "advanced-orders-direct": {
     primaryHref: "https://orbs-spot.vercel.app/?devMode=true",
+    primaryLabel: "Open Interactive Example",
+    sourceHref:
+      "https://github.com/orbs-network/spot-ui/tree/master/packages/spot-ui",
+  },
+  "advanced-orders-sdk": {
+    primaryHref: "https://orbs-spot.vercel.app/?devMode=true&tab=twap",
     primaryLabel: "Open Interactive Example",
     sourceHref:
       "https://github.com/orbs-network/spot-ui/tree/master/packages/spot-ui",
@@ -73,6 +98,18 @@ const RESOURCES: Record<
       "https://github.com/orbs-network/spot-ui/tree/master/packages/spot-react",
   },
 };
+
+function createInteractiveExampleHref(
+  href: string,
+  request?: PartnerDocumentationRequest,
+): string {
+  if (!request) return href;
+
+  const url = new URL(href);
+  url.searchParams.set("partner", request.partner);
+  url.searchParams.set("chainId", String(request.chainId));
+  return url.toString();
+}
 
 function subscribeToLocation(onStoreChange: () => void): () => void {
   window.addEventListener("hashchange", onStoreChange);
@@ -86,7 +123,7 @@ function subscribeToLocation(onStoreChange: () => void): () => void {
 }
 
 function getHashSnapshot(): string {
-  return window.location.hash.slice(1);
+  return window.location.hash.slice(1).split("?", 1)[0] ?? "";
 }
 
 function getServerHashSnapshot(): string {
@@ -125,80 +162,62 @@ function getSearchExcerpt(
 function GuideNavigation({
   activeGuide,
   guides,
+  partnerRequest,
 }: {
   activeGuide: Guide;
   guides: GuideSummary[];
+  partnerRequest?: PartnerDocumentationRequest;
 }) {
-  const liquidityHubGuide = guides.find((guide) => guide.id === "liquidity-hub");
-  const advancedOrdersGuide = guides.find(
-    (guide) => guide.id === "advanced-orders-direct",
-  );
-  const options = [
-    liquidityHubGuide
-      ? {
-          active: activeGuide.id === "liquidity-hub",
-          description: "Best-price routing for swaps",
-          guide: liquidityHubGuide,
-          label: "Liquidity Hub",
-        }
-      : undefined,
-    advancedOrdersGuide
-      ? {
-          active: activeGuide.id !== "liquidity-hub",
-          description: "Direct API or React SDK",
-          guide: advancedOrdersGuide,
-          label: "Advanced Orders",
-        }
-      : undefined,
-  ].filter((option) => option !== undefined);
+  const products = [
+    {
+      description: "Best-price swap routing",
+      id: "liquidity-hub" as const,
+      label: "Liquidity Hub",
+    },
+    {
+      description: "Scheduled and conditional orders",
+      id: "advanced-orders" as const,
+      label: "Advanced Orders",
+    },
+  ];
 
   return (
-    <nav aria-label="Integration guides" className="guide-list">
-      {options.map((option) => {
-        return (
-          <Link
-            aria-current={option.active ? "location" : undefined}
-            className={`guide-link${option.active ? " guide-link-active" : ""}`}
-            href={option.guide.route}
-            key={option.label}
-          >
-            <span className="guide-link-marker" />
-            <span className="guide-link-copy">
-              <span className="guide-link-label">{option.label}</span>
-              <span className="guide-link-description">{option.description}</span>
-            </span>
-          </Link>
-        );
-      })}
-    </nav>
-  );
-}
+    <nav aria-label="Integration guides" className="guide-tree">
+      {products.map((product) => {
+        const activeProduct = activeGuide.product === product.id;
+        const variants = guides.filter((guide) => guide.product === product.id);
 
-function AdvancedOrdersVariantNavigation({
-  activeGuide,
-  guides,
-}: {
-  activeGuide: Guide;
-  guides: GuideSummary[];
-}) {
-  const variants = guides.filter((guide) => guide.id !== "liquidity-hub");
-
-  return (
-    <nav
-      aria-label="Advanced Orders integration type"
-      className="variant-list"
-    >
-      {variants.map((guide) => {
-        const active = guide.id === activeGuide.id;
         return (
-          <Link
-            aria-current={active ? "page" : undefined}
-            className={`variant-link${active ? " variant-link-active" : ""}`}
-            href={guide.route}
-            key={guide.id}
+          <div
+            aria-label={`${product.label} integration methods`}
+            className={`guide-product${activeProduct ? " guide-product-active" : ""}`}
+            key={product.id}
+            role="group"
           >
-            {guide.id === "advanced-orders-react" ? "React SDK" : "Direct API"}
-          </Link>
+            <div className="guide-product-heading">
+              <strong>{product.label}</strong>
+              <span>{product.description}</span>
+            </div>
+            <div className="variant-list">
+              {variants.map((guide) => {
+                const active = guide.id === activeGuide.id;
+                return (
+                  <Link
+                    aria-current={active ? "page" : undefined}
+                    className={`variant-link${active ? " variant-link-active" : ""}`}
+                    href={createPartnerDocumentationHref(
+                      guide.route,
+                      partnerRequest,
+                    )}
+                    key={guide.id}
+                  >
+                    <span aria-hidden="true" className="variant-link-marker" />
+                    <span>{guide.variantLabel}</span>
+                  </Link>
+                );
+              })}
+            </div>
+          </div>
         );
       })}
     </nav>
@@ -209,11 +228,13 @@ function StepNavigation({
   activeStepIndex,
   guide,
   onStepClick,
+  partnerRequest,
   stepRefs,
 }: {
   activeStepIndex: number;
   guide: Guide;
   onStepClick: (event: MouseEvent<HTMLAnchorElement>, step: GuideStep) => void;
+  partnerRequest?: PartnerDocumentationRequest;
   stepRefs: React.RefObject<(HTMLAnchorElement | null)[]>;
 }) {
   return (
@@ -224,7 +245,11 @@ function StepNavigation({
           <a
             aria-current={active ? "step" : undefined}
             className={`step-link${active ? " step-link-active" : ""}`}
-            href={`${guide.route}#${step.id}`}
+            href={createPartnerDocumentationHref(
+              guide.route,
+              partnerRequest,
+              step.id,
+            )}
             key={step.id}
             onClick={(event) => onStepClick(event, step)}
             ref={(element) => {
@@ -244,11 +269,13 @@ function StepFooter({
   guide,
   nextStep,
   onStepClick,
+  partnerRequest,
   previousStep,
 }: {
   guide: Guide;
   nextStep?: GuideStep;
   onStepClick: (event: MouseEvent<HTMLAnchorElement>, step: GuideStep) => void;
+  partnerRequest?: PartnerDocumentationRequest;
   previousStep?: GuideStep;
 }) {
   return (
@@ -256,7 +283,11 @@ function StepFooter({
       {previousStep ? (
         <a
           className="step-footer-link"
-          href={`${guide.route}#${previousStep.id}`}
+          href={createPartnerDocumentationHref(
+            guide.route,
+            partnerRequest,
+            previousStep.id,
+          )}
           onClick={(event) => onStepClick(event, previousStep)}
         >
           <ChevronLeft aria-hidden="true" size={16} />
@@ -271,7 +302,11 @@ function StepFooter({
       {nextStep ? (
         <a
           className="step-footer-link step-footer-link-next"
-          href={`${guide.route}#${nextStep.id}`}
+          href={createPartnerDocumentationHref(
+            guide.route,
+            partnerRequest,
+            nextStep.id,
+          )}
           onClick={(event) => onStepClick(event, nextStep)}
         >
           <span>
@@ -285,14 +320,48 @@ function StepFooter({
   );
 }
 
-export function DocsShell({
-  activeGuide,
-  guides,
-  searchIndex,
-}: {
+interface DocsShellProps {
   activeGuide: Guide;
   guides: GuideSummary[];
   searchIndex: GuideSearchEntry[];
+}
+
+const EMPTY_PARTNER_DOCUMENTATION: PartnerDocumentationState = {
+  kind: "none",
+};
+
+function PartnerAwareDocsShell(props: DocsShellProps) {
+  const partnerDocumentation = usePartnerDocumentation();
+  return (
+    <DocsShellContent
+      {...props}
+      partnerDocumentation={partnerDocumentation}
+    />
+  );
+}
+
+export function DocsShell(props: DocsShellProps) {
+  return (
+    <Suspense
+      fallback={
+        <DocsShellContent
+          {...props}
+          partnerDocumentation={EMPTY_PARTNER_DOCUMENTATION}
+        />
+      }
+    >
+      <PartnerAwareDocsShell {...props} />
+    </Suspense>
+  );
+}
+
+function DocsShellContent({
+  activeGuide,
+  guides,
+  partnerDocumentation,
+  searchIndex,
+}: DocsShellProps & {
+  partnerDocumentation: PartnerDocumentationState;
 }) {
   const router = useRouter();
   const hash = useSyncExternalStore(
@@ -300,6 +369,15 @@ export function DocsShell({
     getHashSnapshot,
     getServerHashSnapshot,
   );
+  const partnerRequest =
+    partnerDocumentation.kind === "none"
+      ? undefined
+      : partnerDocumentation.request;
+  const partnerConfig: PartnerDocumentationConfig | undefined =
+    partnerDocumentation.kind === "ready"
+      ? partnerDocumentation.config
+      : undefined;
+  const partnerName = partnerConfig?.partner;
   const activeStepIndex = getStepIndex(activeGuide, hash);
   const activeStep = activeGuide.steps[activeStepIndex] ?? activeGuide.steps[0];
   const previousStep = activeGuide.steps[activeStepIndex - 1];
@@ -312,40 +390,46 @@ export function DocsShell({
   const [search, setSearch] = useState("");
   const [highlightQuery, setHighlightQuery] = useState("");
   const deferredSearch = useDeferredValue(search.trim().toLowerCase());
-  const introduction = `${activeGuide.intro}\n\n${activeGuide.introReference}`.trim();
+  const rawIntroduction = `${activeGuide.intro}\n\n${activeGuide.introReference}`.trim();
+  const introduction = partnerConfig
+    ? personalizeDocumentationMarkdown(rawIntroduction, partnerConfig)
+    : rawIntroduction;
+  const activeStepContent = partnerConfig
+    ? personalizeDocumentationMarkdown(activeStep.content, partnerConfig)
+    : activeStep.content;
   const matchingSearchResults = deferredSearch
     ? searchIndex
         .filter((entry) => entry.searchText.toLowerCase().includes(deferredSearch))
     : [];
   const searchResults = matchingSearchResults.slice(0, 10);
   const resources = RESOURCES[activeGuide.id];
+  const interactiveExampleHref = createInteractiveExampleHref(
+    resources.primaryHref,
+    partnerDocumentation.kind === "ready"
+      ? partnerDocumentation.request
+      : undefined,
+  );
   const hasInteractiveReference = hasReferenceExample(
     activeGuide.id,
     activeStep.id,
   );
-  const updatedAt = new Intl.DateTimeFormat("en", {
-    day: "numeric",
-    month: "short",
-    timeZone: "UTC",
-    year: "numeric",
-  }).format(new Date(`${activeGuide.updatedAt}T00:00:00Z`));
 
   const openStep = (step: GuideStep, query = "") => {
     setHighlightQuery(query);
     setSearch("");
-    window.history.pushState(null, "", `${activeGuide.route}#${step.id}`);
+    window.history.pushState(
+      null,
+      "",
+      createPartnerDocumentationHref(
+        activeGuide.route,
+        partnerRequest,
+        step.id,
+      ),
+    );
     window.dispatchEvent(new Event(LOCATION_EVENT));
     document.getElementById("mobile-guide-menu")?.removeAttribute("open");
     window.requestAnimationFrame(() => {
       contentRef.current?.focus({ preventScroll: true });
-      if (!query) {
-        contentRef.current?.scrollIntoView({
-          behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches
-            ? "auto"
-            : "smooth",
-          block: "start",
-        });
-      }
     });
   };
 
@@ -362,7 +446,13 @@ export function DocsShell({
     if (result.guideId !== activeGuide.id) {
       setHighlightQuery("");
       setSearch("");
-      router.push(`${result.route}#${result.stepId}`);
+      router.push(
+        createPartnerDocumentationHref(
+          result.route,
+          partnerRequest,
+          result.stepId,
+        ),
+      );
       return;
     }
 
@@ -415,6 +505,13 @@ export function DocsShell({
   }, []);
 
   useEffect(() => {
+    const frame = window.requestAnimationFrame(() => {
+      window.scrollTo({ behavior: "auto", left: 0, top: 0 });
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [activeGuide.id, activeStep.id]);
+
+  useEffect(() => {
     const activeLink = stepRefs.current[activeStepIndex];
     const mobileActiveLink = mobileStepRefs.current[activeStepIndex];
     const behavior = window.matchMedia("(prefers-reduced-motion: reduce)").matches
@@ -441,21 +538,7 @@ export function DocsShell({
 
   return (
     <>
-      <header className="app-header">
-        <a
-          aria-label="Orbs Spot"
-          className="app-logo-link"
-          href="https://orbs-spot.vercel.app"
-        >
-          <Image
-            alt="Orbs Swap"
-            height="40"
-            priority
-            src="/orbs-logo.svg"
-            width="160"
-          />
-        </a>
-      </header>
+      <AppHeader />
       <main className="docs-shell">
         <div className="docs-page">
           <div className="docs-layout">
@@ -464,7 +547,7 @@ export function DocsShell({
             <summary>
               <span>
                 <small>
-                  {activeGuide.id === "liquidity-hub"
+                  {activeGuide.product === "liquidity-hub"
                     ? "Liquidity Hub"
                     : "Advanced Orders"}
                 </small>
@@ -476,18 +559,17 @@ export function DocsShell({
               </span>
             </summary>
             <div className="mobile-menu-content">
-              <GuideNavigation activeGuide={activeGuide} guides={guides} />
-              {activeGuide.id !== "liquidity-hub" ? (
-                <AdvancedOrdersVariantNavigation
-                  activeGuide={activeGuide}
-                  guides={guides}
-                />
-              ) : null}
+              <GuideNavigation
+                activeGuide={activeGuide}
+                guides={guides}
+                partnerRequest={partnerRequest}
+              />
               <div className="sidebar-rule" />
               <StepNavigation
                 activeStepIndex={activeStepIndex}
                 guide={activeGuide}
                 onStepClick={navigateToStep}
+                partnerRequest={partnerRequest}
                 stepRefs={mobileStepRefs}
               />
             </div>
@@ -498,28 +580,33 @@ export function DocsShell({
               <span aria-hidden="true" className="brand-mark"><BookOpen size={17} /></span>
               <span>
                 <small>Orbs Spot Docs</small>
-                <strong>Integration Guides</strong>
+                <strong>
+                  {partnerName ? (
+                    <>
+                      <span className="sidebar-partner-name" translate="no">
+                        {partnerName}
+                      </span>{" "}
+                    </>
+                  ) : null}
+                  Integration Guides
+                </strong>
               </span>
             </div>
-            <GuideNavigation activeGuide={activeGuide} guides={guides} />
-            {activeGuide.id !== "liquidity-hub" ? (
-              <div className="variant-section">
-                <p>Integration Type</p>
-                <AdvancedOrdersVariantNavigation
-                  activeGuide={activeGuide}
-                  guides={guides}
-                />
-              </div>
-            ) : null}
+            <GuideNavigation
+              activeGuide={activeGuide}
+              guides={guides}
+              partnerRequest={partnerRequest}
+            />
             <div className="sidebar-rule" />
             <div className="step-list-heading">
-              <span>{activeGuide.label}</span>
-              <span>{activeStepIndex + 1}/{activeGuide.steps.length}</span>
+              <span>{activeGuide.variantLabel} guide</span>
+              <span>Step {activeStepIndex + 1} of {activeGuide.steps.length}</span>
             </div>
             <StepNavigation
               activeStepIndex={activeStepIndex}
               guide={activeGuide}
               onStepClick={navigateToStep}
+              partnerRequest={partnerRequest}
               stepRefs={stepRefs}
             />
           </div>
@@ -590,7 +677,11 @@ export function DocsShell({
                             <li key={`${result.guideId}-${result.stepId}`}>
                               <a
                                 aria-label={`${result.title}, ${result.guideLabel}`}
-                                href={`${result.route}#${result.stepId}`}
+                                href={createPartnerDocumentationHref(
+                                  result.route,
+                                  partnerRequest,
+                                  result.stepId,
+                                )}
                                 onClick={(event) => {
                                   if (isModifiedClick(event)) return;
                                   event.preventDefault();
@@ -624,18 +715,15 @@ export function DocsShell({
                 ) : null}
               </form>
             </div>
-            <p className="guide-name">{activeGuide.title}</p>
-            <div className="metadata-row">
-              <span>Tested: {activeGuide.metadata}</span>
-              <span>Updated {updatedAt}</span>
-              <span>Sample addresses are illustrative</span>
-            </div>
           </header>
 
           {activeStepIndex === 0 && introduction ? (
             <section aria-label={`${activeGuide.label} introduction`} className="guide-introduction">
-              <p className="eyebrow">Before You Start</p>
-              <MarkdownContent highlightQuery={highlightQuery} markdown={introduction} />
+              <MarkdownContent
+                highlightQuery={highlightQuery}
+                markdown={introduction}
+                partnerRequest={partnerRequest}
+              />
             </section>
           ) : null}
 
@@ -647,12 +735,14 @@ export function DocsShell({
             {hasInteractiveReference ? (
               <InteractiveReference
                 guideId={activeGuide.id}
+                partnerConfig={partnerConfig}
                 stepId={activeStep.id}
               />
             ) : null}
             <MarkdownContent
               highlightQuery={highlightQuery}
-              markdown={activeStep.content}
+              markdown={activeStepContent}
+              partnerRequest={partnerRequest}
             />
           </article>
 
@@ -660,6 +750,7 @@ export function DocsShell({
             guide={activeGuide}
             nextStep={nextStep}
             onStepClick={navigateToStep}
+            partnerRequest={partnerRequest}
             previousStep={previousStep}
           />
 
@@ -673,7 +764,7 @@ export function DocsShell({
                 <Github aria-hidden="true" size={15} />
                 View Source
               </a>
-              <a href={resources.primaryHref} rel="noreferrer" target="_blank">
+              <a href={interactiveExampleHref} rel="noreferrer" target="_blank">
                 {resources.primaryLabel}
                 <ArrowRight aria-hidden="true" size={15} />
               </a>

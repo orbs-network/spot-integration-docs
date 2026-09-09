@@ -100,7 +100,7 @@ export default function OpenGraphImage(): ImageResponse {
       >
         <span>Liquidity Hub</span>
         <span>Advanced Orders</span>
-        <span>Direct API · React SDK</span>
+        <span>API · TypeScript SDK · React</span>
       </div>
     </div>,
     size,

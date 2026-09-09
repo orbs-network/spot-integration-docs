@@ -19,7 +19,9 @@ type CopyStatus =
   | "idle";
 
 function getPagePrompt(pagePath: string): string {
-  const url = new URL(pagePath, window.location.origin).toString();
+  const url = new URL(pagePath, window.location.origin);
+  url.search = window.location.search;
+  url.hash = window.location.hash;
   return `Read this documentation page and use it as context for my questions: ${url}`;
 }
 
@@ -82,7 +84,7 @@ export function PageActions({
 
   const copyForCodex = async () => {
     try {
-      await navigator.clipboard.writeText(getPagePrompt(`${pagePath}.md`));
+      await navigator.clipboard.writeText(getPagePrompt(pagePath));
       setStatus("copied-codex");
       setMenuOpen(false);
     } catch {

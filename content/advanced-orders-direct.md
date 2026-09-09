@@ -1,8 +1,14 @@
-# Advanced Orders · Direct API
+# Advanced Orders · API Only
 
 Use this guide when the application should integrate Advanced Orders without installing an Orbs package. The host application owns the interface, wallet integration, request flow, and order lifecycle while calling the Order Sink APIs directly.
 
 This path has no Orbs package dependency and works with any frontend or backend stack. The HTTP and EIP-712 contract is canonical.
+
+**Prefer an SDK when possible.** With the API-only path, the integrating client must calculate, validate, and populate every strategy, amount, schedule, trigger, limit, nonce, deadline, and EIP-712 order field itself. [`@orbs-network/spot-ui`](/advanced-orders/typescript) is the recommended framework-neutral TypeScript option and provides the most flexibility while keeping calculation and protocol construction inside the SDK. [`@orbs-network/spot-react`](/advanced-orders/react) is the easiest option for React applications because it also provides provider-scoped state, focused form hooks, execution, history, and cancellation.
+
+Use API Only when an Orbs package cannot run in the target environment or the host intentionally needs full ownership of the raw HTTP and EIP-712 implementation.
+
+**Input token requirement:** Advanced Orders accepts ERC-20 input tokens only. Never place a native-token address or placeholder in the signed order. If the user selects the chain's native currency, wrap it first and build the order with the wrapped-native ERC-20 address.
 
 ## Concepts
 
@@ -22,7 +28,7 @@ This path has no Orbs package dependency and works with any frontend or backend 
 
 ## Integration Resources
 
-- [UI](https://orbs-spot.vercel.app/?tab=twap)
+- [Playground](https://orbs-spot.vercel.app/?tab=twap)
 - [Direct integration reference](https://github.com/orbs-network/spot-integration-docs)
 
 ### Function Contracts
@@ -46,9 +52,11 @@ The optional full-flow TypeScript example uses Wagmi v3 and Viem for wallet inte
 
 The RePermit contract, reactor, executor, exchange adapter, and fee reference addresses come from the fetched partner configuration. Do not hardcode them in the integration.
 
-## Fetch Partner Config
+## Quickstart
 
-Use this section as the language-independent HTTP contract. The reference at the top shows the complete `GET /config` request and response; the TypeScript tab is an optional implementation of the same request.
+Before implementing the API-only flow, make sure the integration has an active EVM wallet and chain, an ERC-20 input token, and the partner identifier supplied by Orbs. If Orbs did not provide a partner identifier, use the exact value `"unknown"`. When the user selects native currency, wrap it before creating the order.
+
+The API-only integration uses these HTTP and on-chain operations:
 
 | Operation | Contract |
 | --- | --- |
@@ -56,8 +64,6 @@ Use this section as the language-independent HTTP contract. The reference at the
 | Create order | `POST https://order-sink-v2.orbs.network/orders/new` with JSON `{ signature, order, status: "pending" }`. `order` must be the exact EIP-712 message that produced `signature`. |
 | Fetch history | `GET https://order-sink-v2.orbs.network/orders?swapper={account}&chainId={chainId}&exchange={adapter}`. The adapter comes from the configuration response. |
 | Cancel | Send the on-chain transaction `cancel([metadata.repermitDigest])` to `domain.verifyingContract`; cancellation is not an Order Sink HTTP request. |
-
-`GET /config` returns `domain`, `types`, `primaryType`, and an `order` template. Preserve the domain and types unchanged. Reject the response when `domain.verifyingContract` or `order.witness.exchange.adapter` is missing or the zero address, or when either signed chain ID differs from the connected chain. Encode the partner as a query value and fetch the current template when preparing an order.
 
 ## Strategy Recipes
 
@@ -76,8 +82,14 @@ Build the order close to signing time. The live Spot builder generates one nonce
 
 The optional Wagmi v3 reference at the top contains the complete package-free flow. The default `create-order-flow.ts` tab prepares funds and calls `useSignOrder()` without arguments. The `build-order.ts` tab fetches the default permit data and builds the complete order from the host's `useDerivedData()` values; `use-sign-order.ts` signs that result. `order-types.ts` contains the shared contracts. Replace the example hook imports with the DEX's existing derived swap-data and wrapped-token hooks.
 
+### Fetch Partner Config
+
+Every create-order attempt begins with `GET https://order-sink-v2.orbs.network/config?partner={partner}&chain={chainId}`. This returns the server-controlled `domain`, `types`, `primaryType`, and base `order` template used by the `build-order.ts` tab. Encode the partner as a query value and fetch a fresh template for the active chain when preparing the order.
+
+Preserve the returned domain and types unchanged. Reject the response when `domain.verifyingContract` or `order.witness.exchange.adapter` is missing or the zero address, or when either signed chain ID differs from the connected chain. The RePermit contract, reactor, executor, exchange adapter, and fee reference addresses must come from this response rather than local constants.
+
 1. Fetch the default partner and active-chain permit template.
-2. Check allowance, wrap native input when needed, and approve RePermit for `order.permitted.amount` when allowance is insufficient. This Direct API reference uses an exact allowance; use a maximum allowance only as an explicit host security decision.
+2. Ensure the input is an ERC-20 token. If the user selected native currency, wrap it and replace it with the wrapped-native token before building the order. Then check allowance and approve RePermit for `order.permitted.amount` when allowance is insufficient. This API-only reference uses an exact allowance; use a maximum allowance only as an explicit host security decision.
 3. Call `useSignOrder()` without passing permit data. It reads the current derived values, fetches the default template, builds `signTypedDataArgs`, and signs the resulting order.
 4. Submit the returned `order` unchanged as `{ signature, order, status: "pending" }` to `POST /orders/new`.
 5. Require HTTP and API success, then keep the returned `signedOrder` for progress, history, fills, and cancellation.
@@ -92,7 +104,7 @@ Do not recreate the EIP-712 domain, types, protocol contracts, or exchange field
 
 | Field | Meaning |
 | --- | --- |
-| `inputToken.address` | Selected source-token address from the host DEX. The flow replaces it with `wTokenAddress` after wrapping native input. |
+| `inputToken.address` | ERC-20 source-token address used in the signed order. If the user initially selected native currency, replace it with `wTokenAddress` after wrapping; never sign the native-token address or placeholder. |
 | `dstToken` | ERC-20 destination-token address. |
 | `sourceIsNative` | `true` when the user selected native currency and the flow must wrap it before signing. |
 | `totalInputAmount` | Complete order input as an integer source-token base-unit string. This becomes `permitted.amount` and `input.maxAmount`. |
@@ -131,7 +143,7 @@ Do not recreate the EIP-712 domain, types, protocol contracts, or exchange field
 
 Fetch RePermit orders from Order Sink with the swapper address, chain ID, and exchange adapter from the fetched template. The `swapper` query value is the order owner address, matching `order.witness.swapper`. The `exchange` query value should be `permitDataResponse.order.witness.exchange.adapter`.
 
-Use the Request and Response tabs in the `Fetch Order History Request` reference. The Request tab contains the complete fetch helper and a copyable cURL request. The Response tab contains the successful `orders` JSON returned by Order Sink.
+Use the Request and Response tabs in the `Fetch Order History` reference. The Request tab shows the HTTP method, endpoint, and complete query parameters. The Response tab contains the successful `orders` JSON returned by Order Sink.
 
 Important fields for consumers:
 

@@ -4,6 +4,12 @@ import { ExternalLink } from "lucide-react";
 import { type ReactNode, useMemo } from "react";
 
 import { CodeBlock } from "@/components/code-viewer";
+import {
+  createPartnerDocumentationHref,
+} from "@/features/partner-documentation/query-state";
+import type {
+  PartnerDocumentationRequest,
+} from "@/features/partner-documentation/partner-documentation";
 
 type MarkdownBlock =
   | { code: string; language: string; type: "code" }
@@ -148,7 +154,11 @@ export function HighlightedText({ query, text }: { query?: string; text: string 
   return <>{parts}</>;
 }
 
-function renderInline(text: string, highlightQuery?: string): ReactNode[] {
+function renderInline(
+  text: string,
+  highlightQuery?: string,
+  partnerRequest?: PartnerDocumentationRequest,
+): ReactNode[] {
   const parts: ReactNode[] = [];
   let cursor = 0;
 
@@ -170,11 +180,15 @@ function renderInline(text: string, highlightQuery?: string): ReactNode[] {
 
     if (link) {
       const external = /^https?:\/\//.test(link[2]);
+      const href =
+        !external && link[2].startsWith("/") && partnerRequest
+          ? createPartnerDocumentationHref(link[2], partnerRequest)
+          : link[2];
       parts.push(
         <a
           key={`${token}-${match.index}`}
           className="markdown-link"
-          href={link[2]}
+          href={href}
           rel={external ? "noreferrer" : undefined}
           target={external ? "_blank" : undefined}
         >
@@ -208,9 +222,11 @@ function renderInline(text: string, highlightQuery?: string): ReactNode[] {
 export function MarkdownContent({
   highlightQuery,
   markdown,
+  partnerRequest,
 }: {
   highlightQuery?: string;
   markdown: string;
+  partnerRequest?: PartnerDocumentationRequest;
 }) {
   const blocks = useMemo(() => parseBlocks(markdown), [markdown]);
 
@@ -219,11 +235,19 @@ export function MarkdownContent({
       {blocks.map((block, index) => {
         if (block.type === "heading") {
           const Heading = block.level >= 4 ? "h3" : "h2";
-          return <Heading key={index}>{renderInline(block.text, highlightQuery)}</Heading>;
+          return (
+            <Heading key={index}>
+              {renderInline(block.text, highlightQuery, partnerRequest)}
+            </Heading>
+          );
         }
 
         if (block.type === "paragraph") {
-          return <p key={index}>{renderInline(block.text, highlightQuery)}</p>;
+          return (
+            <p key={index}>
+              {renderInline(block.text, highlightQuery, partnerRequest)}
+            </p>
+          );
         }
 
         if (block.type === "list" || block.type === "orderedList") {
@@ -231,7 +255,9 @@ export function MarkdownContent({
           return (
             <List key={index}>
               {block.items.map((item, itemIndex) => (
-                <li key={itemIndex}>{renderInline(item, highlightQuery)}</li>
+                <li key={itemIndex}>
+                  {renderInline(item, highlightQuery, partnerRequest)}
+                </li>
               ))}
             </List>
           );
@@ -242,13 +268,20 @@ export function MarkdownContent({
         }
 
         const [header, ...rows] = block.rows;
+        const isRecoveryTable = header[0] === "Failure" || header[0] === "Error";
         return (
-          <div className="table-wrap" key={index} tabIndex={0}>
+          <div
+            className={isRecoveryTable ? "table-wrap table-wrap-recovery" : "table-wrap"}
+            key={index}
+            tabIndex={0}
+          >
             <table>
               <thead>
                 <tr>
                   {header.map((cell, cellIndex) => (
-                    <th key={cellIndex} scope="col">{renderInline(cell, highlightQuery)}</th>
+                    <th key={cellIndex} scope="col">
+                      {renderInline(cell, highlightQuery, partnerRequest)}
+                    </th>
                   ))}
                 </tr>
               </thead>
@@ -256,7 +289,9 @@ export function MarkdownContent({
                 {rows.map((row, rowIndex) => (
                   <tr key={rowIndex}>
                     {row.map((cell, cellIndex) => (
-                      <td key={cellIndex}>{renderInline(cell, highlightQuery)}</td>
+                      <td data-label={header[cellIndex]} key={cellIndex}>
+                        {renderInline(cell, highlightQuery, partnerRequest)}
+                      </td>
                     ))}
                   </tr>
                 ))}

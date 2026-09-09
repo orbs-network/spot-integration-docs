@@ -1,8 +1,12 @@
-# Liquidity Hub Integration
+# Liquidity Hub · TypeScript SDK
 
 This guide is for teams that want to add Orbs Liquidity Hub to an existing DEX, swap application, or trading service without adopting a specific UI framework.
 
 Liquidity Hub is an optimization layer. Request its quote during the existing DEX quote cycle, then enter this execution guide after the host application selects Liquidity Hub.
+
+The `@orbs-network/liquidity-hub-sdk` package is framework-neutral TypeScript and has no React dependency. The client, quote, route-selection, and full execution examples below work in any JavaScript or TypeScript application. React and Wagmi adapters are optional host concerns.
+
+Use the Direct API option when the target environment cannot run the SDK and the host will own the complete HTTP, signing, polling, and recovery lifecycle.
 
 ## Concepts
 
@@ -10,7 +14,7 @@ Liquidity Hub is an optimization layer. Request its quote during the existing DE
 | --- | --- |
 | Liquidity Hub | Orbs optimization layer that requests liquidity from on-chain and off-chain solvers. It is used only when it improves the user's executable result. |
 | Permit2 | Token permission contract that receives ERC-20 allowance for Liquidity Hub swaps. The current address is `0x000000000022D473030F116dDEE9F6B43aC78BA3`. |
-| Quote signing data | `quote.eip712` contains the wallet-ready Permit2 domain, types, primary type, and message. Pass those fields unchanged to the host wallet's typed-data signer. |
+| Quote signing data | `quote.eip712` is the wallet-ready typed-data payload. Pass its domain, types, primary type, and message unchanged to the wallet signer. |
 | Partner | Partner name supplied by Orbs. If Orbs has not supplied one, use `"unknown"`. |
 | Session ID | Quote session identifier returned by Liquidity Hub and carried through swap submission and status polling. |
 
@@ -20,58 +24,65 @@ Liquidity Hub is an optimization layer. Request its quote during the existing DE
 2. Request a Liquidity Hub quote alongside the existing DEX quote.
 3. Wrap a native source asset when required.
 4. Approve Permit2 to spend the ERC-20 source token.
-5. Pause quote polling, refresh only when needed, sign the quote's EIP-712 payload, and submit the swap.
-6. Confirm the on-chain receipt and request Liquidity Hub transaction details.
-7. Report the successful Liquidity Hub route—or a successful DEX fallback—through SDK analytics.
+5. Refresh the selected quote when stale, sign its `eip712` payload, and submit the swap.
+6. Confirm the on-chain receipt through the host DEX's wallet or RPC client.
 
 ## Integration Resources
 
-- [UI](https://orbs-spot.vercel.app)
-- [Integration Skill](https://github.com/orbs-network/spot-ui/tree/master/skills/liquidity-hub-integration)
-- [Liquidity Hub example](https://github.com/orbs-network/orbs-spot/blob/main/components/best-trade-form.tsx) — Liquidity-Hub-only example; use the dual-route algorithm in this guide when the host also has a DEX quote.
+- [Playground](https://orbs-spot.vercel.app)
+- [Interactive Example](https://orbs-spot.vercel.app/?devMode=true)
+- [Liquidity Hub Integration Skill](https://github.com/orbs-network/spot-ui/tree/master/skills/liquidity-hub-integration) — implementation workflow and package guardrails for coding agents.
+- [Liquidity Hub SDK and examples](https://github.com/orbs-network/spot-ui/tree/master/packages/liquidity-hub-ui)
+- [Production React implementation](https://github.com/orbs-network/orbs-spot/blob/main/components/best-trade-form.tsx)
 
 ## Install and Initialize
 
-Install the plain JavaScript SDK and Viem. Neither requires React:
+Install the SDK and Viem:
 
 ```bash
-npm install @orbs-network/liquidity-hub-sdk viem
+npm install @orbs-network/liquidity-hub-sdk@latest viem
 ```
 
 Create one Liquidity Hub client for the active chain and reuse it for quote and swap operations. Create a new client when the active chain changes; do not create a new client for every quote.
 
 ```js
-import { constructSDK } from "@orbs-network/liquidity-hub-sdk";
+import { createClient } from "@orbs-network/liquidity-hub-sdk";
 
-const partner = "unknown"; // Replace with the partner name supplied by Orbs.
+// Replace "unknown" only with the partner name supplied by Orbs.
+const partner = "unknown";
 
 function createLiquidityHubClient(chainId) {
-  return constructSDK({
+  return createClient({
     chainId,
     partner,
-    blockAnalytics: false,
   });
-}
-
-let liquidityHub = createLiquidityHubClient(137);
-
-function changeChain(nextChainId) {
-  liquidityHub = createLiquidityHubClient(nextChainId);
 }
 ```
 
+`createClient()` returns a `LiquidityHubClient` synchronously. It rejects an invalid chain ID or empty partner, normalizes the partner to lowercase, and keeps one session scope for that client.
+
 Use the `partner` name supplied by Orbs. If Orbs has not supplied one, use the lowercase string `"unknown"`.
 
-Keep analytics enabled in production. Set `blockAnalytics: true` only in automated tests or a privacy mode agreed with Orbs; disabling it prevents quote and execution feedback from reaching the service.
+The public client surface is intentionally small:
 
-The protocol examples use Viem directly. Reuse the host application's existing `PublicClient` and `WalletClient` for the active chain. The optional interactive panels access those clients through Wagmi v3.
+| Member | Purpose |
+| --- | --- |
+| `chainId` | Read-only chain bound to this client. |
+| `partner` | Read-only normalized partner identifier. |
+| `getQuote(args)` | Request and validate a wallet-bound quote. |
+| `swap(quote, signature, dexRouterData?)` | Submit a fresh signed quote and resolve with its transaction hash. |
+
+The SDK selects the standard chain endpoint when `apiUrl` is omitted. For a same-origin development proxy, pass a relative base path such as `apiUrl: "/api/liquidity-hub"`; it applies to quote, submission, and status requests. Keep any proxy development-only, use fixed upstream hosts, and allow only Liquidity Hub routes.
+
+The Submit Swap reference initializes Viem `publicClient` and `walletClient` instances in the same file. They handle token reads, wallet transactions, EIP-712 signing, and receipt confirmation without requiring React or Wagmi.
+
+For React, the source repository provides a two-file TanStack Query reference: [`liquidity-hub.ts`](https://github.com/orbs-network/spot-ui/blob/master/packages/liquidity-hub-ui/examples/react/liquidity-hub.ts) contains the framework-neutral client and execution flow, while [`liquidity-hub-react.tsx`](https://github.com/orbs-network/spot-ui/blob/master/packages/liquidity-hub-ui/examples/react/liquidity-hub-react.tsx) contains the provider, quote query, and swap mutation. Reuse an existing `QueryClientProvider` instead of adding a second provider. The [`best-trade-form.tsx`](https://github.com/orbs-network/orbs-spot/blob/main/components/best-trade-form.tsx) production example shows how an application can compose its execution hook with `SwapFlow` for review, progress, failure, and success states.
 
 Supported networks in the current SDK integration guide:
 
 | Chain ID | Network |
 | --- | --- |
 | `1` | Ethereum |
-| `14` | Flare |
 | `56` | BNB Chain |
 | `137` | Polygon |
 | `146` | Sonic |
@@ -84,7 +95,24 @@ Supported networks in the current SDK integration guide:
 
 Before enabling a chain, confirm that the integrating application has the correct wrapped-native-token address and can send and confirm transactions on that chain.
 
-## Request Quotes
+## Fetch Quote
+
+Request quotes from the active-chain client with `liquidityHubClient.getQuote(quoteArgs)`, reusing the same client instance throughout the flow. Pass the host DEX route's current protected minimum into `fetchLiquidityHubQuote(account, dexMinAmountOut)`. The interactive Request tab shows the SDK call; the Direct API guide shows the equivalent HTTP request.
+
+The input token cannot be native currency. `fromToken` must be an ERC-20 address. If the user selected the chain's native currency, request the quote with the wrapped token address and wrap the required funds before submission.
+
+The SDK sends the `partner` configured on `createClient()`. Use the exact partner identifier supplied by Orbs; if Orbs has not supplied one, configure the lowercase string `"unknown"`. Do not invent or derive a partner value from the application name or hostname.
+
+```ts
+import type { LiquidityHubClient, Quote, QuoteArgs } from "@orbs-network/liquidity-hub-sdk";
+
+export async function fetchLiquidityHubQuote(
+  liquidityHub: LiquidityHubClient,
+  quoteArgs: QuoteArgs,
+): Promise<Quote> {
+  return liquidityHub.getQuote(quoteArgs);
+}
+```
 
 Quote request fields:
 
@@ -93,13 +121,15 @@ Quote request fields:
 | `fromToken` | Yes | ERC-20 source token address. Use the wrapped token address when the user selected a native asset. |
 | `toToken` | Yes | Destination token address. |
 | `inAmount` | Yes | Source amount as an integer base-unit string. |
-| `dexMinAmountOut` | No, recommended | Current DEX route's slippage-adjusted executable minimum output, in destination-token base units. Pass `"-1"` when no DEX quote exists or both requests must start together; omission and the sentinel are not equivalent to the service. |
+| `dexMinAmountOut` | No, recommended | Current DEX route's slippage-adjusted executable minimum output, in destination-token base units. The SDK sends `"-1"` when this field is omitted or empty. You may pass `"-1"` explicitly when no DEX quote exists or both requests must start together. |
 | `account` | Required for execution | User address that will sign and own the swap. |
 | `slippage` | Yes | Percentage tolerance, such as `0.5` for 0.5%. |
 | `signal` | No | `AbortSignal` used to cancel an obsolete quote request. |
 | `timeout` | No | Quote timeout override in milliseconds. The SDK default is 10 seconds. |
-| `inAmountUsd` | No | USD value of the source amount, used for analytics and diagnostics. |
-| `disabled` | No | Host-controlled flag that records the quote stage as disabled in SDK analytics. Supply the host's disabled state consistently when it intentionally suppresses Liquidity Hub participation. |
+| `inAmountUsd` | No | USD value of the source amount, used for diagnostics. |
+| `disabled` | Deprecated | Prevent the request in host code instead of calling `getQuote()` with a disabled flag. |
+
+The SDK supplies `partner`, encoded page metadata (`qs`), and session reuse internally from the active client. Direct API integrations must send those transport fields themselves.
 
 Important quote response fields:
 
@@ -117,43 +147,56 @@ Important quote response fields:
 | `exchange` | Liquidity Hub execution source selected for this quote. Preserve it unchanged. |
 | `sessionId` | Identifier used for swap submission and status polling. |
 | `serializedOrder` | Opaque solver order. Preserve and submit it unchanged as part of the quote. |
-| `permitData` | Raw Permit2 typed data returned with the quote. Preserve it unchanged with the complete quote. |
-| `eip712` | Wallet-ready EIP-712 representation used by the signing reference. Preserve every field unchanged. |
+| `eip712` | Wallet-ready EIP-712 payload. Pass it unchanged to the wallet's typed-data signer. |
+| `permitData` | Legacy Permit2 representation retained in the response for compatibility. Preserve it with the quote, but use `eip712` for new signing integrations. |
 | `userMinOutAmountWithGas` | User-protected minimum output after gas effects are included. |
 | `outAmountWsMinusGas` | Slippage-adjusted output after subtracting the estimated gas value. |
 | `outAmountWS` | Quoted output after applying slippage protection. |
 | `gasAmountOut` | Estimated gas cost expressed in destination-token base units. |
 | `referencePrice` | Reference market price recorded for diagnostics. |
-| `amountOutUI` | Comparison amount echoed by the quote service for UI diagnostics. Do not use it for route selection. |
-| `inTokenUsd` | Source-token USD reference price used by the quote service. |
-| `outTokenUsd` | Destination-token USD reference price used by the quote service. |
+| `amountOutUI` | Service comparison value retained for diagnostics. Do not use it for route selection. |
+| `inTokenUsd` | Source-token USD reference price returned as service metadata. |
+| `outTokenUsd` | Destination-token USD reference price returned as service metadata. |
 | `timestamp` | Local quote time in milliseconds, used by `isFreshQuote`. |
-| `error` | Optional service error string returned with a non-executable quote. Apply the retry rules in Errors and Recovery. |
+| `error` | Optional service error field in the raw quote shape. `getQuote()` converts a service `error` into a rejected promise, so only fulfilled, error-free quotes are executable. |
 
 Important `eip712` fields:
 
 | Field | Purpose |
 | --- | --- |
-| `domain` | EIP-712 domain derived from the quote permit data. |
+| `domain` | EIP-712 signing domain returned for this quote. |
 | `types` | Complete EIP-712 type definitions. |
 | `primaryType` | Root type signed by the wallet. |
-| `message` | Complete Permit2 message signed by the wallet. |
+| `message` | Complete message signed by the wallet. |
 
-For the number shown as the Liquidity Hub output in the host UI, the reference integration uses `outAmount + (gasAmountOut || "0")` in destination-token base units. Keep route selection on `minAmountOut`; do not compare or execute on the display amount.
+### Compare with a DEX Router (Optional)
 
-If the current DEX minimum output is already available, pass it as `dexMinAmountOut`. If both routes must start at the same time, pass `"-1"` and compare the 2 protected outputs after both settle.
+Use this step only when Liquidity Hub runs alongside an existing DEX router. Liquidity-Hub-only integrations can continue directly to **Submit Swap**.
 
-If the host executes the DEX route, call `liquidityHub.analytics.dexSwap(...)` after its transaction succeeds. Do not report an attempted or reverted DEX transaction as a successful fallback.
+If the current DEX minimum output is already available, pass it as `dexMinAmountOut`. If both routes must start at the same time, pass `"-1"` and compare the two protected outputs after both settle. Use the public helper so malformed values safely lose route selection:
 
-Cancel in-flight requests when the account, chain, token pair, or input amount changes. For interactive applications, debounce amount changes by about 300 milliseconds and refresh an active quote about every 10 seconds.
+```ts
+import { isLiquidityHubBetter } from "@orbs-network/liquidity-hub-sdk";
 
-## Execute the Full Flow
+function selectLiquidityHubWhenBetter(quote, dexMinAmountOut) {
+  if (!isLiquidityHubBetter(quote, dexMinAmountOut)) return false;
 
-The optional Wagmi v3 reference at the top starts after the host has selected Liquidity Hub. It prepares funds, refreshes the Liquidity Hub quote, signs that fresh quote, submits it, and confirms the returned transaction on-chain. It never submits a DEX transaction.
+  selectLiquidityHubRoute(quote);
+  return true;
+}
+```
+
+`getQuote()` validates required response fields, integer amounts, both typed-data representations, and that the returned partner, tokens, input amount, and optional account match the request. It rejects malformed or mismatched payloads instead of exposing an executable quote.
+
+Cancel in-flight requests when the account, chain, token pair, or input amount changes. The SDK's timeout aborts the underlying request, and caller cancellation remains an abort rather than a normal quote failure. For interactive applications, use the exported `FROM_AMOUNT_DEBOUNCE` value (300 milliseconds) and refresh an active quote using `DEFAULT_QUOTE_INTERVAL` (10 seconds).
+
+## Submit Swap
+
+The TypeScript tab in the reference above is the canonical flow and starts after the host has selected Liquidity Hub. It reuses the active-chain `liquidityHubClient` and creates the Viem `publicClient` and `walletClient` inside `executeLiquidityHubSwap()`. Call the function with the connected account, the host-selected input token address, the quote selected during the Fetch Quote stage, and a `refetchQuote` callback from the host quote layer. That callback is invoked only when the selected quote is no longer fresh. The function prepares funds, signs the selected or refreshed quote, submits it, confirms the returned transaction on-chain, and returns the successful Viem `TransactionReceipt`. It never submits a DEX transaction.
 
 ### Wrap and Approve
 
-Liquidity Hub executes ERC-20 inputs. If the user selected a native source asset such as ETH, BNB, or POL, request the quote with the chain's wrapped token and mark the host input as native. The full-flow example calls the wrapped token's payable `deposit()` function with `quote.inAmount`, waits for a successful receipt, and continues with `quote.inToken`.
+Liquidity Hub executes ERC-20 inputs. Pass the address originally selected in the host UI as `inputTokenAddress`, while requesting the quote with the wrapped token address when that selection is native. The Submit Swap example calls `isNativeAddress(inputTokenAddress)` itself. When wrapping is required, it calls the wrapped token's `deposit()` function through the Viem `WalletClient`, confirms it with the `PublicClient`, and continues with `quote.inToken`.
 
 The SDK exports common native-token placeholder addresses through `nativeTokenAddresses`, but the host application must supply the correct wrapped token contract for the active chain.
 
@@ -163,119 +206,25 @@ Complete both transactions before requesting a signature. If wrapping or approva
 
 ### Refresh and Sign
 
-Pause the host quote poll before wrapping, approval, refresh, or signing, and resume it in a `finally`/settled handler. Without that guard, a background refresh can replace the selected quote while the wallet prompt is open.
+Wrapping and approval can take long enough for the selected quote to expire. Immediately before signing, the reference checks `isFreshQuote(quote, 60)`. The 60-second window limits exposure to market-price and available-liquidity changes between quote selection and execution; after that window, the quoted output may no longer represent current executable conditions. If the quote has expired, the flow calls the host's `refetchQuote()` callback. That callback already owns the current token, amount, account, slippage, and DEX minimum inputs. The wallet signs the selected or refreshed quote once.
 
-Wrapping and approval can take long enough for the original quote to expire. Immediately before signing, the reference algorithm:
+Use `quote.eip712` exactly as returned. The Submit Swap reference passes it unchanged to `walletClient.signTypedData()` together with the connected account.
 
-1. Keeps the original quote when `isFreshQuote(originalQuote, 60)` is true.
-2. Refetches the Liquidity Hub quote only when the original is stale.
-3. Keeps the original quote if the refetch fails to return a quote.
-4. Keeps the original quote if the refetched `minAmountOut` is lower than the original.
-5. Otherwise signs the fresher, equal-or-better quote.
+The signature must belong to the same account passed to `getQuote()`. Submit the exact fresh quote object that produced `eip712`; changing the token, amount, user, slippage, or another quote field after signing invalidates the signature.
 
-Do not re-run route selection or fall back to the DEX from inside the signing flow. The host made that decision before execution began.
+The host application owns route selection before this flow begins. Pass its selected Liquidity Hub quote into the TypeScript function; no DEX executor callback is required.
 
-Use the wallet-ready `quote.eip712` payload directly. In a React application using Wagmi and TanStack Query, the signing hook is:
+### Submit and Poll
 
-```ts
-import type { Quote } from "@orbs-network/liquidity-hub-sdk";
-import { useMutation } from "@tanstack/react-query";
-import { useAccount } from "wagmi";
+Pass the same `quote` and `signature` to `liquidityHubClient.swap(quote, signature, dexRouterData)`. Reuse the active-chain client rather than constructing one for each operation. The optional `dexRouterData` value accepts `{ data?: Hex; to?: Address }` and may be `undefined` when no DEX router calldata exists. The SDK uses a hash returned directly by submission or polls status when processing is asynchronous, and rejects another `swap()` call while that client already has one in progress. Treat a rejected signature, validation response, backend error, or polling timeout as a failed Liquidity Hub execution.
 
-import { useSignTypedDataPayload } from "./use-sign-typed-data";
+### Confirm the Receipt
 
-export const useSignEip = () => {
-  const { mutateAsync: signTypedData } = useSignTypedDataPayload();
-  const { address: account } = useAccount();
+After receiving the hash, wait for a successful receipt with `publicClient.waitForTransactionReceipt()`. `executeLiquidityHubSwap()` returns that `TransactionReceipt`, so callers can read `receipt.transactionHash`, block details, logs, and gas usage without another lookup. The SDK has no second transaction-details method: the host owns receipt confirmation, replacements, confirmations, and revert handling.
 
-  return useMutation({
-    mutationFn: async (quote: Quote) => {
-      const permitData = quote.eip712;
-      const signature = await signTypedData({
-        domain: permitData.domain,
-        types: permitData.types,
-        primaryType: permitData.primaryType,
-        message: permitData.message,
-        account,
-      });
-      return signature;
-    },
-  });
-};
-```
+Do not treat a wallet signature or an accepted submission request as confirmation. Wait for a successful receipt before updating the UI. If receipt confirmation fails after a hash was returned, reconcile the known hash rather than submitting a DEX fallback. The Submit Swap reference contains this complete sequence, so no separate submission fragment is needed.
 
-The signature must belong to the same account passed to `getQuote`. Submit the exact fresh quote object that produced `eip712`; changing the token, amount, user, slippage, or another quote field after signing invalidates the signature.
-
-The host application owns route selection before this flow begins. Read its current quote and form values from the existing derived swap-data hook; no DEX executor callback is required.
-
-### Execute and Confirm
-
-After signing, check freshness again and pass the same `quote` and `signature` to `liquidityHub.swap`. The SDK submits the signed quote and polls until it receives an on-chain transaction hash. Treat a rejected signature, validation response, backend error, or polling timeout as a failed Liquidity Hub execution.
-
-After receiving the hash, wait for its receipt with the Viem `PublicClient` configured for the active chain and require `receipt.status === "success"`. Then call `liquidityHub.getTransactionDetails(txHash, quote)` to retrieve service status, `exactOutAmount`, gas charges, and `isMined`. The SDK method adds protocol execution details; it does not replace receipt confirmation.
-
-Do not report success only because the wallet produced a signature or `swap` accepted the request. Report success after the receipt succeeds, call `liquidityHub.analytics.swap.onSuccess()`, and retain the transaction details for the final amount shown to the user. On failure, call `liquidityHub.analytics.swap.onFailed(errorMessage)` before returning the error.
-
-```ts
-try {
-  const txHash = await liquidityHub.swap(quote, signature);
-  const receipt = await publicClient.waitForTransactionReceipt({
-    hash: txHash,
-  });
-  if (receipt.status !== "success") {
-    throw new Error("Liquidity Hub swap reverted");
-  }
-
-  const details = await liquidityHub.getTransactionDetails(txHash, quote);
-  liquidityHub.analytics.swap.onSuccess();
-  return { txHash, receipt, details };
-} catch (error) {
-  const message = error instanceof Error ? error.message : String(error);
-  liquidityHub.analytics.swap.onFailed(message);
-  throw error;
-} finally {
-  setQuotePollingPaused(false);
-}
-```
-
-## Analytics and DEX Fallback
-
-The SDK records quote stages automatically. Report the wallet-controlled stages around the corresponding operations so Liquidity Hub can distinguish user rejection, transaction failure, and a route that lost to the DEX:
-
-```ts
-liquidityHub.analytics.wrap.onRequest();
-liquidityHub.analytics.wrap.onSuccess(wrapTxHash);
-liquidityHub.analytics.wrap.onFailed(errorMessage);
-
-liquidityHub.analytics.approval.onRequest();
-liquidityHub.analytics.approval.onSuccess(approvalTxHash);
-liquidityHub.analytics.approval.onFailed(errorMessage);
-
-liquidityHub.analytics.signature.onRequest();
-liquidityHub.analytics.signature.onSuccess(signature);
-liquidityHub.analytics.signature.onFailed(errorMessage);
-
-liquidityHub.analytics.swap.onSuccess();
-liquidityHub.analytics.swap.onFailed(errorMessage);
-```
-
-Always report a successful DEX fallback after its receipt succeeds:
-
-```ts
-liquidityHub.analytics.dexSwap({
-  panel: "swap",
-  router: dexRouterName,
-  srcTokenAddress: fromToken,
-  dstTokenAddress: toToken,
-  inAmount,
-  inAmountUsd,
-  txHash: dexTxHash,
-});
-```
-
-Do not fire both `swap.onSuccess()` and `dexSwap` for one user action. Report the route that actually mined. Keep the same SDK instance from quote selection through analytics so its session and Liquidity Hub identifiers remain intact.
-
-For local diagnostics, setting `localStorage.lhDebug` to a non-empty value enables SDK console logging. `localStorage.lhOverrideApiUrl` overrides the quote/status API origin. Treat both as local development escape hatches: never set them for users or persist an override in production.
+For local diagnostics, setting `localStorage.lhDebug` to a non-empty value enables SDK console logging. Treat it as a local development escape hatch: never set it for users or persist it in production.
 
 ## Errors and Recovery
 
@@ -285,13 +234,13 @@ If a Liquidity Hub swap fails after the user has already wrapped or approved, ex
 
 Common quote failures include:
 
-Only errors containing `"not supported"` or `"ldv"` stop polling and automatic retries. Other quote failures may retry up to 2 times and participate again in the next quote cycle.
+Errors containing `"not supported"`, `"no liquidity"`, `"tns"`, or `"ldv"` are terminal for the current query and are not retried automatically. Other failures, including timeouts, may retry up to 2 times and participate again in the next quote cycle.
 
 | Error | Meaning and action |
 | --- | --- |
-| Contains `"not supported"` | Pair or token is unsupported. Stop polling and retries until the selected tokens change. Do not branch solely on the short `"tns"` code. |
+| Contains `"not supported"` or `"tns"` | Pair or token is unsupported. Stop automatic retries until the quote inputs change. |
 | Contains `"ldv"` | Input value is below the supported threshold. Stop polling and retries until the amount changes. |
-| `"no liquidity"` | No solver filled this request. Retry within the normal limit, then allow a later quote cycle to try again. |
+| `"no liquidity"` | No solver filled this request. Do not automatically retry the same query; allow a later quote cycle or changed inputs to try again. |
 | `"timeout"` | Quote request exceeded its timeout. Retry within the normal limit, then allow a later quote cycle to try again. |
 | Other error or `quote.error` | Preserve the message for diagnostics, retry within the normal limit, and never treat the quote as executable while `error` is present. |
 
@@ -302,9 +251,8 @@ Only errors containing `"not supported"` or `"ldv"` stop polling and automatic r
 | Client | Reuse one SDK client for the active chain and use the Orbs-provided partner name or `"unknown"`. | Quote requests use the same chain and partner. | Recreate the client after the chain changes. |
 | Quote cycle | Request Liquidity Hub during the existing host quote cycle, pass `"-1"` when no DEX minimum exists, debounce inputs, and cancel obsolete requests. | The selected Liquidity Hub quote describes the current wallet, pair, amount, and chain. | Do not enter the Liquidity Hub execution flow. |
 | Preparation | Wrap native input and approve `permit2Address`, checking both receipts. | Prepared ERC-20 balance and allowance cover `quote.inAmount`. | Explain which transaction reverted and stop submission. |
-| Freshness | Pause polling, keep a fresh original quote, and replace a stale quote only with an equal-or-better refresh. | Signing and submission use the same selected quote object. | Keep the original quote when refresh is missing or worse; surface a later swap rejection normally. |
-| Submission | Submit the exact signed quote, confirm the returned hash on-chain, and fetch SDK transaction details. | Receipt status is `success`; the details contain the final execution amount/status. | Show the failure and call `analytics.swap.onFailed`. |
-| Analytics | Report wrap, approval, signature, Liquidity Hub success/failure, and every mined DEX fallback. | Exactly 1 executed route is reported for the user action. | Fix missing or duplicated lifecycle callbacks before launch. |
+| Freshness | Refresh a stale quote immediately before signing. | Signing and submission use the same fresh quote object. | Do not submit a stale quote; request another quote and signature. |
+| Submission | Submit the exact signed quote once and confirm the returned hash on-chain. | Receipt status is `success` before the UI reports completion. | After a hash exists, reconcile that hash and never start the DEX fallback. |
 | Recovery | Exercise timeout, no-liquidity, stale, and lower-price cases. | Every case stops without submitting an invalid Liquidity Hub transaction. | Keep the flow blocked until a new valid quote is available. |
 
 Ready to launch when every row passes on each supported chain.

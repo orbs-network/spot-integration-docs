@@ -7,7 +7,7 @@ import {
   Maximize2,
   Minimize2,
 } from "lucide-react";
-import { Highlight, themes, type Language } from "prism-react-renderer";
+import { Highlight, type Language, type PrismTheme } from "prism-react-renderer";
 import {
   type KeyboardEvent,
   type RefObject,
@@ -26,15 +26,92 @@ const LANGUAGE_ALIASES: Readonly<Record<string, Language>> = {
   ts: "typescript",
 };
 
+const CODE_THEME = {
+  plain: {
+    backgroundColor: "transparent",
+    color: "var(--syntax-text)",
+  },
+  styles: [
+    {
+      style: { color: "var(--syntax-comment)" },
+      types: ["comment", "prolog", "cdata"],
+    },
+    {
+      style: { color: "var(--syntax-text)" },
+      types: ["doctype", "punctuation", "entity"],
+    },
+    {
+      style: { color: "var(--syntax-number)" },
+      types: [
+        "attr-name",
+        "class-name",
+        "maybe-class-name",
+        "boolean",
+        "constant",
+        "number",
+        "atrule",
+      ],
+    },
+    {
+      style: { color: "var(--syntax-keyword)" },
+      types: ["keyword"],
+    },
+    {
+      style: { color: "var(--syntax-property)" },
+      types: ["property", "tag", "symbol", "deleted", "important"],
+    },
+    {
+      style: { color: "var(--syntax-string)" },
+      types: [
+        "selector",
+        "string",
+        "char",
+        "builtin",
+        "inserted",
+        "regex",
+        "attr-value",
+      ],
+    },
+    {
+      style: { color: "var(--syntax-function)" },
+      types: ["variable", "operator", "function"],
+    },
+    {
+      style: { color: "var(--syntax-url)" },
+      types: ["url"],
+    },
+    {
+      style: { textDecorationLine: "line-through" },
+      types: ["deleted"],
+    },
+    {
+      style: { textDecorationLine: "underline" },
+      types: ["inserted"],
+    },
+    {
+      style: { fontStyle: "italic" },
+      types: ["italic"],
+    },
+    {
+      style: { fontWeight: "bold" },
+      types: ["important", "bold"],
+    },
+  ],
+} satisfies PrismTheme;
+
 type CopyStatus = "copied" | "failed" | "idle";
 type FullscreenStatus = "active" | "failed" | "idle";
 
-function useResetCopyStatus(copyStatus: CopyStatus, reset: () => void): void {
+function useCopyStatus() {
+  const [copyStatus, setCopyStatus] = useState<CopyStatus>("idle");
+
   useEffect(() => {
     if (copyStatus === "idle") return;
-    const timeout = window.setTimeout(reset, 1800);
+    const timeout = window.setTimeout(() => setCopyStatus("idle"), 1800);
     return () => window.clearTimeout(timeout);
-  }, [copyStatus, reset]);
+  }, [copyStatus]);
+
+  return [copyStatus, setCopyStatus] as const;
 }
 
 function SyntaxHighlightedCode({
@@ -55,7 +132,7 @@ function SyntaxHighlightedCode({
   const syntaxLanguage = LANGUAGE_ALIASES[language] ?? language;
 
   return (
-    <Highlight code={code} language={syntaxLanguage} theme={themes.oneDark}>
+    <Highlight code={code} language={syntaxLanguage} theme={CODE_THEME}>
       {({ className, getLineProps, getTokenProps, style, tokens }) => (
         <pre
           aria-labelledby={labelledBy}
@@ -105,11 +182,9 @@ function SyntaxHighlightedCode({
 export function CodeBlock({ code, language }: { code: string; language: string }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const preRef = useRef<HTMLPreElement>(null);
-  const [copyStatus, setCopyStatus] = useState<CopyStatus>("idle");
+  const [copyStatus, setCopyStatus] = useCopyStatus();
   const [fullscreenStatus, setFullscreenStatus] =
     useState<FullscreenStatus>("idle");
-
-  useResetCopyStatus(copyStatus, () => setCopyStatus("idle"));
 
   useEffect(() => {
     const onFullscreenChange = () => {
@@ -212,23 +287,15 @@ export function CodeBlock({ code, language }: { code: string; language: string }
   );
 }
 
-export function TabbedCodeViewer({
-  files,
-  idPrefix,
-}: {
-  files: readonly ReferenceFile[];
-  idPrefix: string;
-}) {
+function useCodeViewerControls(files: readonly ReferenceFile[]) {
   const containerRef = useRef<HTMLDivElement>(null);
   const preRef = useRef<HTMLPreElement>(null);
   const tabRefs = useRef<(HTMLButtonElement | null)[]>([]);
   const [activeFileIndex, setActiveFileIndex] = useState(0);
-  const [copyStatus, setCopyStatus] = useState<CopyStatus>("idle");
+  const [copyStatus, setCopyStatus] = useCopyStatus();
   const [fullscreenStatus, setFullscreenStatus] =
     useState<FullscreenStatus>("idle");
   const activeFile = files[activeFileIndex] ?? files[0];
-
-  useResetCopyStatus(copyStatus, () => setCopyStatus("idle"));
 
   useEffect(() => {
     const onFullscreenChange = () => {
@@ -240,10 +307,9 @@ export function TabbedCodeViewer({
     return () => document.removeEventListener("fullscreenchange", onFullscreenChange);
   }, []);
 
-  if (!activeFile) return null;
-
   const selectFile = (index: number, focus = false) => {
     setActiveFileIndex(index);
+    setCopyStatus("idle");
     preRef.current?.scrollTo({ left: 0, top: 0 });
     if (focus) window.requestAnimationFrame(() => tabRefs.current[index]?.focus());
   };
@@ -263,6 +329,7 @@ export function TabbedCodeViewer({
   };
 
   const copyCode = async () => {
+    if (!activeFile) return;
     try {
       await navigator.clipboard.writeText(activeFile.code);
       setCopyStatus("copied");
@@ -282,6 +349,44 @@ export function TabbedCodeViewer({
       setFullscreenStatus("failed");
     }
   };
+
+  return {
+    activeFile,
+    activeFileIndex,
+    containerRef,
+    copyCode,
+    copyStatus,
+    fullscreenStatus,
+    navigateTabs,
+    preRef,
+    selectFile,
+    tabRefs,
+    toggleFullscreen,
+  };
+}
+
+export function TabbedCodeViewer({
+  files,
+  idPrefix,
+}: {
+  files: readonly ReferenceFile[];
+  idPrefix: string;
+}) {
+  const {
+    activeFile,
+    activeFileIndex,
+    containerRef,
+    copyCode,
+    copyStatus,
+    fullscreenStatus,
+    navigateTabs,
+    preRef,
+    selectFile,
+    tabRefs,
+    toggleFullscreen,
+  } = useCodeViewerControls(files);
+
+  if (!activeFile) return null;
 
   const panelId = `${idPrefix}-panel`;
 
@@ -378,6 +483,178 @@ export function TabbedCodeViewer({
           : copyStatus === "failed"
             ? "Reference code could not be copied. Try again."
             : ""}
+      </span>
+    </div>
+  );
+}
+
+export function RequestResponseCodeViewer({
+  idPrefix,
+  request,
+  response,
+}: {
+  idPrefix: string;
+  request: ReferenceFile;
+  response: ReferenceFile;
+}) {
+  const files = [request, response] as const;
+  const {
+    activeFile,
+    activeFileIndex,
+    containerRef,
+    copyCode,
+    copyStatus: codeCopyStatus,
+    fullscreenStatus,
+    navigateTabs,
+    preRef,
+    selectFile,
+    tabRefs,
+    toggleFullscreen,
+  } = useCodeViewerControls(files);
+  const [curlCopyStatus, setCurlCopyStatus] = useCopyStatus();
+
+  if (!activeFile) return null;
+
+  const copyCurl = async () => {
+    if (!request.curl) return;
+    try {
+      await navigator.clipboard.writeText(request.curl);
+      setCurlCopyStatus("copied");
+    } catch {
+      setCurlCopyStatus("failed");
+    }
+  };
+
+  const panelId = `${idPrefix}-panel`;
+
+  return (
+    <div className="request-response-viewer" ref={containerRef}>
+      <div className="request-response-toolbar">
+        <div className="request-response-toolbar-left">
+          <div
+            aria-label="API request and response"
+            className="request-response-tabs"
+            role="tablist"
+          >
+            {files.map((file, index) => {
+              const active = activeFileIndex === index;
+              const tabId = `${idPrefix}-file-${index}`;
+              return (
+                <button
+                  aria-controls={panelId}
+                  aria-selected={active}
+                  className={active ? "active" : undefined}
+                  id={tabId}
+                  key={file.name}
+                  onClick={() => selectFile(index)}
+                  onKeyDown={(event) => navigateTabs(event, index)}
+                  ref={(element) => {
+                    tabRefs.current[index] = element;
+                  }}
+                  role="tab"
+                  tabIndex={active ? 0 : -1}
+                  type="button"
+                >
+                  {file.name}
+                </button>
+              );
+            })}
+          </div>
+          <span className="request-method" translate="no">
+            {request.method ?? "GET"}
+          </span>
+        </div>
+        <div className="request-response-actions">
+          {request.curl ? (
+            <button
+              aria-label={
+                curlCopyStatus === "copied"
+                  ? "cURL command copied"
+                  : curlCopyStatus === "failed"
+                    ? "Copy cURL command failed, retry"
+                    : "Copy request as cURL"
+              }
+              onClick={() => void copyCurl()}
+              type="button"
+            >
+              {curlCopyStatus === "copied" ? (
+                <Check aria-hidden="true" size={14} />
+              ) : (
+                <Clipboard aria-hidden="true" size={14} />
+              )}
+              {curlCopyStatus === "copied"
+                ? "Copied"
+                : curlCopyStatus === "failed"
+                  ? "Retry cURL"
+                  : "Copy as cURL"}
+            </button>
+          ) : null}
+          <button
+            aria-label={
+              codeCopyStatus === "copied"
+                ? `${activeFile.name} copied`
+                : codeCopyStatus === "failed"
+                  ? `Copy ${activeFile.name.toLowerCase()} failed, retry`
+                  : `Copy ${activeFile.name.toLowerCase()}`
+            }
+            onClick={() => void copyCode()}
+            type="button"
+          >
+            {codeCopyStatus === "copied" ? (
+              <Check aria-hidden="true" size={14} />
+            ) : (
+              <Clipboard aria-hidden="true" size={14} />
+            )}
+            {codeCopyStatus === "copied"
+              ? "Copied"
+              : codeCopyStatus === "failed"
+                ? "Retry"
+                : "Copy"}
+          </button>
+          {fullscreenStatus === "failed" ? (
+            <span className="reference-code-error" role="status">
+              Full screen unavailable
+            </span>
+          ) : null}
+          <button
+            aria-label={
+              fullscreenStatus === "active"
+                ? "Exit full screen"
+                : "Open request and response in full screen"
+            }
+            aria-pressed={fullscreenStatus === "active"}
+            onClick={() => void toggleFullscreen()}
+            type="button"
+          >
+            {fullscreenStatus === "active" ? (
+              <Minimize2 aria-hidden="true" size={14} />
+            ) : (
+              <Maximize2 aria-hidden="true" size={14} />
+            )}
+            <span className="reference-fullscreen-label">
+              {fullscreenStatus === "active" ? "Exit" : "Full screen"}
+            </span>
+          </button>
+        </div>
+      </div>
+      <SyntaxHighlightedCode
+        code={activeFile.code}
+        labelledBy={`${idPrefix}-file-${activeFileIndex}`}
+        language={activeFile.language}
+        panelId={panelId}
+        preRef={preRef}
+        role="tabpanel"
+      />
+      <span aria-live="polite" className="sr-only">
+        {curlCopyStatus === "copied"
+          ? "cURL command copied"
+          : curlCopyStatus === "failed"
+            ? "cURL command could not be copied. Try again."
+            : codeCopyStatus === "copied"
+              ? `${activeFile.name} copied`
+              : codeCopyStatus === "failed"
+                ? `${activeFile.name} could not be copied. Try again.`
+                : ""}
       </span>
     </div>
   );
