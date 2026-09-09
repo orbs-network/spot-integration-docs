@@ -11,9 +11,7 @@ const THEME_INITIALIZER = `
     var storedTheme = window.localStorage.getItem("orbs-docs-theme");
     var theme = storedTheme === "light" || storedTheme === "dark"
       ? storedTheme
-      : window.matchMedia("(prefers-color-scheme: light)").matches
-        ? "light"
-        : "dark";
+      : "dark";
     document.documentElement.dataset.theme = theme;
     document.documentElement.style.colorScheme = theme;
     document.querySelectorAll('meta[name="theme-color"]').forEach(function (meta) {
@@ -57,16 +55,13 @@ export const metadata: Metadata = {
 export const viewport: Viewport = {
   colorScheme: "light dark",
   initialScale: 1,
-  themeColor: [
-    { color: "#f7f7f8", media: "(prefers-color-scheme: light)" },
-    { color: "#09090b", media: "(prefers-color-scheme: dark)" },
-  ],
+  themeColor: "#09090b",
   width: "device-width",
 };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
-    <html data-scroll-behavior="smooth" lang="en" suppressHydrationWarning>
+    <html data-scroll-behavior="smooth" data-theme="dark" lang="en" suppressHydrationWarning>
       <head>
         <script dangerouslySetInnerHTML={{ __html: THEME_INITIALIZER }} />
       </head>
