@@ -7,10 +7,10 @@ The package uses `@orbs-network/spot-ui` internally. Choose [API Only](/advanced
 ## Integration Resources
 
 - [React SDK package](https://github.com/orbs-network/spot-ui/tree/master/packages/spot-react)
-- [React SDK API](https://github.com/orbs-network/spot-ui/blob/master/packages/spot-react/README.md)
 - [Spot React integration skill](https://github.com/orbs-network/spot-ui/tree/master/skills/spot-react-integration)
-- [Reference React implementation](https://github.com/orbs-network/spot-ui/blob/master/apps/web/components/spot/spot-form.tsx)
-- [Playground](https://orbs-spot.vercel.app/?tab=twap)
+- [Reference React implementation](https://github.com/orbs-network/orbs-spot/blob/main/components/advanced-order/spot-provider-shell.tsx)
+- [Swap UI execution helper](https://www.npmjs.com/package/@orbs-network/swap-ui)
+- [Playground](https://orbs-spot.vercel.app/?tab=twap&devMode=true)
 
 ## Quickstart
 
@@ -50,22 +50,16 @@ The host must provide React `^18 || ^19`. Zustand is internal; Viem, Wagmi, and 
 
 ## Configure SpotProvider
 
-Memoize adapted tokens, the market quote, wallet interactions, and callbacks by their real dependencies. The small hooks below keep token conversion and quote freshness reusable without mirroring DEX state.
+Memoize adapted tokens, the market quote, wallet interactions, and callbacks by their real dependencies. Keep the wallet adapter in its own hook so the provider stays focused on composing host values. The tabs show the two files together.
 
-```tsx
+```tsx title="advanced-order-form.tsx"
 "use client";
 
 import { useMemo } from "react";
-import {
-  type Callbacks,
-  type ClientErrorFallbackProps,
-  type MarketQuote,
-  Module,
-  Partners,
-  SpotProvider,
-  type Token,
-  type WalletInteractions,
-} from "@orbs-network/spot-react";
+import { type Callbacks, type ClientErrorFallbackProps, type MarketQuote, Module, Partners, SpotProvider, type Token } from "@orbs-network/spot-react";
+import { useDexDerivedData } from "./use-dex-derived-data";
+import { useWalletInteractions } from "./use-wallet-interactions";
+import { SpotFormContent } from "./spot-form-content";
 
 type DexCurrency = {
   address: string;
@@ -89,41 +83,13 @@ function useSpotToken(currency?: DexCurrency): Token | undefined {
   );
 }
 
-function useMarketQuote({
-  inputAmountUi,
-  inputToken,
-  isQuoteLoading,
-  outputToken,
-  quotedInputAmountUi,
-  quotedOutputAmountRaw,
-}: {
-  inputAmountUi: string;
-  inputToken?: Token;
-  isQuoteLoading: boolean;
-  outputToken?: Token;
-  quotedInputAmountUi?: string;
-  quotedOutputAmountRaw?: string;
-}): MarketQuote {
-  return useMemo(() => {
-    const shouldQuote = Boolean(inputAmountUi && inputToken && outputToken);
-    const isStale = shouldQuote && quotedInputAmountUi !== inputAmountUi;
-    const currentOutput =
-      !shouldQuote || isStale ? undefined : quotedOutputAmountRaw;
-    const isLoading = shouldQuote && (isStale || isQuoteLoading);
-
-    return {
-      quotedOutputAmountRaw: currentOutput,
-      isLoading,
-      noLiquidity: shouldQuote && !isLoading && !currentOutput,
-    };
-  }, [
-    inputAmountUi,
-    inputToken,
-    isQuoteLoading,
-    outputToken,
-    quotedInputAmountUi,
-    quotedOutputAmountRaw,
-  ]);
+function useMarketQuote(): MarketQuote {
+  const dex = useDexDerivedData();
+  return {
+    quotedOutputAmountRaw: dex.quotedOutputAmountRaw,
+    isLoading: dex.isQuoteLoading,
+    noLiquidity: dex.noLiquidity,
+  };
 }
 
 function ClientErrorFallback({
@@ -133,7 +99,7 @@ function ClientErrorFallback({
 }: ClientErrorFallbackProps) {
   return (
     <div role="alert">
-      <p>{getLocalizedErrorMessage(error)}</p>
+      <p>{error.message}</p>
       <button disabled={isRetrying} onClick={retry} type="button">
         {isRetrying ? "Retrying…" : "Retry configuration"}
       </button>
@@ -142,23 +108,12 @@ function ClientErrorFallback({
 }
 
 export function AdvancedOrderForm({ module }: { module: Module }) {
-  const dex = useDexSpotAdapter();
+  const dex = useDexDerivedData();
   const inputToken = useSpotToken(dex.inputCurrency);
   const outputToken = useSpotToken(dex.outputCurrency);
   const wrappedNativeToken = useSpotToken(dex.wrappedNativeCurrency);
-  const marketQuote = useMarketQuote({
-    inputAmountUi: dex.inputAmountUi,
-    inputToken,
-    isQuoteLoading: dex.isQuoteLoading,
-    outputToken,
-    quotedInputAmountUi: dex.quotedInputAmountUi,
-    quotedOutputAmountRaw: dex.quotedOutputAmountRaw,
-  });
-
-  const walletInteractions = useMemo<WalletInteractions>(
-    () => createWalletInteractions(dex.wallet),
-    [dex.wallet],
-  );
+  const marketQuote = useMarketQuote();
+  const walletInteractions = useWalletInteractions();
   const callbacks = useMemo<Callbacks>(
     () => ({
       onWrapSuccess: () => dex.refetchBalances(),
@@ -200,7 +155,134 @@ export function AdvancedOrderForm({ module }: { module: Module }) {
 }
 ```
 
-`marketQuote.quotedOutputAmountRaw` is the current DEX quote's raw output for the complete `inputAmountUi`, not a standalone per-token price. Omit it when the quote belongs to an older amount or token pair and keep `isLoading: true` until the current quote arrives.
+```ts title="use-wallet-interactions.ts"
+"use client";
+
+import { useCallback, useMemo } from "react";
+import type { WalletInteractions } from "@orbs-network/spot-react";
+import { erc20Abi, parseAbi, type Address, type Hash } from "viem";
+import { useConnection, usePublicClient, useWalletClient } from "wagmi";
+import { useDexDerivedData } from "./use-dex-derived-data";
+
+const wrappedNativeAbi = parseAbi(["function deposit() payable"]);
+
+export function useWalletInteractions(): WalletInteractions {
+  const { wrappedNativeCurrency } = useDexDerivedData();
+  const wrappedNativeAddress = wrappedNativeCurrency?.address;
+  const { address: account } = useConnection();
+  const { data: walletClient } = useWalletClient();
+  const publicClient = usePublicClient();
+
+  const waitForSuccess = useCallback(
+    async (txHash: Hash): Promise<Hash> => {
+      if (!publicClient) throw new Error("Public client is unavailable");
+
+      const receipt = await publicClient.waitForTransactionReceipt({
+        hash: txHash,
+      });
+      if (receipt.status !== "success") throw new Error("Transaction reverted");
+      return txHash;
+    },
+    [publicClient],
+  );
+
+  const wrapNativeToken = useCallback<WalletInteractions["wrapNativeToken"]>(
+    async (amountRaw) => {
+      if (!walletClient || !wrappedNativeAddress) {
+        throw new Error("Connect a wallet on a supported chain first");
+      }
+
+      const txHash = await walletClient.writeContract({
+        account: walletClient.account,
+        address: wrappedNativeAddress as Address,
+        abi: wrappedNativeAbi,
+        functionName: "deposit",
+        value: BigInt(amountRaw),
+        chain: walletClient.chain,
+      });
+      return waitForSuccess(txHash);
+    },
+    [waitForSuccess, walletClient, wrappedNativeAddress],
+  );
+
+  const approveToken = useCallback<WalletInteractions["approveToken"]>(
+    async ({ tokenAddress, amount, spenderAddress }) => {
+      if (!walletClient) throw new Error("Connect a wallet first");
+
+      const txHash = await walletClient.writeContract({
+        account: walletClient.account,
+        address: tokenAddress as Address,
+        abi: erc20Abi,
+        functionName: "approve",
+        args: [spenderAddress, BigInt(amount)],
+        chain: walletClient.chain,
+      });
+      return waitForSuccess(txHash);
+    },
+    [waitForSuccess, walletClient],
+  );
+
+  const cancelOrder = useCallback<WalletInteractions["cancelOrder"]>(
+    async ({ contractAddress, abi, args }) => {
+      if (!walletClient) throw new Error("Connect a wallet first");
+
+      const txHash = await walletClient.writeContract({
+        account: walletClient.account,
+        address: contractAddress as Address,
+        abi,
+        functionName: "cancel",
+        args,
+        chain: walletClient.chain,
+      });
+      return waitForSuccess(txHash);
+    },
+    [waitForSuccess, walletClient],
+  );
+
+  const signOrder = useCallback<WalletInteractions["signOrder"]>(
+    async ({ signerAddress, typedData }) => {
+      if (!walletClient) throw new Error("Connect a wallet first");
+
+      return walletClient.signTypedData({
+        ...typedData,
+        message: { ...typedData.message },
+        account: signerAddress,
+      });
+    },
+    [walletClient],
+  );
+
+  const getAllowance = useCallback<WalletInteractions["getAllowance"]>(
+    async ({ tokenAddress, spenderAddress }) => {
+      if (!publicClient || !account) throw new Error("Connect a wallet first");
+
+      const allowance = await publicClient.readContract({
+        address: tokenAddress as Address,
+        abi: erc20Abi,
+        functionName: "allowance",
+        args: [account, spenderAddress],
+      });
+      return allowance.toString();
+    },
+    [account, publicClient],
+  );
+
+  return useMemo(
+    () => ({
+      approveToken,
+      cancelOrder,
+      getAllowance,
+      signOrder,
+      wrapNativeToken,
+    }),
+    [approveToken, cancelOrder, getAllowance, signOrder, wrapNativeToken],
+  );
+}
+```
+
+`useWalletInteractions()` adapts Wagmi's connected wallet and public clients into all five operations required by `SpotProvider`. Transaction callbacks wait for successful receipts before returning their hashes. The SDK supplies the spender, cancellation contract/ABI/arguments, signing account, and EIP-712 payload; forward those exact values instead of reconstructing them. Return the complete `0x` signature unchanged.
+
+`marketQuote.quotedOutputAmountRaw` is the current DEX quote's raw output for the complete `inputAmountUi`, not a standalone per-token price. `useDexDerivedData()` should omit stale output, keep `isQuoteLoading: true` until the current quote arrives, and expose `noLiquidity` only for the active amount and token pair.
 
 For a native/wrapped-native pair, the provider derives the 1:1 relationship using the host-supplied `wrappedNativeToken`. `spot-react` has no network registry: the DEX also owns chain labels and explorer URLs.
 
@@ -228,69 +310,18 @@ For a native/wrapped-native pair, the provider derives the 1:1 relationship usin
 
 Changing module or token pair reapplies form defaults without rebuilding unrelated provider state. Partner or chain changes re-key the configured client. Active execution keeps a frozen form, token, chain, and prepared order snapshot.
 
-## Implement Wallet Interactions
-
-Implement all five methods with the host's wallet stack. Transaction methods must wait for a successful receipt, reject reverted transactions, and then return the hash.
-
-```tsx
-type DexWallet = ReturnType<typeof useDexSpotAdapter>["wallet"];
-
-function createWalletInteractions(dexWallet: DexWallet): WalletInteractions {
-  return {
-    wrapNativeToken: async (amountRaw) => {
-      const txHash = await dexWallet.wrapNativeToken(amountRaw);
-      await dexWallet.waitForReceipt(txHash);
-      return txHash;
-    },
-
-    approveToken: async ({ tokenAddress, amount, spenderAddress }) => {
-      const txHash = await dexWallet.approveToken({
-        tokenAddress,
-        amount,
-        spenderAddress,
-      });
-      await dexWallet.waitForReceipt(txHash);
-      return txHash;
-    },
-
-    cancelOrder: async ({ contractAddress, abi, args }) => {
-      const txHash = await dexWallet.writeContract({
-        address: contractAddress,
-        abi,
-        functionName: "cancel",
-        args,
-      });
-      await dexWallet.waitForReceipt(txHash);
-      return txHash;
-    },
-
-    signOrder: ({ signerAddress, typedData }) =>
-      dexWallet.signTypedData({ ...typedData, account: signerAddress }),
-
-    getAllowance: ({ tokenAddress, spenderAddress }) =>
-      dexWallet.getAllowance({ tokenAddress, spenderAddress }),
-  };
-}
-```
-
-The SDK chooses the spender, cancellation contract/ABI/arguments, signing account, and EIP-712 payload. Adapt those exact values instead of reconstructing them. Return the original complete `0x` signature without splitting or normalizing it.
-
 When native input is selected, the SDK uses the required `wrappedNativeToken`, calls `wrapNativeToken()` for the complete amount, checks and approves its ERC-20 address, and prepares the signed order with that same address. After approval it rechecks allowance with a bounded retry to cover RPC propagation delay.
 
 ## Build with Focused Hooks
 
-There is no aggregate `useSpot()` API. Let each component call only the focused hooks needed by the controls and values it renders. For example, this order settings component reads the calculated form, renders its current output, and connects editable trade-count, limit-price, and price-direction controls directly to their SDK actions:
+Let each component call the focused hooks for its controls. These files adapt the reference app's trade, schedule, trigger/limit-price, and feedback panels to the current SDK. `useTranslations()` is the DEX's translation hook; it resolves the SDK's error keys and interpolation arguments using the host's messages.
 
-```tsx
-import {
-  useLimitPrice,
-  useOrderForm,
-  useOutputAmount,
-  usePriceDisplay,
-  useTrades,
-} from "@orbs-network/spot-react";
+```tsx title="order-settings.tsx"
+import { Module, useLimitPrice, useOrderForm, useOutputAmount, usePriceDisplay, useTrades } from "@orbs-network/spot-react";
+import { useTranslations } from "./use-translations";
 
-function AdvancedOrderSettings() {
+export function AdvancedOrderSettings() {
+  const t = useTranslations();
   const form = useOrderForm();
   const { amount: outputAmount, isLoading: isOutputLoading } =
     useOutputAmount();
@@ -306,7 +337,7 @@ function AdvancedOrderSettings() {
         Estimated output: {isOutputLoading ? "Loading…" : outputAmount.ui}
       </p>
 
-      <label>
+      {form.module === Module.TWAP && <label>
         Number of trades
         <input
           max={trades.maxTrades}
@@ -315,17 +346,23 @@ function AdvancedOrderSettings() {
           type="number"
           value={trades.totalTrades}
         />
-      </label>
+      </label>}
       {trades.error ? (
-        <p role="alert">{getLocalizedErrorMessage(trades.error)}</p>
+        <p role="alert">{t(trades.error.type, trades.error.args)}</p>
       ) : null}
 
+      {form.module !== Module.LIMIT && (
+        <label>
+          <input type="checkbox" checked={limitPrice.isEnabled} onChange={limitPrice.toggle} />
+          Use a limit price
+        </label>
+      )}
       {limitPrice.isEnabled ? (
         <label>
           Limit price
           <input
             onChange={(event) => limitPrice.onInputChange(event.target.value)}
-            value={limitPrice.price ?? ""}
+            value={limitPrice.price.ui}
           />
         </label>
       ) : null}
@@ -336,12 +373,125 @@ function AdvancedOrderSettings() {
       </button>
 
       {!form.canSubmit && form.errors.primary ? (
-        <p role="alert">{getLocalizedErrorMessage(form.errors.primary)}</p>
+        <p role="alert">{t(form.errors.primary.type, form.errors.primary.args)}</p>
       ) : null}
     </section>
   );
 }
 ```
+
+```tsx title="schedule-and-trigger.tsx"
+"use client";
+
+import { Module, TimeUnit, useDuration, useFillDelay, useOrderForm, useTriggerPrice } from "@orbs-network/spot-react";
+import { useTranslations } from "./use-translations";
+
+export function ScheduleSettings() {
+  const { module } = useOrderForm();
+  const duration = useDuration();
+  const interval = useFillDelay();
+  const t = useTranslations();
+  const isTwap = module === Module.TWAP;
+  const value = isTwap ? interval.fillDelay : duration.duration;
+  const onInputChange = isTwap ? interval.onInputChange : duration.onInputChange;
+  const onUnitSelect = isTwap ? interval.onUnitSelect : duration.onUnitSelect;
+  const error = isTwap ? interval.error : duration.error;
+  const units = [
+    { label: "Minutes", value: TimeUnit.Minutes },
+    { label: "Hours", value: TimeUnit.Hours },
+    { label: "Days", value: TimeUnit.Days },
+  ];
+
+  return (
+    <fieldset>
+      <legend>{isTwap ? "Trade interval" : "Order duration"}</legend>
+      <label>
+        Value
+        <input
+          type="number"
+          min={0}
+          value={value.value ?? ""}
+          onChange={(event) => onInputChange(event.target.value)}
+        />
+      </label>
+      <label>
+        Unit
+        <select
+          value={value.unit}
+          onChange={(event) => onUnitSelect(Number(event.target.value) as TimeUnit)}
+        >
+          {units.map((unit) => <option key={unit.value} value={unit.value}>{unit.label}</option>)}
+        </select>
+      </label>
+      {error && <p role="alert">{t(error.type, error.args)}</p>}
+    </fieldset>
+  );
+}
+
+export function TriggerPriceSettings() {
+  const { module } = useOrderForm();
+  const trigger = useTriggerPrice();
+  const t = useTranslations();
+
+  if (module !== Module.STOP_LOSS && module !== Module.TAKE_PROFIT) return null;
+
+  return (
+    <fieldset>
+      <legend>{module === Module.STOP_LOSS ? "Stop-loss trigger" : "Take-profit trigger"}</legend>
+      <p>1 {trigger.displayInputToken?.symbol} in {trigger.displayOutputToken?.symbol}</p>
+      <label>
+        Trigger price
+        <input inputMode="decimal" value={trigger.price.ui} onChange={(event) => trigger.onInputChange(event.target.value)} />
+      </label>
+      <label>
+        Difference from market (%)
+        <input inputMode="decimal" value={trigger.percentage} onChange={(event) => trigger.onPercentageChange(event.target.value)} />
+      </label>
+      <button onClick={trigger.onReset} type="button">Reset trigger</button>
+      {trigger.error && <p role="alert">{t(trigger.error.type, trigger.error.args)}</p>}
+    </fieldset>
+  );
+}
+```
+
+```tsx title="spot-form-content.tsx"
+"use client";
+
+import { useState } from "react";
+import { ORBS_TWAP_FAQ_URL, useDisclaimer } from "@orbs-network/spot-react";
+import { AdvancedOrderSettings } from "./order-settings";
+import { ScheduleSettings, TriggerPriceSettings } from "./schedule-and-trigger";
+import { SubmitOrderDialog } from "./submit-order-dialog";
+import { OrdersList } from "./orders-list";
+import { useTranslations } from "./use-translations";
+
+export function SpotFormContent() {
+  const [showOrders, setShowOrders] = useState(false);
+  const disclaimer = useDisclaimer();
+  const t = useTranslations();
+
+  return (
+    <>
+      <AdvancedOrderSettings />
+      <ScheduleSettings />
+      <TriggerPriceSettings />
+      <SubmitOrderDialog />
+      {disclaimer && (
+        <p>
+          {t(disclaimer)}{" "}
+          <a href={ORBS_TWAP_FAQ_URL} target="_blank" rel="noreferrer">Learn more</a>
+        </p>
+      )}
+      <button aria-expanded={showOrders} onClick={() => setShowOrders(!showOrders)} type="button">
+        {showOrders ? "Hide order history" : "Show order history"}
+      </button>
+      {showOrders && <OrdersList />}
+    </>
+  );
+}
+```
+
+The provider renders `SpotFormContent` alongside the host’s existing token/amount inputs. Mounting the history panel activates its shared polling; closing it removes that consumer. The submission modal and any portal-based history UI stay under the same provider.
 
 | Hook | What it does |
 | --- | --- |
@@ -364,96 +514,513 @@ An explicit TWAP trade count persists after amount changes. If it exceeds the ne
 
 ## Submit and Track Execution
 
-Use `useExecution()` for the lifecycle and `useOrderForm()` for the frozen review details. The exact phase is `idle → preparing → wrapping → approving → signing → submitting → success`, with `failed` and `rejected` terminal branches.
+Mount `SubmitOrderDialog` inside `SpotProvider`. The review button opens the modal; only its confirm button calls `submitOrder()`. These three files adapt the review, progress, and custom result panels from [orbs-spot’s submission UI](https://github.com/orbs-network/orbs-spot/blob/main/components/advanced-order/submit-order.tsx) to the current React SDK.
 
-```tsx
-import {
-  useExecution,
-  useSubmitButton,
-} from "@orbs-network/spot-react";
+The linked app currently uses the older `useSpot()` API. These snippets preserve its modal behavior using the current SDK's focused hooks.
 
-function AdvancedOrderActions() {
+The modal example uses Radix Dialog, as the reference app does. Reuse the DEX’s existing accessible dialog and icons, or install `@radix-ui/react-dialog` and `lucide-react` to use these files directly. The utility classes assume the host’s Tailwind styles and theme tokens. `useDexDerivedData().setInputAmount()` is the existing DEX input setter; every order-specific component and helper is shown below.
+
+```tsx title="submit-order-dialog.tsx"
+"use client";
+
+import { useState } from "react";
+import * as Dialog from "@radix-ui/react-dialog";
+import { useExecution, useSubmitButton } from "@orbs-network/spot-react";
+import { useDexDerivedData } from "./use-dex-derived-data";
+import { OrderFlow } from "./order-flow";
+
+export function SubmitOrderDialog() {
+  const [open, setOpen] = useState(false);
   const execution = useExecution();
   const { disabled, loading } = useSubmitButton();
+  const { setInputAmount } = useDexDerivedData();
+
+  const changeOpen = (nextOpen: boolean) => {
+    if (!nextOpen && !execution.canDismiss) return;
+    setOpen(nextOpen);
+  };
+
+  // Radix calls this after the closing content unmounts, including its exit
+  // animation. Keep the result visible until then; no guessed timeout is needed.
+  const resetAfterClose = () => {
+    if (execution.isSuccess) {
+      execution.startNewOrder();
+      setInputAmount("");
+    } else if (execution.isFailed || execution.isRejected) {
+      execution.returnToOrderForm();
+    }
+  };
 
   return (
-    <>
-      <button
-        disabled={disabled || execution.isExecuting}
-        onClick={() => execution.submitOrder()}
-        type="button"
-      >
-        {loading ? "Creating order…" : "Create order"}
-      </button>
+    <Dialog.Root open={open} onOpenChange={changeOpen}>
+      <Dialog.Trigger asChild>
+        <button disabled={disabled} type="button">
+          {loading ? "Preparing quote…" : "Review order"}
+        </button>
+      </Dialog.Trigger>
+      <Dialog.Portal>
+        <Dialog.Overlay className="fixed inset-0 z-50 bg-black/50" />
+        <Dialog.Content
+          className="fixed left-1/2 top-1/2 z-50 max-h-[90dvh] w-[calc(100vw-2rem)] max-w-md -translate-x-1/2 -translate-y-1/2 overflow-y-auto rounded-2xl bg-background p-6 text-foreground shadow-xl"
+          onCloseAutoFocus={resetAfterClose}
+          onEscapeKeyDown={(event) => {
+            if (!execution.canDismiss) event.preventDefault();
+          }}
+          onInteractOutside={(event) => {
+            if (!execution.canDismiss) event.preventDefault();
+          }}
+        >
+          <Dialog.Title className="sr-only">Advanced order</Dialog.Title>
+          <Dialog.Description className="sr-only">
+            Review the order, confirm wallet requests, and follow its progress.
+          </Dialog.Description>
 
-      <OrderProgress
-        phase={execution.phase}
-        currentStep={execution.currentStep}
-        currentStepIndex={execution.currentStepIndex}
-        totalSteps={execution.totalSteps}
-        error={execution.error}
-      />
-    </>
+          <OrderFlow />
+
+          <Dialog.Close asChild>
+            <button disabled={!execution.canDismiss} type="button">
+              {execution.isSuccess ? "Done" : "Close"}
+            </button>
+          </Dialog.Close>
+        </Dialog.Content>
+      </Dialog.Portal>
+    </Dialog.Root>
   );
 }
 ```
 
-The optional `@orbs-network/swap-ui` package can render the same review/progress flow, but it has its own presentation status contract. Keep any conversion to that package inside a small view adapter instead of mixing its status enum into application or Spot execution state.
+```tsx title="order-flow.tsx"
+"use client";
 
-Keep the accessible modal open while `isExecuting`. `returnToOrderForm()` dismisses a failed/rejected attempt while preserving the form and reusable completed wrap. `startNewOrder()` clears internal form/retry state after a terminal attempt; the host still clears its own input after success, ideally after the modal exit animation.
+import { Check, LoaderCircle, TriangleAlert } from "lucide-react";
+import { SwapFlow, SwapStatus } from "@orbs-network/swap-ui";
+import { ExecutionPhase, Steps, type SpotExecutionData, type Token, useExecution, useOrderForm } from "@orbs-network/spot-react";
+import { useConfig } from "wagmi";
+import { OrderReview } from "./order-review";
 
-Callbacks are observers for analytics, notifications, controlled field synchronization, and balance refresh. Current field callbacks are `onOrderDurationChange`, `onTradeIntervalChange`, and `onTradeCountChange`. Refetch balances after wrap, creation, fills, progress updates, and cancellation. Callback failures never change a wallet or API result.
+export function OrderFlow() {
+  const execution = useExecution();
+  const form = useOrderForm();
+
+  return (
+    <SwapFlow
+      inAmount={form.inputAmount.ui}
+      outAmount={form.outputAmount.ui}
+      inToken={execution.inputToken}
+      outToken={execution.outputToken}
+      swapStatus={getSwapUiStatus(execution)}
+      currentStepIndex={execution.currentStepIndex}
+      totalSteps={execution.totalSteps}
+      components={{
+        // Main covers review and every active phase. Results replace it.
+        Main: execution.isExecuting ? <OrderProgress /> : <OrderReview />,
+        Success: <OrderSuccess />,
+        Failed: <OrderFailure />,
+        SrcTokenLogo: <TokenLogo token={execution.inputToken} />,
+        DstTokenLogo: <TokenLogo token={execution.outputToken} />,
+        Loader: <LoaderCircle aria-hidden="true" className="size-10 animate-spin motion-reduce:animate-none" />,
+        SuccessIcon: <Check aria-hidden="true" className="size-10 text-green-600" />,
+        FailedIcon: <TriangleAlert aria-hidden="true" className="size-10 text-red-600" />,
+      }}
+    />
+  );
+}
+
+// Only this view adapter knows about swap-ui's presentation enum.
+function getSwapUiStatus(execution: SpotExecutionData): SwapStatus | undefined {
+  if (execution.isSuccess) return SwapStatus.SUCCESS;
+  if (execution.isFailed || execution.isRejected) return SwapStatus.FAILED;
+  if (execution.isExecuting) return SwapStatus.LOADING;
+  return undefined;
+}
+
+function OrderProgress() {
+  const execution = useExecution();
+  const steps = execution.executionSteps ?? [];
+  const stepLabels = {
+    [Steps.WRAP]: "Wrap native input",
+    [Steps.APPROVE]: "Approve input token",
+    [Steps.CREATE]: "Create order",
+  };
+  const progress = getProgressContent(execution.phase);
+  const activeIndex = execution.currentStepIndex ?? 0;
+
+  return (
+    <div role="status" aria-live="polite" className="w-full space-y-4">
+      <SwapFlow.StepLayout
+        title={progress.title}
+        body={<p>{progress.message}</p>}
+      />
+      <ol aria-label="Order creation steps">
+        {steps.map((step, index) => (
+          <li key={step} aria-current={index === activeIndex ? "step" : undefined}>
+            {index < activeIndex ? "✓ " : (index + 1) + ". "}
+            {stepLabels[step]}
+          </li>
+        ))}
+      </ol>
+      <ExecutionTransactions />
+    </div>
+  );
+}
+
+function getProgressContent(phase: ExecutionPhase) {
+  switch (phase) {
+    case ExecutionPhase.PREPARING:
+      return {
+        title: "Preparing order",
+        message: "Checking token allowance and calculating the required steps.",
+      };
+    case ExecutionPhase.WRAPPING:
+      return {
+        title: "Wrap native input",
+        message: "Confirm wrapping in your wallet, then wait for confirmation. The order spends the wrapped ERC-20 token.",
+      };
+    case ExecutionPhase.APPROVING:
+      return {
+        title: "Approve input token",
+        message: "Approve the SDK-provided spender in your wallet. Waiting for the transaction and updated allowance.",
+      };
+    case ExecutionPhase.SIGNING:
+      return {
+        title: "Sign order",
+        message: "Review and sign the EIP-712 order in your wallet.",
+      };
+    case ExecutionPhase.SUBMITTING:
+      return {
+        title: "Submitting order",
+        message: "Your signature is ready. Waiting for the order service to accept the order.",
+      };
+    default:
+      return { title: "Order progress", message: "" };
+  }
+}
+
+function OrderSuccess() {
+  const execution = useExecution();
+  const form = useOrderForm();
+
+  return (
+    <div role="status" className="w-full space-y-4">
+      <SwapFlow.StepLayout
+        title="Order created"
+        body={
+          <>
+            <p>{form.inputAmount.ui} {execution.inputToken?.symbol}</p>
+            <p>Estimated output: {form.outputAmount.ui} {execution.outputToken?.symbol}</p>
+            <p>Your order was accepted. Follow its fills in order history.</p>
+          </>
+        }
+      />
+      <WrappedFundsNotice />
+      <ExecutionTransactions />
+    </div>
+  );
+}
+
+function OrderFailure() {
+  const execution = useExecution();
+
+  return (
+    <div role="alert" className="w-full space-y-4">
+      <SwapFlow.StepLayout
+        title={execution.isRejected ? "Wallet request declined" : "Order creation failed"}
+        body={
+          <>
+            <p>{execution.error?.message || "Review the order and try again."}</p>
+            {execution.error?.code ? <p>Error code: {execution.error.code}</p> : null}
+            <WrappedFundsNotice />
+          </>
+        }
+      />
+      <ExecutionTransactions />
+      <button onClick={() => execution.returnToOrderForm()} type="button">
+        Back to review
+      </button>
+    </div>
+  );
+}
+
+function WrappedFundsNotice() {
+  const { wrapTxHash } = useExecution();
+  if (!wrapTxHash) return null;
+
+  return <p>The native-token wrap completed. Closing this dialog does not undo it.</p>;
+}
+
+function ExecutionTransactions() {
+  const { chainId, wrapTxHash, approvalTxHash } = useExecution();
+  const { chains } = useConfig();
+  // Use the frozen execution chain, even if the connected wallet has changed.
+  const explorer = chains.find((chain) => chain.id === chainId)?.blockExplorers?.default.url;
+  const transactions = [
+    { label: "Wrap transaction", hash: wrapTxHash },
+    { label: "Approval transaction", hash: approvalTxHash },
+  ].filter((transaction) => transaction.hash);
+
+  return (
+    <ul>
+      {transactions.map(({ label, hash }) => (
+        <li key={hash}>
+          {explorer ? (
+            <a href={explorer + "/tx/" + hash} target="_blank" rel="noreferrer">
+              {label}
+            </a>
+          ) : (
+            <span>{label}: {hash}</span>
+          )}
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+function TokenLogo({ token }: { token?: Token }) {
+  return token?.logoUrl ? (
+    <img src={token.logoUrl} alt="" width={32} height={32} className="rounded-full" />
+  ) : (
+    <span aria-hidden="true">{token?.symbol?.slice(0, 1)}</span>
+  );
+}
+```
+
+```tsx title="order-review.tsx"
+"use client";
+
+import { useState } from "react";
+import { SwapFlow } from "@orbs-network/swap-ui";
+import { DISCLAIMER_URL, Module, useExecution, useOrderForm, useSubmitButton } from "@orbs-network/spot-react";
+
+export function OrderReview() {
+  const [accepted, setAccepted] = useState(false);
+  const execution = useExecution();
+  const form = useOrderForm();
+  const { disabled, loading } = useSubmitButton();
+  const input = execution.inputToken?.symbol;
+  const output = execution.outputToken?.symbol;
+  const priceInput = form.isInverted ? output : input;
+  const priceOutput = form.isInverted ? input : output;
+  const orderNames = {
+    [Module.TWAP]: "TWAP",
+    [Module.LIMIT]: "Limit",
+    [Module.STOP_LOSS]: "Stop loss",
+    [Module.TAKE_PROFIT]: "Take profit",
+  };
+
+  return (
+    <section className="w-full space-y-4">
+      <h2>Review {orderNames[form.module]} order</h2>
+      <SwapFlow.Main
+        fromTitle="Pay"
+        toTitle="Estimated output"
+        inUsd={form.inputAmount.usd ? "$" + form.inputAmount.usd : undefined}
+        outUsd={form.outputAmount.usd ? "$" + form.outputAmount.usd : undefined}
+      />
+
+      <dl>
+        <dt>Duration from submission</dt>
+        <dd>{formatDuration(form.schedule.durationMillis)}</dd>
+
+        {form.triggerPrice.enabled && (
+          <>
+            <dt>Trigger price</dt>
+            <dd>1 {priceInput} = {form.triggerPrice.display.ui} {priceOutput}</dd>
+          </>
+        )}
+        {!form.values.isMarketOrder && (
+          <>
+            <dt>Limit price</dt>
+            <dd>1 {priceInput} = {form.limitPrice.display.ui} {priceOutput}</dd>
+          </>
+        )}
+        <dt>{form.trades.totalTrades > 1 ? "Minimum received per trade" : "Minimum received"}</dt>
+        <dd>{form.trades.minOutputAmountPerTrade.ui} {output}</dd>
+
+        {form.trades.totalTrades > 1 && (
+          <>
+            <dt>Number of trades</dt>
+            <dd>{form.trades.totalTrades}</dd>
+            <dt>Input per trade</dt>
+            <dd>{form.trades.inputAmountPerTrade.ui} {input}</dd>
+            <dt>Trade interval</dt>
+            <dd>{formatDuration(form.schedule.fillDelayMillis)}</dd>
+          </>
+        )}
+        {form.fees.percentage > 0 && (
+          <>
+            <dt>Estimated fee ({form.fees.percentage}%)</dt>
+            <dd>{form.fees.ui} {output}</dd>
+          </>
+        )}
+      </dl>
+
+      <label>
+        <input type="checkbox" checked={accepted} onChange={(event) => setAccepted(event.target.checked)} />
+        {" "}I accept the{" "}
+        <a href={DISCLAIMER_URL} target="_blank" rel="noreferrer">order disclaimer</a>
+      </label>
+      <button disabled={!accepted || disabled} onClick={execution.submitOrder} type="button">
+        {loading ? "Preparing order…" : "Submit order"}
+      </button>
+    </section>
+  );
+}
+
+function formatDuration(milliseconds: number): string {
+  if (milliseconds >= 86_400_000) return (milliseconds / 86_400_000) + " days";
+  if (milliseconds >= 3_600_000) return (milliseconds / 3_600_000) + " hours";
+  return (milliseconds / 60_000) + " minutes";
+}
+```
+
+| Execution condition | Modal content |
+| --- | --- |
+| `phase === ExecutionPhase.IDLE` | Token preview, duration/prices/trade details, disclaimer, and submit button. |
+| `phase === ExecutionPhase.PREPARING` | Allowance check and step-plan loading UI. |
+| `phase === ExecutionPhase.WRAPPING` | Native-to-ERC-20 wrap instructions and transaction confirmation. |
+| `phase === ExecutionPhase.APPROVING` | Approval instructions and allowance confirmation. |
+| `phase === ExecutionPhase.SIGNING` | Wallet EIP-712 signature prompt. |
+| `phase === ExecutionPhase.SUBMITTING` | Waiting for service acceptance; no additional wallet confirmation. |
+| `isSuccess` | Custom order-created summary. Creation success does not mean the order is filled. |
+| `isFailed` or `isRejected` | Custom error or declined-request screen, completed transaction links, and back-to-review action. |
+
+`SwapFlow` selects `Success` or `Failed` using `getSwapUiStatus()`. Otherwise, `Main` explicitly chooses progress while `isExecuting` and review while idle. This keeps the confirm button and review details out of every active and terminal screen. `StepLayout`, `Loader`, token-logo slots, and the success/failure icons provide the custom UI; the only status conversion is inside this view adapter.
+
+The SDK builds `executionSteps`: wrapping appears only when needed, approval appears only when allowance is insufficient, and signing/submission share the create-order step. Use its zero-based `currentStepIndex` and `totalSteps`. `useOrderForm()` and the tokens/chain from `useExecution()` retain the active attempt’s snapshot while the DEX’s inputs change.
+
+All close paths respect `canDismiss`. After the dialog exits, success calls `startNewOrder()` and clears the host input; failure or rejection calls `returnToOrderForm()` and preserves the form and reusable completed wrap. “Back to review” performs the latter reset while keeping the modal open. If the host uses another dialog, connect the same reset to its exit-complete callback. Use the host’s number formatter and translations for production display.
+
+Callbacks are observers for notifications, field synchronization, and balance refresh. Refetch balances after wrap, creation, fills, progress updates, and cancellation. Callback failures never change a wallet or API result.
 
 ## Order History and Cancellation
 
-`useOrders()` enables provider-scoped history fetching only while a consumer is mounted.
+`useOrders()` enables provider-scoped history fetching while mounted. The list and detail files follow the reference app’s filters, selected-order view, fill list, and cancellation feedback. Keep them under `SpotProvider`, including when the DEX renders them in a modal or portal.
 
-```tsx
+```tsx title="orders-list.tsx"
+"use client";
+
+import { useState } from "react";
 import { useOrders } from "@orbs-network/spot-react";
+import { useConnection } from "wagmi";
+import { OrderDetails } from "./order-details";
 
-function OpenOrdersList() {
-  const { data: orders, isLoading, isRefetching, refetch } = useOrders();
+export function OrdersList() {
+  const { address } = useConnection();
+  const { data: orders, error, isLoading, isRefetching, refetch } = useOrders();
+  const filters = ["all", "open", "completed", "cancelled", "expired"] as const;
+  const [filter, setFilter] = useState<(typeof filters)[number]>("open");
+  const [selectedKey, setSelectedKey] = useState<string>();
 
-  if (isLoading) return <p aria-live="polite">Loading orders…</p>;
+  // Resolve from all orders so a background update or cancellation refreshes
+  // the open details even when that order leaves the selected filter.
+  const selectedOrder = orders?.all.find((order) => order.historyKey === selectedKey);
+
+  if (!address) return <p>Connect a wallet to view orders.</p>;
+  if (isLoading) return <p role="status">Loading orders…</p>;
 
   return (
-    <section aria-busy={isRefetching}>
-      <button onClick={() => void refetch()} type="button">
-        Refresh
+    <section aria-label="Order history" aria-busy={isRefetching}>
+      {error && <p role="alert">{error.message}</p>}
+      <button disabled={isRefetching} onClick={() => void refetch()} type="button">
+        {isRefetching ? "Refreshing…" : "Refresh"}
       </button>
-      <ul>
-        {(orders?.open ?? []).map((order) => (
-          <li key={order.historyKey}>
-            <OrderRow order={order} />
-          </li>
-        ))}
-      </ul>
+      {selectedOrder ? (
+        <>
+          <button onClick={() => setSelectedKey(undefined)} type="button">Back to orders</button>
+          <OrderDetails key={selectedOrder.historyKey} order={selectedOrder} />
+        </>
+      ) : (
+        <>
+          <label>
+            Filter orders
+            <select value={filter} onChange={(event) => setFilter(event.target.value as typeof filter)}>
+              {filters.map((value) => <option key={value} value={value}>{value}</option>)}
+            </select>
+          </label>
+          <ul>
+            {(orders?.[filter] ?? []).map((order) => (
+              <li key={order.historyKey}>
+                <button onClick={() => setSelectedKey(order.historyKey)} type="button">
+                  {order.type} · {order.id} · {order.status}
+                </button>
+                <progress aria-label="Order fill progress" max={100} value={order.progress} />
+              </li>
+            ))}
+          </ul>
+          {!error && orders?.[filter].length === 0 && <p>No {filter} orders.</p>}
+        </>
+      )}
     </section>
   );
 }
 ```
 
-Store `order.historyKey` as list/cache identity and look up the current object from `orders?.all ?? []`; legacy numeric IDs can collide across deployments. `order.id` remains the protocol display/cancellation value.
+```tsx title="order-details.tsx"
+"use client";
 
-```tsx
-import { OrderStatus, useCancelOrder } from "@orbs-network/spot-react";
+import { OrderStatus, type Order, useCancelOrder, useHistoryOrder } from "@orbs-network/spot-react";
+import { useConfig } from "wagmi";
+import { useCurrency } from "./use-currency";
 
-function CancelOrderButton({ order }) {
-  const { cancelOrder, disabled, isLoading } = useCancelOrder(order);
+export function OrderDetails({ order }: { order: Order }) {
+  // Resolve metadata for this order, not the tokens currently selected to swap.
+  const inputToken = useCurrency(order.srcTokenAddress);
+  const outputToken = useCurrency(order.dstTokenAddress);
+  const details = useHistoryOrder(order, inputToken, outputToken);
+  const cancellation = useCancelOrder(order);
+  const { chains } = useConfig();
+  const explorer = chains.find((chain) => chain.id === order.chainId)?.blockExplorers?.default.url;
 
-  if (order.status !== OrderStatus.Open) return null;
+  if (!details || !inputToken || !outputToken) return <p role="status">Loading token details…</p>;
 
   return (
-    <button disabled={disabled || isLoading} onClick={cancelOrder} type="button">
-      {isLoading ? "Cancelling…" : "Cancel order"}
-    </button>
+    <article>
+      <h3>{inputToken.symbol} → {outputToken.symbol}</h3>
+      <p>Status: {order.status}</p>
+      <dl>
+        <dt>Order ID</dt><dd>{order.id}</dd>
+        <dt>Input amount</dt><dd>{details.inputAmount.ui} {inputToken.symbol}</dd>
+        <dt>Input filled</dt><dd>{details.inputAmountFilled.ui} {inputToken.symbol}</dd>
+        <dt>Output received</dt><dd>{details.outputAmountFilled.ui} {outputToken.symbol}</dd>
+        <dt>Fill progress</dt><dd>{details.progress}%</dd>
+        <dt>Minimum output per trade</dt><dd>{details.minOutputAmountPerTrade.ui} {outputToken.symbol}</dd>
+      </dl>
+      <details>
+        <summary>Fills ({details.fills.length})</summary>
+        <ul>
+          {details.fills.map((fill, index) => (
+            <li key={fill.txHash + "-" + index}>
+              {fill.inputAmount.ui} {inputToken.symbol} → {fill.outputAmount.ui} {outputToken.symbol}
+              {" "}{explorer ? (
+                <a href={explorer + "/tx/" + fill.txHash} target="_blank" rel="noreferrer">View fill</a>
+              ) : <span>{fill.txHash}</span>}
+            </li>
+          ))}
+        </ul>
+      </details>
+
+      {order.status === OrderStatus.Open && !cancellation.isSuccess && (
+        <button
+          disabled={cancellation.disabled || cancellation.isLoading}
+          onClick={() => void cancellation.cancelOrder()}
+          type="button"
+        >
+          {cancellation.isLoading ? "Cancelling…" : "Cancel order"}
+        </button>
+      )}
+      {cancellation.error && <p role="alert">{cancellation.error}</p>}
+      {cancellation.isSuccess && <p role="status">Order cancelled.</p>}
+      {explorer && cancellation.txHash && (
+        <a href={explorer + "/tx/" + cancellation.txHash} target="_blank" rel="noreferrer">Cancellation transaction</a>
+      )}
+    </article>
   );
 }
 ```
 
-Use `useHistoryOrder(order, inputToken?, outputToken?)` for display-ready amounts and fills. Keep order lists, details, cancellation controls, and context-preserving portals under `SpotProvider`. For large histories, use the DEX's existing virtualization library.
+`useCurrency(address)` is the host’s token-registry hook, returning metadata with `address`, `symbol`, `decimals`, and optional `logoUrl` for the active chain. Its lookup must use the history order’s token addresses. This lets `useHistoryOrder()` format raw amounts and fills correctly even when the swap form displays another pair.
 
-Cancellation uses the initialized client for both v1 and v2 requests, waits for the host wallet method, and refreshes history. Explorer URLs remain host-owned.
+Store `historyKey` as list/selection identity and resolve the current object from `orders.all`; legacy IDs can collide across deployments. `id` remains the protocol display/cancellation value. `useCancelOrder()` handles the wallet request, cancellation state, and cache update; it exposes errors and the confirmed hash without an extra host refetch parameter. For large histories, reuse the DEX’s existing virtualization library.
 
 ## Integration Checklist
 

@@ -3,7 +3,7 @@
 import { ExternalLink } from "lucide-react";
 import { type ReactNode, useMemo } from "react";
 
-import { CodeBlock } from "@/components/code-viewer";
+import { CodeBlock, TabbedCodeViewer } from "@/components/code-viewer";
 import {
   createPartnerDocumentationHref,
 } from "@/features/partner-documentation/query-state";
@@ -12,7 +12,11 @@ import type {
 } from "@/features/partner-documentation/partner-documentation";
 
 type MarkdownBlock =
-  | { code: string; language: string; type: "code" }
+  | { code: string; language: string; name?: string; type: "code" }
+  | {
+      files: { code: string; language: string; name: string }[];
+      type: "codeTabs";
+    }
   | { level: number; text: string; type: "heading" }
   | { items: string[]; type: "list" }
   | { items: string[]; type: "orderedList" }
@@ -47,7 +51,7 @@ function parseBlocks(markdown: string): MarkdownBlock[] {
       continue;
     }
 
-    const codeStart = line.match(/^```([\w-]+)?\s*$/);
+    const codeStart = line.match(/^```([\w-]+)?(?:\s+title="([^"]+)")?\s*$/);
     if (codeStart) {
       const codeLines: string[] = [];
       index += 1;
@@ -58,6 +62,7 @@ function parseBlocks(markdown: string): MarkdownBlock[] {
       blocks.push({
         code: codeLines.join("\n"),
         language: codeStart[1] ?? "text",
+        name: codeStart[2],
         type: "code",
       });
       index += 1;
@@ -127,7 +132,45 @@ function parseBlocks(markdown: string): MarkdownBlock[] {
     blocks.push({ text: paragraph.join(" "), type: "paragraph" });
   }
 
-  return blocks;
+  return blocks.reduce<MarkdownBlock[]>((grouped, block) => {
+    const previous = grouped.at(-1);
+
+    if (block.type !== "code" || !block.name) {
+      grouped.push(block);
+      return grouped;
+    }
+
+    if (previous?.type === "codeTabs") {
+      previous.files.push({
+        code: block.code,
+        language: block.language,
+        name: block.name,
+      });
+      return grouped;
+    }
+
+    if (previous?.type === "code" && previous.name) {
+      grouped[grouped.length - 1] = {
+        files: [
+          {
+            code: previous.code,
+            language: previous.language,
+            name: previous.name,
+          },
+          {
+            code: block.code,
+            language: block.language,
+            name: block.name,
+          },
+        ],
+        type: "codeTabs",
+      };
+      return grouped;
+    }
+
+    grouped.push(block);
+    return grouped;
+  }, []);
 }
 
 export function HighlightedText({ query, text }: { query?: string; text: string }) {
@@ -265,6 +308,16 @@ export function MarkdownContent({
 
         if (block.type === "code") {
           return <CodeBlock code={block.code} key={index} language={block.language} />;
+        }
+
+        if (block.type === "codeTabs") {
+          return (
+            <TabbedCodeViewer
+              files={block.files}
+              idPrefix={`markdown-code-tabs-${index}`}
+              key={index}
+            />
+          );
         }
 
         const [header, ...rows] = block.rows;

@@ -18,6 +18,8 @@ import {
 
 import type { ReferenceFile } from "@/lib/reference-examples";
 
+type CodeViewerFile = Omit<ReferenceFile, "language"> & { language: string };
+
 const LANGUAGE_ALIASES: Readonly<Record<string, Language>> = {
   js: "javascript",
   sh: "bash",
@@ -287,7 +289,7 @@ export function CodeBlock({ code, language }: { code: string; language: string }
   );
 }
 
-function useCodeViewerControls(files: readonly ReferenceFile[]) {
+function useCodeViewerControls(files: readonly CodeViewerFile[]) {
   const containerRef = useRef<HTMLDivElement>(null);
   const preRef = useRef<HTMLPreElement>(null);
   const tabRefs = useRef<(HTMLButtonElement | null)[]>([]);
@@ -369,7 +371,7 @@ export function TabbedCodeViewer({
   files,
   idPrefix,
 }: {
-  files: readonly ReferenceFile[];
+  files: readonly CodeViewerFile[];
   idPrefix: string;
 }) {
   const {

@@ -20,7 +20,7 @@ The TypeScript and React SDKs share the same form calculation and configured cli
 - [TypeScript SDK package](https://github.com/orbs-network/spot-ui/tree/master/packages/spot-ui)
 - [TypeScript SDK API](https://github.com/orbs-network/spot-ui/blob/master/packages/spot-ui/README.md)
 - [Spot TypeScript integration skill](https://github.com/orbs-network/spot-ui/tree/master/skills/spot-integration)
-- [Playground](https://orbs-spot.vercel.app/?tab=twap)
+- [Playground](https://orbs-spot.vercel.app/?tab=twap&devMode=true)
 
 ## Quickstart
 
@@ -47,10 +47,7 @@ The package has no React or wallet-library dependency. Import only from the pack
 `createClient(partner, chainId)` validates support, fetches and validates the current RePermit configuration, and returns a new frozen client bound to that exact partner and chain.
 
 ```typescript
-import {
-  createClient,
-  Partners,
-} from "@orbs-network/spot-ui";
+import { createClient, Partners } from "@orbs-network/spot-ui";
 
 async function getSpotClient() {
   const chainId = 137;
@@ -85,11 +82,7 @@ Do not fetch or reconstruct RePermit configuration in host code. The client reje
 Use `calculateOrderForm()` as the only calculation entry point. It is synchronous and time-independent, so derive it from the exact primitive form and market inputs in the host's existing computed state or memoization layer. Store only editable inputs; do not copy the calculated result into writable state.
 
 ```typescript
-import {
-  calculateOrderForm,
-  Module,
-  type CalculateOrderFormParams,
-} from "@orbs-network/spot-ui";
+import { calculateOrderForm, Module, type CalculateOrderFormParams } from "@orbs-network/spot-ui";
 
 function getCalculatedOrderForm() {
   const params = {
@@ -176,52 +169,35 @@ Use `.raw` only for wallet and protocol operations, `.ui` for editable token val
 
 Treat one click as one immutable attempt and reject concurrent submissions. Capture the current form, tokens, account, chain, and client. For native input, obtain the chain's wrapped-native `Token` from DEX configuration, wrap the full amount, then use that ERC-20 address for allowance, approval, and order preparation.
 
-This example is framework-neutral: the connected account and Viem clients arrive as arguments, and Viem handles the ERC-20 and wrapped-native contract calls. A React host passes the clients Wagmi already gives it; see the React SDK guide for that wrapper.
+This is a plain browser TypeScript example. It creates the Viem clients once at module scope from the active chain and injected wallet provider, while the host passes the connected account with the current order inputs. Replace the example Polygon chain with the chain selected in the wallet.
 
 ```typescript
-import {
-  isNativeAddress,
-  isTxRejected,
-  type AllowanceRequest,
-  type CalculatedOrderForm,
-  type Token,
-} from "@orbs-network/spot-ui";
-import {
-  erc20Abi,
-  parseAbi,
-  type Address,
-  type Hash,
-  type PublicClient,
-  type WalletClient,
-} from "viem";
+import { isNativeAddress, type CalculatedOrderForm, type Token } from "@orbs-network/spot-ui";
+import { createPublicClient, createWalletClient, custom, erc20Abi, http, parseAbi, type Address, type Hash } from "viem";
+import { polygon } from "viem/chains";
 
+// Use the Viem chain connected in the host wallet; Polygon is only an example.
+const chain = polygon;
+const publicClient = createPublicClient({ chain, transport: http() });
+const walletProvider = (window as unknown as { ethereum: Parameters<typeof custom>[0] }).ethereum;
+const walletClient = createWalletClient({ chain, transport: custom(walletProvider) });
 const wrappedNativeAbi = parseAbi(["function deposit() payable"]);
 
-// Everything this flow needs from the host's wallet layer. These are Viem
-// types, so any host can supply them: Wagmi's usePublicClient() and
-// useWalletClient().data return exactly these clients.
-type WalletContext = {
-  account: Address;
-  publicClient: PublicClient;
-  walletClient: WalletClient;
-};
-
 type SubmitAdvancedOrderParams = {
+  account: Address;
   form: CalculatedOrderForm;
   inputToken: Token;
   outputToken: Token;
-  wallet: WalletContext;
-  wrappedNativeToken?: Token;
+  wrappedNativeToken: Token;
 };
 
 export async function submitAdvancedOrder({
+  account,
   form,
   inputToken,
   outputToken,
-  wallet,
   wrappedNativeToken,
 }: SubmitAdvancedOrderParams) {
-  const { account, publicClient, walletClient } = wallet;
   const client = await getSpotClient();
   if (!form.canSubmit) throw new Error("Order form is not ready");
 
@@ -229,95 +205,80 @@ export async function submitAdvancedOrder({
   const sourceIsNative = isNativeAddress(inputToken.address);
   const orderInputToken = sourceIsNative ? wrappedNativeToken : inputToken;
 
-  if (!orderInputToken || isNativeAddress(orderInputToken.address)) {
-    throw new Error("The DEX has no wrapped-native token for this chain");
-  }
-
   const tokenAddress = orderInputToken.address as Address;
-  const allowanceRequest = {
-    tokenAddress,
-    spenderAddress: client.spenderAddress,
-  } satisfies AllowanceRequest;
 
-  async function waitForSuccessfulReceipt(hash: Hash) {
-    const receipt = await publicClient.waitForTransactionReceipt({ hash });
-    if (receipt.status !== "success") {
-      throw new Error("Wallet transaction reverted");
-    }
+  if (sourceIsNative) await wrapNativeToken(account, tokenAddress, amount);
+  await approveTokenIfNeeded(account, tokenAddress, client.spenderAddress, amount);
+
+  // Prepare late so the signed start, deadline, and nonce remain fresh.
+  const preparedOrder = client.prepareOrder({
+    form,
+    inputTokenAddress: tokenAddress,
+    outputTokenAddress: outputToken.address,
+    swapperAddress: account,
+  });
+
+  const signature = await client.signOrder(
+    preparedOrder,
+    ({ signerAddress, typedData }) =>
+      walletClient.signTypedData({
+        ...typedData,
+        account: signerAddress,
+      }),
+  );
+
+  return client.submitOrder(preparedOrder, signature);
+}
+
+async function wrapNativeToken(account: Address, tokenAddress: Address, amount: string): Promise<void> {
+  const hash = await walletClient.writeContract({
+    address: tokenAddress,
+    abi: wrappedNativeAbi,
+    functionName: "deposit",
+    value: BigInt(amount),
+    account,
+    chain: walletClient.chain,
+  });
+  await waitForSuccessfulReceipt(hash);
+}
+
+async function approveTokenIfNeeded(account: Address, tokenAddress: Address, spenderAddress: Address, amount: string): Promise<void> {
+  if (await hasAllowance(account, tokenAddress, spenderAddress, amount)) return;
+
+  const hash = await walletClient.writeContract({
+    address: tokenAddress,
+    abi: erc20Abi,
+    functionName: "approve",
+    args: [spenderAddress, BigInt(amount)],
+    account,
+    chain: walletClient.chain,
+  });
+  await waitForSuccessfulReceipt(hash);
+
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    if (await hasAllowance(account, tokenAddress, spenderAddress, amount)) return;
+    await new Promise((resolve) => setTimeout(resolve, 3_000));
   }
+  throw new Error("Confirmed approval was not observed by the RPC");
+}
 
-  async function hasAllowance() {
-    const allowance = await publicClient.readContract({
-      address: tokenAddress,
-      abi: erc20Abi,
-      functionName: "allowance",
-      args: [account, client.spenderAddress],
-    });
+async function hasAllowance(account: Address, tokenAddress: Address, spenderAddress: Address, amount: string): Promise<boolean> {
+  const allowance = await publicClient.readContract({
+    address: tokenAddress,
+    abi: erc20Abi,
+    functionName: "allowance",
+    args: [account, spenderAddress],
+  });
+  return allowance >= BigInt(amount);
+}
 
-    return allowance >= BigInt(amount);
-  }
-
-  try {
-    if (sourceIsNative) {
-      const wrapHash = await walletClient.writeContract({
-        address: tokenAddress,
-        abi: wrappedNativeAbi,
-        functionName: "deposit",
-        value: BigInt(amount),
-        account,
-        chain: walletClient.chain,
-      });
-      await waitForSuccessfulReceipt(wrapHash);
-    }
-
-    if (!(await hasAllowance())) {
-      const approvalHash = await walletClient.writeContract({
-        address: tokenAddress,
-        abi: erc20Abi,
-        functionName: "approve",
-        args: [client.spenderAddress, BigInt(amount)],
-        account,
-        chain: walletClient.chain,
-      });
-      await waitForSuccessfulReceipt(approvalHash);
-
-      let approvalObserved = false;
-      for (let attempt = 0; attempt < 3; attempt += 1) {
-        approvalObserved = await hasAllowance();
-        if (approvalObserved) break;
-        await new Promise((resolve) => setTimeout(resolve, 3_000));
-      }
-      if (!approvalObserved) {
-        throw new Error("Confirmed approval was not observed by the RPC");
-      }
-    }
-
-    // Prepare late so the signed start, deadline, and nonce remain fresh.
-    const preparedOrder = client.prepareOrder({
-      form,
-      inputTokenAddress: tokenAddress,
-      outputTokenAddress: outputToken.address,
-      swapperAddress: account,
-    });
-
-    const signature = await client.signOrder(
-      preparedOrder,
-      ({ signerAddress, typedData }) =>
-        walletClient.signTypedData({
-          ...typedData,
-          account: signerAddress,
-        }),
-    );
-
-    return await client.submitOrder(preparedOrder, signature);
-  } catch (error: unknown) {
-    if (isTxRejected(error)) return;
-    throw error;
-  }
+async function waitForSuccessfulReceipt(hash: Hash): Promise<void> {
+  const receipt = await publicClient.waitForTransactionReceipt({ hash });
+  if (receipt.status !== "success") throw new Error("Wallet transaction reverted");
 }
 ```
 
-`useWalletClient()` supplies the connected wallet transport for `writeContract()` and `signTypedData()`. `usePublicClient()` supplies the active chain's RPC transport for `readContract()` and receipt confirmation. This example assumes the host exposes the action only after the account and clients are ready on the intended chain. Wallet writes are not complete until `waitForTransactionReceipt()` returns a successful receipt. Re-read allowance with a small bounded retry after approval to tolerate RPC indexing lag.
+`walletClient` uses the injected wallet transport for `writeContract()` and `signTypedData()`. `publicClient` uses the active chain's RPC transport for `readContract()` and receipt confirmation. The host should expose the action only after the account and provider are ready on that chain. Wallet writes are not complete until `waitForTransactionReceipt()` returns a successful receipt. Re-read allowance with a small bounded retry after approval to tolerate RPC indexing lag.
 
 Run `prepareOrder()` after wrapping and approval, immediately before signing. It rejects `form.canSubmit === false`, stamps fresh `currentTimeMillis`, `deadlineMillis`, and a monotonic client nonce, and returns `order`, `signingRequest`, `approvalRequest`, `form`, and `values`. It does not recalculate the form or perform a wallet call.
 
@@ -325,34 +286,35 @@ Return the wallet's original `0x`-prefixed EIP-712 signature. Do not split it in
 
 ## Fetch and Cancel Orders
 
-Use the initialized client so partner, chain, and exchange remain aligned with submission.
+### Fetch Orders
+
+Use the initialized client so partner, chain, and exchange remain aligned with submission. Omit `page` to fetch all available pages.
 
 ```typescript
-async function cancelSelectedOrder() {
-  const orders = await client.getAccountOrders({
+async function fetchOrders() {
+  return client.getAccountOrders({
     account,
-    page: 0,
-    limit: 25,
     signal: abortController.signal,
   });
+}
+```
 
-  const selectedOrder = orders.find(
-    (order) => order.historyKey === selectedHistoryKey,
-  );
-  if (!selectedOrder) {
-    throw new Error("Order is no longer in recent history");
-  }
+Use `historyKey` for UI and cache identity because legacy numeric IDs can repeat across contract deployments. Keep `order.id` for protocol display and cancellation. History values are raw integer strings; format them with the correct token decimals. Helpers such as `getOrderFillDelayMillis`, `getOrderExecutionRate`, `getOrderLimitPriceRate`, and `getTriggerPriceRate` normalize display data.
 
-  const request = client.getCancelOrderRequest(selectedOrder);
+### Cancel Order
+
+Pass the selected order returned by `fetchOrders()` to the same initialized client.
+
+```typescript
+import type { Order } from "@orbs-network/spot-ui";
+
+async function cancelSelectedOrder(order: Order) {
+  const request = client.getCancelOrderRequest(order);
   const txHash = await wallet.cancelOrder(request);
   await refreshOrders();
   return txHash;
 }
 ```
-
-Omit `page` to fetch all available pages. `legacyOrders` defaults to `true`; disable it only when the product intentionally excludes v1 orders. There is no authoritative single-order endpoint, so poll a bounded recent page and match by `order.historyKey`.
-
-Use `historyKey` for UI and cache identity because legacy numeric IDs can repeat across contract deployments. Keep `order.id` for protocol display and cancellation. History values are raw integer strings; format them with the correct token decimals. Helpers such as `getOrderFillDelayMillis`, `getOrderExecutionRate`, `getOrderLimitPriceRate`, and `getTriggerPriceRate` normalize display data.
 
 `getCancelOrderRequest()` selects the correct v1 or v2 contract, ABI, and arguments. The host wallet must submit it on `client.chainId`, wait for a successful receipt, prevent duplicate prompts, and refresh normalized history afterward.
 
