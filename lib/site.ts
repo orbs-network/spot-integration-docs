@@ -1,7 +1,9 @@
 export const SITE_NAME = "Spot Integration Docs";
 export const SITE_DESCRIPTION =
-  "Integration guides for Orbs Liquidity Hub and Advanced Orders.";
+  "Integration guides for Orbs Swap and Advanced Orders.";
 export const SITE_REPOSITORY = "https://github.com/orbs-network/spot-integration-docs";
+export const ADVANCED_ORDERS_SKILL_URL =
+  "https://github.com/orbs-network/spot/tree/master/skill";
 
 const DEFAULT_SITE_URL = "https://spot-integration-docs.vercel.app";
 

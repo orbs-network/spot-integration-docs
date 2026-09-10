@@ -9,6 +9,7 @@ import {
   ChevronDown,
   ChevronLeft,
   ChevronRight,
+  ExternalLink,
   Github,
   Search,
 } from "lucide-react";
@@ -25,6 +26,7 @@ import {
 } from "react";
 
 import { AppHeader } from "@/components/app-header";
+import { CategoryAccordion } from "@/components/category-accordion";
 import { HighlightedText, MarkdownContent } from "@/components/markdown-content";
 import { PageActions } from "@/components/page-actions";
 import {
@@ -47,6 +49,7 @@ import type {
   GuideSummary,
 } from "@/lib/guides";
 import { hasReferenceExample } from "@/lib/reference-keys";
+import { ADVANCED_ORDERS_SKILL_URL } from "@/lib/site";
 
 const InteractiveReference = dynamic(() =>
   import("@/components/interactive-reference").then(
@@ -67,6 +70,16 @@ const RESOURCES: Record<
   GuideId,
   { primaryHref: string; primaryLabel: string; sourceHref: string }
 > = {
+  "liquidity-hub-shared": {
+    primaryHref: "https://orbs-spot.vercel.app/?devMode=true",
+    primaryLabel: "Open Interactive Example",
+    sourceHref: "https://github.com/orbs-network/spot-ui/tree/master/packages/liquidity-hub-ui",
+  },
+  "advanced-orders-shared": {
+    primaryHref: "https://orbs-spot.vercel.app/?devMode=true&tab=twap",
+    primaryLabel: "Open Interactive Example",
+    sourceHref: "https://github.com/orbs-network/spot/blob/master/config.json",
+  },
   "liquidity-hub": {
     primaryHref: "https://orbs-spot.vercel.app/?devMode=true",
     primaryLabel: "Open Interactive Example",
@@ -172,7 +185,7 @@ function GuideNavigation({
     {
       description: "Best-price swap routing",
       id: "liquidity-hub" as const,
-      label: "Liquidity Hub",
+      label: "Swap",
     },
     {
       description: "Scheduled and conditional orders",
@@ -183,43 +196,70 @@ function GuideNavigation({
 
   return (
     <nav aria-label="Integration guides" className="guide-tree">
-      {products.map((product) => {
-        const activeProduct = activeGuide.product === product.id;
-        const variants = guides.filter((guide) => guide.product === product.id);
+      <section aria-label="Perpetual Hub" className="category-accordion guide-category category-upcoming">
+        <div className="category-summary">
+          <h2>Perpetual Hub</h2>
+          <span className="coming-soon-badge">Coming soon</span>
+        </div>
+      </section>
+      <CategoryAccordion
+        className="guide-category"
+        selected
+        title="Spot"
+      >
+        <div className="guide-category-products">
+          {products.map((product) => {
+            const activeProduct = activeGuide.product === product.id;
+            const variants = guides.filter((guide) => guide.product === product.id);
 
-        return (
-          <div
-            aria-label={`${product.label} integration methods`}
-            className={`guide-product${activeProduct ? " guide-product-active" : ""}`}
-            key={product.id}
-            role="group"
-          >
-            <div className="guide-product-heading">
-              <strong>{product.label}</strong>
-              <span>{product.description}</span>
-            </div>
-            <div className="variant-list">
-              {variants.map((guide) => {
-                const active = guide.id === activeGuide.id;
-                return (
-                  <Link
-                    aria-current={active ? "page" : undefined}
-                    className={`variant-link${active ? " variant-link-active" : ""}`}
-                    href={createPartnerDocumentationHref(
-                      guide.route,
-                      partnerRequest,
-                    )}
-                    key={guide.id}
-                  >
-                    <span aria-hidden="true" className="variant-link-marker" />
-                    <span>{guide.variantLabel}</span>
-                  </Link>
-                );
-              })}
-            </div>
-          </div>
-        );
-      })}
+            return (
+              <div
+                aria-label={`${product.label} integration methods`}
+                className={`guide-product${activeProduct ? " guide-product-active" : ""}`}
+                key={product.id}
+                role="group"
+              >
+                <div className="guide-product-heading">
+                  <strong>{product.label}</strong>
+                  <span>{product.description}</span>
+                </div>
+                <div className="variant-list">
+                  {variants.map((guide) => {
+                    const active = guide.id === activeGuide.id;
+                    return (
+                      <Link
+                        aria-current={active ? "page" : undefined}
+                        className={`variant-link${guide.id.endsWith("-shared") ? " variant-link-reference" : ""}${active ? " variant-link-active" : ""}`}
+                        href={createPartnerDocumentationHref(
+                          guide.route,
+                          partnerRequest,
+                        )}
+                        key={guide.id}
+                      >
+                        <span aria-hidden="true" className="variant-link-marker" />
+                        <span>{guide.variantLabel}</span>
+                      </Link>
+                    );
+                  })}
+                  {product.id === "advanced-orders" ? (
+                    <a
+                      className="variant-link"
+                      href={ADVANCED_ORDERS_SKILL_URL}
+                      rel="noreferrer"
+                      target="_blank"
+                    >
+                      <span aria-hidden="true" className="variant-link-marker" />
+                      <span>MCP Skill</span>
+                      <ExternalLink aria-hidden="true" size={12} />
+                    </a>
+                  ) : null}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </CategoryAccordion>
+
     </nav>
   );
 }
@@ -364,6 +404,7 @@ function DocsShellContent({
   partnerDocumentation: PartnerDocumentationState;
 }) {
   const router = useRouter();
+  const sectionLabel = activeGuide.id.endsWith("-shared") ? "Section" : "Step";
   const hash = useSyncExternalStore(
     subscribeToLocation,
     getHashSnapshot,
@@ -548,7 +589,7 @@ function DocsShellContent({
               <span>
                 <small>
                   {activeGuide.product === "liquidity-hub"
-                    ? "Liquidity Hub"
+                    ? "Swap"
                     : "Advanced Orders"}
                 </small>
                 <strong>{activeStepIndex + 1}. {activeStep.title}</strong>
@@ -599,8 +640,8 @@ function DocsShellContent({
             />
             <div className="sidebar-rule" />
             <div className="step-list-heading">
-              <span>{activeGuide.variantLabel} guide</span>
-              <span>Step {activeStepIndex + 1} of {activeGuide.steps.length}</span>
+              <span>{activeGuide.variantLabel}</span>
+              <span>{sectionLabel} {activeStepIndex + 1} of {activeGuide.steps.length}</span>
             </div>
             <StepNavigation
               activeStepIndex={activeStepIndex}
@@ -621,7 +662,7 @@ function DocsShellContent({
         >
           <header className="guide-header">
             <p className="eyebrow">
-              {activeGuide.label} · Step {activeStepIndex + 1} of {activeGuide.steps.length}
+              {activeGuide.label} · {sectionLabel} {activeStepIndex + 1} of {activeGuide.steps.length}
             </p>
             <div className="guide-title-row">
               <div className="guide-heading-row">

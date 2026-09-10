@@ -1,22 +1,18 @@
 # Advanced Orders · React SDK
 
+[Shared Reference](/advanced-orders/shared) — concepts, lifecycle, input tokens, chains, fees, partner configuration, and resources for every Advanced Orders integration.
+
 Use `@orbs-network/spot-react` when an existing React DEX wants provider-scoped Advanced Orders state and focused hooks. The host keeps its swap state, wallet access, components, styling, translations, routing, chain metadata, and modal shell. `SpotProvider` owns the calculated form, configured client, execution state, history, and cancellation state.
 
-The package uses `@orbs-network/spot-ui` internally. Choose [API Only](/advanced-orders/direct) for a package-free protocol integration or the [TypeScript SDK](/advanced-orders/typescript) for a non-React/headless integration.
-
-## Integration Resources
-
-- [React SDK package](https://github.com/orbs-network/spot-ui/tree/master/packages/spot-react)
-- [Spot React integration skill](https://github.com/orbs-network/spot-ui/tree/master/skills/spot-react-integration)
-- [Reference React implementation](https://github.com/orbs-network/orbs-spot/blob/main/components/advanced-order/spot-provider-shell.tsx)
-- [Swap UI execution helper](https://www.npmjs.com/package/@orbs-network/swap-ui)
-- [Playground](https://orbs-spot.vercel.app/?tab=twap&devMode=true)
+The package uses `@orbs-network/spot-ui` internally. See [Choose an Integration](/advanced-orders/shared#integration-options) for the API and SDK comparison.
 
 ## Quickstart
 
+### Quickstart
+
 Keep the existing DEX swap form as the source of truth and adapt these values into `SpotProvider`:
 
-**Input token requirement:** The signed order always spends an ERC-20 token. `inputToken` may be the native asset selected by the user, but the host must also pass the connected chain's `wrappedNativeToken`. The SDK wraps native funds when necessary, then uses that wrapped ERC-20 for allowance, approval, and signing.
+Follow the shared [Input Tokens](/advanced-orders/shared#how-it-works) requirements when wiring `inputToken` and `wrappedNativeToken`.
 
 | Host value | Expected shape |
 | --- | --- |
@@ -28,9 +24,9 @@ Keep the existing DEX swap form as the source of truth and adapt these values in
 | Wallet | Connected `chainId`, `account`, and five `walletInteractions` methods. |
 | Product policy | Orbs-provided partner enum, positive `minTradeSizeUsd`, and `priceProtectionPercent`. |
 
-Use `Partners.Unknown` unless Orbs provided a specific enum member. Never infer the partner from a name, hostname, or chain. Validate the connected chain for that partner; if unavailable, keep the form visible and replace only the submit area with the DEX's connect-wallet or switch-network control.
+Apply the shared [Partner Configuration](/advanced-orders/shared#fees-and-configuration) requirements. If the wallet or supported network is unavailable, keep the form visible and replace only the submit area with the DEX's connect-wallet or switch-network control.
 
-## Install the React SDK
+### Install the React SDK
 
 Use the host's package manager. `@orbs-network/swap-ui` is an optional helper for review/progress UI and is not required by the headless React SDK.
 

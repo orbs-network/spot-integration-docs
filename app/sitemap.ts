@@ -5,7 +5,7 @@ import { getSiteUrl } from "@/lib/site";
 
 export default function sitemap(): MetadataRoute.Sitemap {
   const siteUrl = getSiteUrl();
-  const latestGuideUpdate = GUIDE_SOURCES.reduce(
+  const latestGuideUpdate = GUIDE_SOURCES.reduce<string>(
     (latest, guide) => (guide.updatedAt > latest ? guide.updatedAt : latest),
     GUIDE_SOURCES[0].updatedAt,
   );

@@ -98,7 +98,7 @@ export default function OpenGraphImage(): ImageResponse {
           paddingTop: 28,
         }}
       >
-        <span>Liquidity Hub</span>
+        <span>Swap</span>
         <span>Advanced Orders</span>
         <span>API · TypeScript SDK · React</span>
       </div>

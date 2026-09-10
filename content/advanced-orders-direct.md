@@ -1,41 +1,31 @@
 # Advanced Orders · API Only
 
+[Shared Reference](/advanced-orders/shared) — concepts, lifecycle, input tokens, chains, fees, partner configuration, and resources for every Advanced Orders integration.
+
 Use this guide when the application should integrate Advanced Orders without installing an Orbs package. The host application owns the interface, wallet integration, request flow, and order lifecycle while calling the Order Sink APIs directly.
 
 This path has no Orbs package dependency and works with any frontend or backend stack. The HTTP and EIP-712 contract is canonical.
 
-**Prefer an SDK when possible.** With the API-only path, the integrating client must calculate, validate, and populate every strategy, amount, schedule, trigger, limit, nonce, deadline, and EIP-712 order field itself. [`@orbs-network/spot-ui`](/advanced-orders/typescript) is the recommended framework-neutral TypeScript option and provides the most flexibility while keeping calculation and protocol construction inside the SDK. [`@orbs-network/spot-react`](/advanced-orders/react) is the easiest option for React applications because it also provides provider-scoped state, focused form hooks, execution, history, and cancellation.
+See [Choose an Integration](/advanced-orders/shared#integration-options) for the SDK comparison and [Input Tokens](/advanced-orders/shared#how-it-works) for the shared ERC-20 requirement.
 
-Use API Only when an Orbs package cannot run in the target environment or the host intentionally needs full ownership of the raw HTTP and EIP-712 implementation.
+## Quickstart
 
-**Input token requirement:** Advanced Orders accepts ERC-20 input tokens only. Never place a native-token address or placeholder in the signed order. If the user selects the chain's native currency, wrap it first and build the order with the wrapped-native ERC-20 address.
+Start with the shared [Partner Configuration](/advanced-orders/shared#fees-and-configuration) and [Input Tokens](/advanced-orders/shared#how-it-works) requirements, then implement these API operations.
 
-## Concepts
+The API-only integration uses these HTTP and on-chain operations:
 
-| Term | Meaning |
+| Operation | Contract |
 | --- | --- |
-| Order Sink | Off-chain service that accepts signed RePermit orders and exposes them through the orders API. |
-| RePermit | On-chain contract used for token authorization and cancellation. Users approve this contract to spend the source token. |
-| Reactor | Contract encoded as the signed permit `spender`. It is part of the signed order and is not the ERC-20 allowance spender. |
-| Swapper | User address that owns the order. This must be the EIP-712 signer and is stored at `order.witness.swapper`. |
-| RePermit digest | Order cancellation digest returned by Order Sink as `metadata.repermitDigest`. This is passed to the RePermit `cancel(bytes32[])` function. |
-
-### Integration Sequence
-
-1. Create an order by fetching trusted configuration, preparing funds, building and signing the order, and submitting it to Order Sink.
-2. Fetch orders from Order Sink for the swapper, chain ID, and adapter.
-3. Cancel an order on-chain when needed.
-
-## Integration Resources
-
-- [Playground](https://orbs-spot.vercel.app/?tab=twap)
-- [Direct integration reference](https://github.com/orbs-network/spot-integration-docs)
+| Fetch configuration | `GET https://order-sink-v2.orbs.network/config?partner={partner}&chain={chainId}` with `Accept: application/json`. |
+| Create order | `POST https://order-sink-v2.orbs.network/orders/new` with JSON `{ signature, order, status: "pending" }`. `order` must be the exact EIP-712 message that produced `signature`. |
+| Fetch history | `GET https://order-sink-v2.orbs.network/orders?swapper={account}&chainId={chainId}&exchange={adapter}`. The adapter comes from the configuration response. |
+| Cancel | Send the on-chain transaction `cancel([metadata.repermitDigest])` to `domain.verifyingContract`; cancellation is not an Order Sink HTTP request. |
 
 ### Function Contracts
 
 This document describes the behavior of three functions. Your implementation can be in Java, Python, TypeScript, Go, or any other stack.
 
-The optional full-flow TypeScript example uses Wagmi v3 and Viem for wallet interactions. The same protocol steps can be implemented with another wallet or backend stack.
+The TypeScript examples use Viem for wallet interactions. The same protocol steps can be implemented with another wallet or backend stack.
 
 `fetchRePermitData(partner, chainId)` fetches the server-controlled EIP-712 domain, types, primary type, and order template for one partner and chain.
 
@@ -51,19 +41,6 @@ The optional full-flow TypeScript example uses Wagmi v3 and Viem for wallet inte
 `submitOrder(signature, order)` sends the signed order to Order Sink as `{ signature, order, status: "pending" }`. The complete request appears once in the Create Order snippet.
 
 The RePermit contract, reactor, executor, exchange adapter, and fee reference addresses come from the fetched partner configuration. Do not hardcode them in the integration.
-
-## Quickstart
-
-Before implementing the API-only flow, make sure the integration has an active EVM wallet and chain, an ERC-20 input token, and the partner identifier supplied by Orbs. If Orbs did not provide a partner identifier, use the exact value `"unknown"`. When the user selects native currency, wrap it before creating the order.
-
-The API-only integration uses these HTTP and on-chain operations:
-
-| Operation | Contract |
-| --- | --- |
-| Fetch configuration | `GET https://order-sink-v2.orbs.network/config?partner={partner}&chain={chainId}` with `Accept: application/json`. |
-| Create order | `POST https://order-sink-v2.orbs.network/orders/new` with JSON `{ signature, order, status: "pending" }`. `order` must be the exact EIP-712 message that produced `signature`. |
-| Fetch history | `GET https://order-sink-v2.orbs.network/orders?swapper={account}&chainId={chainId}&exchange={adapter}`. The adapter comes from the configuration response. |
-| Cancel | Send the on-chain transaction `cancel([metadata.repermitDigest])` to `domain.verifyingContract`; cancellation is not an Order Sink HTTP request. |
 
 ## Strategy Recipes
 

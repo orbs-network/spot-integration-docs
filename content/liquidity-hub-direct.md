@@ -1,34 +1,10 @@
-# Liquidity Hub · Direct API
+# Swap · Direct API
+
+[Shared Reference](/liquidity-hub/shared) — concepts, lifecycle, input tokens, chains, fees, partner configuration, and resources for every Swap integration.
 
 Use this guide when the host application needs to integrate Liquidity Hub over HTTP and will own request cancellation, quote freshness, Permit2 approval, EIP-712 signing, and status polling itself.
 
-For most browser and React integrations, prefer the SDK option. It wraps this transport contract and keeps the quote and execution lifecycle aligned. Choose Direct API only when the SDK cannot run in the target environment or the host already has equivalent infrastructure.
-
-## Concepts
-
-| Term | Meaning |
-| --- | --- |
-| Liquidity Hub API | Chain-aware quote and execution service used by the SDK. Every request includes the active `chainId`. |
-| Protected output | `minAmountOut`, the integer base-unit value that can be compared with a host DEX route's protected minimum. |
-| Permit2 | Token permission contract at `0x000000000022D473030F116dDEE9F6B43aC78BA3`. The source token must approve this address before execution. |
-| Signed quote | The complete quote returned by the service plus a wallet signature over its EIP-712 data. Do not edit quote fields after signing. |
-| Session ID | Quote identifier carried into submission and status polling. |
-
-### Integration Sequence
-
-1. Use the Liquidity Hub API origin with the active chain ID.
-2. Request a quote during the host DEX quote cycle.
-3. When integrating alongside a DEX router, select the route with the better protected output.
-4. Wrap native input if needed, approve Permit2, refresh the quote, and sign its EIP-712 payload.
-5. Submit the signed quote and poll its session until a transaction hash is available.
-6. Get the transaction receipt from the active chain and require success.
-
-## Integration Resources
-
-- [Interactive example](https://orbs-spot.vercel.app/?devMode=true)
-- [SDK and HTTP transport source](https://github.com/orbs-network/spot-ui/tree/master/packages/liquidity-hub-ui)
-- [Quote request implementation](https://github.com/orbs-network/spot-ui/blob/master/packages/liquidity-hub-ui/src/lib/quote.ts)
-- [Swap submission and polling implementation](https://github.com/orbs-network/spot-ui/blob/master/packages/liquidity-hub-ui/src/lib/swap.ts)
+See [Choose an Integration](/liquidity-hub/shared#integration-options) for the SDK comparison and [Integration Lifecycle](/liquidity-hub/shared#how-it-works) for the shared execution sequence.
 
 ## Quickstart
 

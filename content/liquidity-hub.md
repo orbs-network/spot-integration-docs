@@ -1,39 +1,14 @@
-# Liquidity Hub · TypeScript SDK
+# Swap · TypeScript SDK
+
+[Shared Reference](/liquidity-hub/shared) — concepts, lifecycle, input tokens, chains, fees, partner configuration, and resources for every Swap integration.
 
 This guide is for teams that want to add Orbs Liquidity Hub to an existing DEX, swap application, or trading service without adopting a specific UI framework.
 
-Liquidity Hub is an optimization layer. Request its quote during the existing DEX quote cycle, then enter this execution guide after the host application selects Liquidity Hub.
+Start with the shared [Integration Lifecycle](/liquidity-hub/shared#how-it-works); this guide implements it with the SDK.
 
 The `@orbs-network/liquidity-hub-sdk` package is framework-neutral TypeScript and has no React dependency. The client, quote, route-selection, and full execution examples below work in any JavaScript or TypeScript application. React and Wagmi adapters are optional host concerns.
 
-Use the Direct API option when the target environment cannot run the SDK and the host will own the complete HTTP, signing, polling, and recovery lifecycle.
-
-## Concepts
-
-| Term | Meaning |
-| --- | --- |
-| Liquidity Hub | Orbs optimization layer that requests liquidity from on-chain and off-chain solvers. It is used only when it improves the user's executable result. |
-| Permit2 | Token permission contract that receives ERC-20 allowance for Liquidity Hub swaps. The current address is `0x000000000022D473030F116dDEE9F6B43aC78BA3`. |
-| Quote signing data | `quote.eip712` is the wallet-ready typed-data payload. Pass its domain, types, primary type, and message unchanged to the wallet signer. |
-| Partner | Partner name supplied by Orbs. If Orbs has not supplied one, use `"unknown"`. |
-| Session ID | Quote session identifier returned by Liquidity Hub and carried through swap submission and status polling. |
-
-### Integration Sequence
-
-1. Create one Liquidity Hub SDK client for the active chain.
-2. Request a Liquidity Hub quote alongside the existing DEX quote.
-3. Wrap a native source asset when required.
-4. Approve Permit2 to spend the ERC-20 source token.
-5. Refresh the selected quote when stale, sign its `eip712` payload, and submit the swap.
-6. Confirm the on-chain receipt through the host DEX's wallet or RPC client.
-
-## Integration Resources
-
-- [Playground](https://orbs-spot.vercel.app)
-- [Interactive Example](https://orbs-spot.vercel.app/?devMode=true)
-- [Liquidity Hub Integration Skill](https://github.com/orbs-network/spot-ui/tree/master/skills/liquidity-hub-integration) — implementation workflow and package guardrails for coding agents.
-- [Liquidity Hub SDK and examples](https://github.com/orbs-network/spot-ui/tree/master/packages/liquidity-hub-ui)
-- [Production React implementation](https://github.com/orbs-network/orbs-spot/blob/main/components/best-trade-form.tsx)
+See [Choose an Integration](/liquidity-hub/shared#integration-options) for the SDK and Direct API comparison.
 
 ## Install and Initialize
 
@@ -78,22 +53,7 @@ The Submit Swap reference initializes Viem `publicClient` and `walletClient` ins
 
 For React, the source repository provides a two-file TanStack Query reference: [`liquidity-hub.ts`](https://github.com/orbs-network/spot-ui/blob/master/packages/liquidity-hub-ui/examples/react/liquidity-hub.ts) contains the framework-neutral client and execution flow, while [`liquidity-hub-react.tsx`](https://github.com/orbs-network/spot-ui/blob/master/packages/liquidity-hub-ui/examples/react/liquidity-hub-react.tsx) contains the provider, quote query, and swap mutation. Reuse an existing `QueryClientProvider` instead of adding a second provider. The [`best-trade-form.tsx`](https://github.com/orbs-network/orbs-spot/blob/main/components/best-trade-form.tsx) production example shows how an application can compose its execution hook with `SwapFlow` for review, progress, failure, and success states.
 
-Supported networks in the current SDK integration guide:
-
-| Chain ID | Network |
-| --- | --- |
-| `1` | Ethereum |
-| `56` | BNB Chain |
-| `137` | Polygon |
-| `146` | Sonic |
-| `250` | Fantom |
-| `1101` | Polygon zkEVM |
-| `8453` | Base |
-| `42161` | Arbitrum |
-| `59144` | Linea |
-| `81457` | Blast |
-
-Before enabling a chain, confirm that the integrating application has the correct wrapped-native-token address and can send and confirm transactions on that chain.
+See [Supported Chains](/liquidity-hub/shared#supported-chains) for the shared network list and requirements.
 
 ## Fetch Quote
 

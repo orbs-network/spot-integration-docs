@@ -1,36 +1,22 @@
 # Advanced Orders · TypeScript SDK
 
+[Shared Reference](/advanced-orders/shared) — concepts, lifecycle, input tokens, chains, fees, partner configuration, and resources for every Advanced Orders integration.
+
 Use `@orbs-network/spot-ui` when the host needs Advanced Orders calculation and protocol operations without React. It is framework-neutral and works with Vue, Angular, Svelte, vanilla TypeScript, and server-side TypeScript while the host keeps ownership of UI, wallet access, state, caching, and routing.
 
-The TypeScript and React SDKs share the same form calculation and configured client, so previews and submitted orders use one set of defaults, validation rules, prices, schedules, and execution values.
-
-**Input token requirement:** The signed order always spends an ERC-20 token. If the user selects native currency, use the wrapped-native token supplied by the DEX, wrap the full input amount first, then approve and prepare the order with that wrapped token.
-
-## Concepts
-
-| Term | Meaning |
-| --- | --- |
-| Calculated form | The synchronous result of `calculateOrderForm()`. It is the single source for display values, protocol values, validation, and submission readiness. |
-| Spot client | A partner- and chain-scoped client returned by `createClient()`. It owns configuration-dependent preparation, signing, submission, history, and cancellation requests. |
-| Prepared order | The order, EIP-712 signing request, approval request, calculated form snapshot, and fresh execution timestamps returned by `client.prepareOrder()`. |
-| Host adapter | Application code that maps the existing market, state, wallet, and transaction layers to SDK inputs. |
-
-## Integration Resources
-
-- [TypeScript SDK package](https://github.com/orbs-network/spot-ui/tree/master/packages/spot-ui)
-- [TypeScript SDK API](https://github.com/orbs-network/spot-ui/blob/master/packages/spot-ui/README.md)
-- [Spot TypeScript integration skill](https://github.com/orbs-network/spot-ui/tree/master/skills/spot-integration)
-- [Playground](https://orbs-spot.vercel.app/?tab=twap&devMode=true)
+See [Concepts](/advanced-orders/shared#how-it-works) for the shared client and form model, and [Input Tokens](/advanced-orders/shared#how-it-works) before preparing an order.
 
 ## Quickstart
 
+### Quickstart
+
 Install `@orbs-network/spot-ui`, create one client for the Orbs-provided partner and connected chain, derive the form from current DEX inputs, then prepare, sign, and submit one immutable attempt. Reuse the same client for history and cancellation.
 
-The host owns controls, market data, quote freshness, wallet transactions, client caching, translations, modals, and polling. The SDK owns form defaults and validation, trusted partner configuration, order construction, submission, normalized history, and version-aware cancellation requests.
+See [Integration Lifecycle](/advanced-orders/shared#how-it-works) for the host and SDK responsibilities.
 
-Before starting, confirm that the partner and chain are supported by `getPartnerChains(partner)`. Use `Partners.Unknown` unless Orbs provided a specific enum member. Never infer a partner from the DEX name or hostname, and never substitute a different chain.
+Initialize the client using the shared [Partner Configuration](/advanced-orders/shared#fees-and-configuration) requirements.
 
-## Install the TypeScript SDK
+### Install the TypeScript SDK
 
 Use the package manager already used by the host application. Do not mix lockfiles.
 
@@ -42,7 +28,7 @@ npm install @orbs-network/spot-ui@latest
 
 The package has no React or wallet-library dependency. Import only from the package root; do not use `dist/*` or internal source paths.
 
-## Initialize the Client
+### Initialize the Client
 
 `createClient(partner, chainId)` validates support, fetches and validates the current RePermit configuration, and returns a new frozen client bound to that exact partner and chain.
 
