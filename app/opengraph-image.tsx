@@ -1,3 +1,5 @@
+import { readFile } from "node:fs/promises";
+import path from "node:path";
 import { ImageResponse } from "next/og";
 
 import { SITE_DESCRIPTION, SITE_NAME } from "@/lib/site";
@@ -9,17 +11,21 @@ export const size = {
   width: 1200,
 };
 
-export default function OpenGraphImage(): ImageResponse {
+export default async function OpenGraphImage(): Promise<ImageResponse> {
+  const [regular, bold] = await Promise.all([
+    readFile(path.join(process.cwd(), "public/fonts/montserrat-regular.ttf")),
+    readFile(path.join(process.cwd(), "public/fonts/montserrat-extrabold.ttf")),
+  ]);
   return new ImageResponse(
     <div
       style={{
         alignItems: "stretch",
         background:
-          "radial-gradient(circle at 82% 18%, rgba(255,55,199,0.22), transparent 26%), #0a0a0a",
+          "radial-gradient(circle at 82% 18%, rgba(122,137,233,0.22), transparent 26%), #0a0a0a",
         color: "#fafafa",
         display: "flex",
         flexDirection: "column",
-        fontFamily: "Arial, sans-serif",
+        fontFamily: "Montserrat",
         height: "100%",
         justifyContent: "space-between",
         padding: "72px 80px",
@@ -29,10 +35,10 @@ export default function OpenGraphImage(): ImageResponse {
       <div
         style={{
           alignItems: "center",
-          color: "#ff37c7",
+          color: "#7a89e9",
           display: "flex",
           fontSize: 22,
-          fontWeight: 700,
+          fontWeight: 800,
           letterSpacing: "0.16em",
           textTransform: "uppercase",
         }}
@@ -40,7 +46,7 @@ export default function OpenGraphImage(): ImageResponse {
         <span
           style={{
             alignItems: "center",
-            border: "2px solid rgba(255,55,199,0.6)",
+            border: "2px solid rgba(122,137,233,0.6)",
             borderRadius: 16,
             display: "flex",
             height: 48,
@@ -51,7 +57,7 @@ export default function OpenGraphImage(): ImageResponse {
         >
           <span
             style={{
-              border: "3px solid #ff37c7",
+              border: "3px solid #7a89e9",
               display: "flex",
               height: 16,
               transform: "rotate(45deg)",
@@ -67,7 +73,7 @@ export default function OpenGraphImage(): ImageResponse {
           style={{
             display: "flex",
             fontSize: 72,
-            fontWeight: 700,
+            fontWeight: 800,
             letterSpacing: "-0.045em",
             lineHeight: 1.04,
           }}
@@ -98,11 +104,17 @@ export default function OpenGraphImage(): ImageResponse {
           paddingTop: 28,
         }}
       >
-        <span>Swap</span>
-        <span>Advanced Orders</span>
+        <span style={{ color: "#2cedfc" }}>Swap</span>
+        <span style={{ color: "#7a89e9" }}>Advanced Orders</span>
         <span>API · TypeScript SDK · React</span>
       </div>
     </div>,
-    size,
+    {
+      ...size,
+      fonts: [
+        { name: "Montserrat", data: regular, weight: 400, style: "normal" },
+        { name: "Montserrat", data: bold, weight: 800, style: "normal" },
+      ],
+    },
   );
 }

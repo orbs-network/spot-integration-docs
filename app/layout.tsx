@@ -1,9 +1,18 @@
 import type { Metadata, Viewport } from "next";
+import localFont from "next/font/local";
 import { NuqsAdapter } from "nuqs/adapters/next/app";
+import { ProductBackground } from "@/components/product-background";
 
 import { getSiteUrl, SITE_DESCRIPTION, SITE_NAME } from "@/lib/site";
 
 import "./globals.css";
+
+const montserrat = localFont({
+  src: "../public/fonts/montserrat-latin.woff2",
+  variable: "--font-orbs",
+  weight: "400 800",
+  display: "swap",
+});
 
 const THEME_INITIALIZER = `
 (function () {
@@ -61,11 +70,12 @@ export const viewport: Viewport = {
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
-    <html data-scroll-behavior="smooth" data-theme="dark" lang="en" suppressHydrationWarning>
+    <html className={montserrat.variable} data-scroll-behavior="smooth" data-theme="dark" lang="en" suppressHydrationWarning>
       <head>
         <script dangerouslySetInnerHTML={{ __html: THEME_INITIALIZER }} />
       </head>
       <body>
+        <ProductBackground />
         <a className="skip-link" href="#guide-content">
           Skip to main content
         </a>

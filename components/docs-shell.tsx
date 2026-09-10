@@ -196,7 +196,7 @@ function GuideNavigation({
 
   return (
     <nav aria-label="Integration guides" className="guide-tree">
-      <section aria-label="Perpetual Hub" className="category-accordion guide-category category-upcoming">
+      <section data-product="perpetual-hub" aria-label="Perpetual Hub" className="category-accordion guide-category category-upcoming">
         <div className="category-summary">
           <h2>Perpetual Hub</h2>
           <span className="coming-soon-badge">Coming soon</span>
@@ -216,6 +216,7 @@ function GuideNavigation({
               <div
                 aria-label={`${product.label} integration methods`}
                 className={`guide-product${activeProduct ? " guide-product-active" : ""}`}
+                data-product={product.id}
                 key={product.id}
                 role="group"
               >
@@ -580,7 +581,7 @@ function DocsShellContent({
   return (
     <>
       <AppHeader />
-      <main className="docs-shell">
+      <main className="docs-shell" data-product={activeGuide.product}>
         <div className="docs-page">
           <div className="docs-layout">
         <aside className="sidebar">

@@ -3,7 +3,6 @@ import type { Metadata } from "next";
 import Link from "next/link";
 
 import { AppHeader } from "@/components/app-header";
-import { CategoryAccordion } from "@/components/category-accordion";
 import {
   parsePartnerDocumentationQuery,
   type PartnerDocumentationRequest,
@@ -82,17 +81,18 @@ export default async function HomePage({
             </p>
           </header>
 
-          <section aria-label="Perpetual Hub" className="category-accordion docs-home-category category-upcoming">
-            <div className="category-summary">
-              <h2>Perpetual Hub</h2>
+          <nav aria-label="Product categories" className="home-category-badges">
+            <span className="home-category-badge home-category-badge-upcoming" data-product="perpetual-hub">
+              Perpetual Hub
               <span className="coming-soon-badge">Coming soon</span>
-            </div>
-          </section>
-          <CategoryAccordion
-            className="docs-home-category"
-            description="Swap and Advanced Orders"
-            title="Spot"
-          >
+            </span>
+            <a aria-current="location" className="home-category-badge home-category-badge-active" href="#spot-guides">
+              <span aria-hidden="true" className="home-category-dot" />
+              Spot
+            </a>
+          </nav>
+          <section aria-labelledby="spot-heading" className="docs-home-category home-category-panel" id="spot-guides">
+            <h2 className="sr-only" id="spot-heading">Spot</h2>
             <div className="docs-home-products">
               {PRODUCTS.map((product) => {
                 const guides = GUIDE_SOURCES.filter(
@@ -100,7 +100,7 @@ export default async function HomePage({
                 );
 
                 return (
-                  <article className="docs-home-product" key={product.id}>
+                  <article className="docs-home-product" data-product={product.id} key={product.id}>
                     <header>
                       <p>{product.kicker}</p>
                       <h3>{product.title}</h3>
@@ -145,8 +145,7 @@ export default async function HomePage({
                 );
               })}
             </div>
-          </CategoryAccordion>
-
+          </section>
 
           <footer className="docs-home-footer">
             <span>
