@@ -8,6 +8,12 @@ See [Choose an Integration](/liquidity-hub/shared#integration-options) for the S
 
 ## Quickstart
 
+### Before You Start
+
+Complete the shared [setup requirements](/liquidity-hub/shared#integration-options). This path additionally requires JSON HTTP requests with cancellation/timeouts, response validation, a wallet typed-data signer, contract read/write support, and a status poller. The TypeScript reference uses Viem; a different stack must implement those same operations.
+
+Implement a quote adapter first, then connect the `submit-swap.ts` and `types.ts` reference files in [Submit Swap](/liquidity-hub/direct#submit-swap). Replace example wallet, chain, token, and amount values with host configuration. The host owns the entire HTTP and wallet sequence.
+
 Liquidity Hub exposes one public API origin: `https://hub.orbs.network`. Hardcode it in every request, use it for every supported chain, and pass the active `chainId` in each endpoint's query string.
 
 Do not accept an API origin from user input or replace it based on the chain. Send and receive JSON. Apply a 10-second timeout to quote requests and abort obsolete requests when the account, chain, pair, or input amount changes.
@@ -144,3 +150,14 @@ Do not automatically repeat a signed submission. Disable duplicate user actions 
 | Recovery | Every wallet or service failure leaves the form in a recoverable state. |
 
 If the host cannot own every item in this checklist, use the SDK integration instead.
+
+### End-to-End Acceptance Run
+
+1. Fill the [Fetch Quote request](/liquidity-hub/direct#fetch-quote) with real active-chain tokens, raw amount, connected `user`, partner, and slippage. Example response data is illustrative; never sign a copied response fixture.
+2. Preserve the validated live response and pass it to `submitLiquidityHubSwap(quote, account, refetchQuote)` from [Submit Swap](/liquidity-hub/direct#submit-swap), with `types.ts` alongside it. The callback must return a fresh quote for the same current inputs. Prepare native input in the host before calling this ERC-20 submission flow.
+3. Start with insufficient allowance and verify approval confirmation precedes signing. Inspect outgoing submission: the signed quote remains unchanged, with the matching signature.
+4. Exercise both hash-delivery paths: hash returned by submission and hash discovered through status polling. Confirm the returned receipt before rendering success.
+5. Simulate non-JSON quote responses, a rejected signature, and a lost submission response. Verify invalid responses never become executable and uncertain submissions retain their session for reconciliation.
+6. Repeat with an already approved ERC-20 and with wrapped native input. Confirm balances and the successful transaction hash on the original chain.
+
+Use a funded development wallet and real supported token addresses for the live run. It spends tokens and gas; use mocked service responses to exercise error branches without repeated trades.

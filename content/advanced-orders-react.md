@@ -8,6 +8,12 @@ The package uses `@orbs-network/spot-ui` internally. See [Choose an Integration]
 
 ## Quickstart
 
+### Before You Start
+
+Complete the shared [setup requirements](/advanced-orders/shared#integration-options). Use the host application's existing wallet connection, token registry, quote, balance, and price sources. Install the packages below and the dependencies imported by the wallet adapter example.
+
+Mount one `SpotProvider` around the form, submission dialog, and history consumers. Implement all five `walletInteractions` methods from [Configure SpotProvider](/advanced-orders/react#configure-spotprovider), then connect the focused hooks and submission dialog. The SDK supplies provider state and execution orchestration; your app supplies wallet access, data, controls, and presentation.
+
 ### Quickstart
 
 Keep the existing DEX swap form as the source of truth and adapt these values into `SpotProvider`:
@@ -1030,3 +1036,14 @@ Store `historyKey` as list/selection identity and resolve the current object fro
 - Implement all wallet methods, wait for receipts, and preserve SDK-supplied request values and signature bytes.
 - Keep one immutable execution active, close only at a terminal phase, and reset after the exit animation.
 - Use `historyKey` for list identity and keep history/cancellation consumers inside provider scope.
+
+### End-to-End Acceptance Run
+
+1. Assemble the [provider and wallet adapter](/advanced-orders/react#configure-spotprovider), [focused form components](/advanced-orders/react#build-with-focused-hooks), [submission dialog](/advanced-orders/react#submit-and-track-execution), and [history components](/advanced-orders/react#order-history-and-cancellation). Preserve the relative imports between the displayed files.
+2. Replace host-specific wallet/data imports with your application's sources. Use real active-chain tokens and a current full-amount quote. Confirm connect-wallet, unsupported-network, loading, and validation states are visible before testing submission.
+3. Open review and verify it reflects the current calculated form. Confirm once; with insufficient allowance, expect approval to complete before signing. For native input, expect wrapping first. With sufficient allowance, the approval prompt is skipped.
+4. Keep the attempt immutable while execution is active. Display successful submission separately from fill completion, then verify the submitted order appears in provider-scoped history.
+5. Cancel a selected open order through the history flow. Confirm the wallet transaction receipt and refresh the order state; do not mark it cancelled just because a transaction hash exists.
+6. Reject each wallet prompt and test rapid repeated confirmation clicks. Verify one active attempt, an actionable error, and an explicit retry path. Change account/chain before starting a new attempt and verify provider data follows the new context.
+
+Use a funded development wallet for live ERC-20/native-input tests, with an amount satisfying the partner's minimums. Live orders may fill and spend funds; use mocked wallet/service failures for repeatable recovery checks.

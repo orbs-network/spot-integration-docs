@@ -24,6 +24,26 @@ Before enabling a network, provide its wrapped-native-token address and wallet/R
 
 ## Integration Options
 
+### Before You Start
+
+Collect these values before wiring either integration. Contract and token addresses must belong to the selected chain.
+
+| Requirement | Supplied by | Ready when |
+| --- | --- | --- |
+| Partner identifier | Orbs; use `"unknown"` if none was supplied | The same value is used for quotes and execution. |
+| Chain and RPC | Host wallet/network configuration | Wallet writes and RPC reads target the same supported chain. |
+| Token addresses and decimals | Host token registry | Both tokens resolve on that chain; the wrapped-native address is known. |
+| Account and wallet | Host wallet connection | The account can send transactions and sign EIP-712 typed data. Never put a private key in frontend configuration. |
+| Spendable balance and gas | Connected wallet | The account can fund the input amount and any wrap/approval transactions. |
+| Current quote inputs | Host swap form and quote layer | Account, chain, pair, amount, and slippage describe the same form snapshot. |
+| Fee presentation | Partner terms agreed with Orbs | Review uses the [fee guidance](/liquidity-hub/shared#fees-and-configuration), without inventing a fixed rate. |
+
+### Amounts and Units
+
+Send token amounts as integer base-unit strings. For a token with 6 decimals, `"1.25"` in the form becomes `"1250000"` in the request; for 18 decimals it becomes `"1250000000000000000"`. Use token-aware decimal parsing rather than JavaScript floating-point multiplication. Format output amounts using the output token's decimals, which may differ from the input token's.
+
+Swap quote `slippage` uses percentage units: `0.5` means 0.5%. Compare both routes in output-token base units. Example amounts here demonstrate encoding; they do not establish a minimum trade size or guarantee liquidity.
+
 ### Choose an Integration
 
 Swap uses Liquidity Hub to improve an existing DEX quote with on-chain and off-chain solver liquidity. The host selects the route before execution.
@@ -68,6 +88,23 @@ Swap uses Liquidity Hub to improve an existing DEX quote with on-chain and off-c
 6. Confirm a successful on-chain receipt before reporting completion.
 
 The host owns wallet access, route selection, and receipt confirmation. The SDK manages transport and polling; Direct API integrations implement those operations themselves.
+
+### Wallet Actions and Completion
+
+| Stage | User action / transport | What must happen before continuing |
+| --- | --- | --- |
+| Fetch quote | HTTP; no wallet prompt | A current, validated quote is selected. |
+| Wrap native input, if needed | On-chain wallet transaction | The wrapping receipt succeeds. |
+| Approve Permit2, if needed | On-chain ERC-20 transaction | The approval receipt succeeds and allowance covers the input. |
+| Sign quote | EIP-712 wallet signature | Keep the exact quote that was signed. A signature alone does not execute the swap. |
+| Submit and locate transaction | Service request; SDK handles transport/polling when used | Retain the session ID and resulting transaction hash. |
+| Confirm swap | RPC receipt lookup | Receipt status is successful before showing “Swap complete”. |
+
+The host must disable repeated confirmation clicks, stop using stale quotes when inputs change, and handle wallet rejection at each prompt. Keep the account and chain fixed for one attempt; if either changes before signing or submission, stop and obtain a fresh quote. After submission, reconcile against the original chain and account.
+
+### Recovery State to Retain
+
+Keep the original account, chain, session ID, and any known transaction hash available while the operation is unresolved. A status timeout is not proof that no swap occurred. Resume status/receipt checks before offering another execution. Do not automatically submit a DEX fallback after a potentially accepted Swap submission. Keep signed payloads out of ordinary analytics and error logs.
 
 ### Input Tokens
 

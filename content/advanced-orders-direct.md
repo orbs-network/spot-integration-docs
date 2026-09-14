@@ -10,6 +10,12 @@ See [Choose an Integration](/advanced-orders/shared#integration-options) for the
 
 ## Quickstart
 
+### Before You Start
+
+Complete the shared [setup requirements](/advanced-orders/shared#integration-options). This path requires no Orbs runtime package, but the TypeScript examples use Viem for wallet and contract operations. Supply the `WalletContext`, chain-specific wrapped-token address, and a validated `OrderInput` from your host form.
+
+Implement in this order: configuration fetch, strategy derivation, the four [Create Order reference files](/advanced-orders/direct#create-order), history, then cancellation. The host owns strategy math, protocol field validation, HTTP requests, and wallet transactions.
+
 Start with the shared [Partner Configuration](/advanced-orders/shared#fees-and-configuration) and [Input Tokens](/advanced-orders/shared#how-it-works) requirements, then implement these API operations.
 
 The API-only integration uses these HTTP and on-chain operations:
@@ -57,7 +63,7 @@ Build the order close to signing time. The live Spot builder generates one nonce
 
 ## Create Order
 
-The optional Wagmi v3 reference at the top contains the complete package-free flow. The default `create-order-flow.ts` tab prepares funds and calls `useSignOrder()` without arguments. The `build-order.ts` tab fetches the default permit data and builds the complete order from the host's `useDerivedData()` values; `use-sign-order.ts` signs that result. `order-types.ts` contains the shared contracts. Replace the example hook imports with the DEX's existing derived swap-data and wrapped-token hooks.
+The framework-neutral reference above contains the complete flow. `create-order-flow.ts` exports `submitOrdersSinkOrder()` and prepares funds; `build-order.ts` fetches trusted permit data and constructs the order; `sign-order.ts` signs it; `order-types.ts` defines the shared contracts. Supply `OrderInput`, `WalletContext`, and the wrapped-token address from the host application. No React hooks are required.
 
 ### Fetch Partner Config
 
@@ -67,7 +73,7 @@ Preserve the returned domain and types unchanged. Reject the response when `doma
 
 1. Fetch the default partner and active-chain permit template.
 2. Ensure the input is an ERC-20 token. If the user selected native currency, wrap it and replace it with the wrapped-native token before building the order. Then check allowance and approve RePermit for `order.permitted.amount` when allowance is insufficient. This API-only reference uses an exact allowance; use a maximum allowance only as an explicit host security decision.
-3. Call `useSignOrder()` without passing permit data. It reads the current derived values, fetches the default template, builds `signTypedDataArgs`, and signs the resulting order.
+3. Call `signOrder()` with the account, chain, validated `orderInput`, wallet client, and wrapped-token address. It fetches the trusted template, builds `signTypedDataArgs`, and signs the resulting order.
 4. Submit the returned `order` unchanged as `{ signature, order, status: "pending" }` to `POST /orders/new`.
 5. Require HTTP and API success, then keep the returned `signedOrder` for progress, history, fills, and cancellation.
 
@@ -77,7 +83,7 @@ Do not recreate the EIP-712 domain, types, protocol contracts, or exchange field
 
 `POST /orders/new` returns a success envelope containing `signedOrder`, or an API error. Preserve the returned order `hash`, service `metadata`, original `order`, `signature`, and timestamp. Transport success alone is insufficient: also require the response body's `success` value before treating creation as complete.
 
-### `useDerivedData()` Fields
+### `OrderInput` Fields
 
 | Field | Meaning |
 | --- | --- |
@@ -171,3 +177,14 @@ The transaction sender should be the same address that signed the original order
 | Cancellation | Resolve RePermit for the active wallet chain, call `cancel([metadata.repermitDigest])`, confirm the receipt, then refetch. | Order Sink eventually reports the terminal cancelled state. | Show the on-chain failure and leave the order open. |
 
 Ready to launch when every row passes on each supported chain.
+
+### End-to-End Acceptance Run
+
+1. Resolve partner/chain configuration and select a strategy from [Strategy Recipes](/advanced-orders/direct#strategy-recipes). Fill `OrderInput` with real token metadata and validated raw amounts; example addresses and response objects are not executable fixtures.
+2. Copy all four [Create Order files](/advanced-orders/direct#create-order) together: `create-order-flow.ts`, `build-order.ts`, `sign-order.ts`, and `order-types.ts`. Supply host Viem clients/account in `WalletContext` and the correct wrapped-native address.
+3. Call `submitOrdersSinkOrder({ orderInput, wallet, wTokenAddress })` from one guarded confirmation handler. Start with insufficient allowance; verify RePermit approval confirms before the EIP-712 prompt. Repeat with native input to verify wrapping occurs first.
+4. Require HTTP and API success, retain the returned `signedOrder`, and show “Order submitted”. Fetch history using the same account, chain, and configured adapter; match the returned order hash. Acceptance alone is not a fill.
+5. Select an open order from history and exercise [Cancel Order Sink Orders](/advanced-orders/direct#cancel-order-sink-orders). Use its `metadata.repermitDigest`, confirm the transaction, then refresh until history reflects the result.
+6. Reject signing and simulate a lost create response. Verify the first case never submits, while the second reconciles history before another attempt. Test wrong-chain configuration and invalid strategy fields before enabling review.
+
+Use an explicitly funded development wallet for the live run. Choose an amount meeting partner requirements and a strategy you understand: execution can spend funds before you cancel. A successful cancellation does not reverse prior fills.

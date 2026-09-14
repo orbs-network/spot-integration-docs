@@ -220,6 +220,39 @@ a[href] {
   outline-offset: 2px;
 }
 
+.app-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.playground-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 40px;
+  padding: 0 12px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--control-background);
+  color: var(--muted-strong);
+  font-size: 12px;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.playground-link:hover {
+  border-color: var(--border-strong);
+  background: var(--panel-raised);
+  color: var(--text);
+}
+
+.playground-link:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+
 .theme-toggle {
   position: relative;
   display: inline-grid;

@@ -8,6 +8,12 @@ See [Concepts](/advanced-orders/shared#how-it-works) for the shared client and f
 
 ## Quickstart
 
+### Before You Start
+
+Complete the shared [setup requirements](/advanced-orders/shared#integration-options). Install the SDK below and Viem for the wallet example. Supply the connected account/provider, active-chain RPC, token metadata, raw balance, and a current quote for the full input amount.
+
+Build one partner/chain client cache, one `calculateOrderForm()` adapter, one guarded confirmation handler, and a history/cancellation view. The SDK prepares and submits protocol data; the host owns application state, current market data, wallet transactions, and polling.
+
 ### Quickstart
 
 Install `@orbs-network/spot-ui`, create one client for the Orbs-provided partner and connected chain, derive the form from current DEX inputs, then prepare, sign, and submit one immutable attempt. Reuse the same client for history and cancellation.
@@ -316,3 +322,14 @@ async function cancelSelectedOrder(order: Order) {
 - Use `client.spenderAddress`, exact raw amounts, confirmed wallet writes, and bounded post-approval verification.
 - Prepare immediately before signing and submit the same prepared order with the unchanged signature once.
 - Key history by `order.historyKey`; use configured history and cancellation methods from the same client.
+
+### End-to-End Acceptance Run
+
+1. Initialize the client as shown in [Quickstart](/advanced-orders/typescript#quickstart). Supply the actual connected chain instead of leaving the example Polygon chain hardcoded in wallet clients.
+2. Assemble [Calculate the Order Form](/advanced-orders/typescript#calculate-the-order-form) and [Prepare and Submit an Order](/advanced-orders/typescript#prepare-and-submit-an-order) in the same module, or export/import `getSpotClient()` explicitly. Provide real token metadata, current prices/quote, and account state; wait for `form.canSubmit`.
+3. Connect `submitAdvancedOrder({ account, form, inputToken, outputToken, wrappedNativeToken })` to one guarded confirm handler. Verify approval to `client.spenderAddress`, confirmed wallet writes, late preparation, signing, and submission.
+4. Render “Order submitted” after acceptance, then fetch the account's orders through the same client. Use `historyKey` for UI identity and render actual fill progress separately from submission success.
+5. Wire `getCancelOrderRequest(order)` to your wallet transaction adapter. The `wallet.cancelOrder` and `refreshOrders` names in the cancellation snippet are host adapters: implement sending, successful receipt confirmation, and history refresh before using the snippet.
+6. Test missing/stale quote inputs, rejected approval/signature, and a lost submission response. Ensure invalid forms cannot submit, concurrent clicks produce one attempt, and ambiguous submission triggers reconciliation rather than automatic resubmission.
+
+Run ERC-20, already-approved, and native-input cases using a funded development wallet. The live flow can execute trades and incurs network costs; mocked failure cases do not establish successful settlement.

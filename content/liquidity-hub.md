@@ -12,6 +12,12 @@ See [Choose an Integration](/liquidity-hub/shared#integration-options) for the S
 
 ## Install and Initialize
 
+### Before You Start
+
+Complete the shared [setup requirements](/liquidity-hub/shared#integration-options). For this path, install the packages below and supply a connected wallet provider, active-chain RPC, token registry, and a quote-refresh callback from your host app.
+
+Your implementation has three parts: one reusable SDK client per active chain, a quote adapter driven by the current form, and a confirmation handler that calls the complete [Submit Swap example](/liquidity-hub#submit-swap). The host owns route comparison, wallet operations, and successful receipt confirmation.
+
 Install the SDK and Viem:
 
 ```bash
@@ -216,3 +222,14 @@ Errors containing `"not supported"`, `"no liquidity"`, `"tns"`, or `"ldv"` are t
 | Recovery | Exercise timeout, no-liquidity, stale, and lower-price cases. | Every case stops without submitting an invalid Liquidity Hub transaction. | Keep the flow blocked until a new valid quote is available. |
 
 Ready to launch when every row passes on each supported chain.
+
+### End-to-End Acceptance Run
+
+1. Configure one supported chain and a liquid token pair from the host registry. Enter an amount above applicable minimums; verify raw amount conversion using the token decimals.
+2. Wire [Fetch Quote](/liquidity-hub#fetch-quote) to the current form. Inspect the response: `user`, tokens, and input amount must match; retain `sessionId` and `eip712`.
+3. Connect the TypeScript tab in [Submit Swap](/liquidity-hub#submit-swap) to a guarded confirm action. Supply the connected account, originally selected input token, selected quote, and `refetchQuote` from the same form snapshot.
+4. Start with insufficient Permit2 allowance. Expect approval, its successful receipt, the signature prompt, submission, and a successful swap receipt, in that order. With sufficient allowance, expect approval to be skipped.
+5. Show completion from the returned receipt and expose its `transactionHash`. Re-read balances. For native input, also exercise wrapping before approval.
+6. Reject a signature, change chain before signing, and let a quote become stale. Verify that no invalid quote is submitted. Simulate a receipt timeout and verify recovery checks the known hash without another swap.
+
+These are live integration checks and may spend tokens and gas. Use an explicitly funded development wallet and an amount that meets the selected partner/pair requirements; mock HTTP responses are useful for failure cases but do not prove on-chain execution.

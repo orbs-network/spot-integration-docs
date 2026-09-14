@@ -34,6 +34,34 @@ This is a documentation snapshot. Check the linked configuration for updates bef
 
 ## Integration Options
 
+### Before You Start
+
+| Requirement | Supplied by | Ready when |
+| --- | --- | --- |
+| Partner | Orbs; otherwise `"unknown"` / `Partners.Unknown` | Partner configuration is available for the connected chain. |
+| RPC, chain, account | Host wallet/network layer | Reads, writes, signer, and configured client use the same chain and account. |
+| Tokens and wrapped-native token | Host token registry | Addresses and decimals are correct for that chain. |
+| Input balance and gas | Host balance layer / connected wallet | The full input is available, with gas for wrapping, approval, and later cancellation. |
+| Market data | Host quote and price layers | Quote output describes the complete current input amount and pair; stale values are excluded. |
+| Strategy and validation | Host form; SDK calculation where used | Amount, schedule, limit, trigger, and deadline pass the chosen strategy's validation. |
+| Protocol addresses and fee reference | Trusted partner configuration / SDK | RePermit, reactor, and exchange adapter are resolved rather than guessed. |
+| History UI | Host application | The user can find a submitted order, inspect progress, and request cancellation. |
+
+No private key belongs in frontend configuration. The host wallet supplies signing and transaction access. See [Fees and Configuration](/advanced-orders/shared#fees-and-configuration) for partner and fee setup.
+
+### Amounts and Units
+
+| Value | Representation |
+| --- | --- |
+| Human input | Decimal string, for example `"1.25"`. |
+| Raw token amount | Integer string in that token's base units: `"1250000"` for 1.25 tokens with 6 decimals. |
+| SDK form timestamps/delays named `*Millis` | Milliseconds; use the SDK's preparation/conversion. |
+| API-only signed schedule | Follow the strategy recipe's seconds conversion; do not send a millisecond timestamp as seconds. |
+| API-only `slippageBps` | Basis points: `50` means 0.5%. This differs from Swap's percentage-valued `slippage`. |
+| USD price inputs | Price of one whole token, not the price of one base unit. |
+
+Use token-aware decimal parsing and integer arithmetic for protocol amounts. Do not assume input and output tokens share decimals. Example amounts illustrate units only; they may be below a partner's minimum trade size.
+
 ### Choose an Integration
 
 | Method | Choose it when |
@@ -96,6 +124,35 @@ The TypeScript and React SDKs share the same form calculation and configured cli
 The host owns wallet access and transaction confirmation. API-only integrations construct protocol fields directly; the SDKs provide preparation, submission, history, and cancellation requests. React adds provider-scoped state and execution handling.
 
 Across SDK integrations, the host owns controls, market data, quote freshness, wallet transactions, translations, and modal presentation. The SDK owns form defaults and validation, trusted partner configuration, order construction, submission, normalized history, and version-aware cancellation requests. The TypeScript host manages client caching and polling; React manages the provider-scoped client and mounted history queries.
+
+### Wallet Actions and Completion
+
+| Stage | User action / transport | Completion signal |
+| --- | --- | --- |
+| Configuration and preview | HTTP / local calculation | Partner-chain configuration and current form are valid. |
+| Wrap, if needed | On-chain wallet transaction | Successful receipt for the full required input. |
+| Approve RePermit, if needed | On-chain ERC-20 transaction | Successful receipt and sufficient allowance to RePermit, not the reactor. |
+| Sign prepared order | EIP-712 wallet signature | Exact prepared message and original signature are retained together. |
+| Submit order | Order Sink HTTP request | Service acceptance means “Order submitted”; it does not mean the order has filled. |
+| Track execution | History queries | Render actual fills and current order state from history. |
+| Cancel | On-chain wallet transaction, then history refresh | Confirm the cancellation receipt; show that history is refreshing until it reflects the result. |
+
+Do not show “Trade complete” when order creation succeeds. Scheduled and conditional orders may remain unfilled. A cancellation request is not complete when the wallet returns a hash, and fills already executed are not undone by cancellation.
+
+### Errors and Recovery
+
+| Situation | Host behavior |
+| --- | --- |
+| Unsupported partner/chain or invalid configuration | Block preparation and show the configuration problem; do not substitute another network. |
+| Missing balance, price, quote, or invalid strategy | Identify the unavailable/invalid input and keep submission disabled. |
+| User rejects a wallet prompt | Stop that attempt, retain editable form values, and let the user explicitly retry. |
+| Wrap or approval reverts | Stop before signing; identify the failed transaction. Re-read balances and allowance on retry. |
+| Account or chain changes before submission | Invalidate the attempt and recalculate/reprepare for the new context. Do not reuse its signature. |
+| Submission response is lost or times out | Treat acceptance as unknown. Check recent history for the original account, chain, and order before creating a new attempt. Do not automatically generate another nonce and submit again. |
+| Accepted order has no fills yet | Show its actual pending/open state and strategy conditions; do not promise an execution time. |
+| Cancellation receipt succeeds but history lags | Preserve the hash, show confirmation plus pending history refresh, and retry reads without sending another cancellation. |
+
+Retain the original account, chain, returned order identity, and any transaction hashes for reconciliation. API-only integrations also retain the returned cancellation metadata; SDK integrations retain the normalized order. Do not put signatures or full signed payloads into routine analytics logs.
 
 ### Input Tokens
 

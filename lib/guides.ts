@@ -89,7 +89,7 @@ export const GUIDE_SOURCES = [
     route: "/liquidity-hub/shared",
     segments: ["liquidity-hub", "shared"],
     stepOrder: [],
-    updatedAt: "2026-09-10",
+    updatedAt: "2026-09-14",
     variantLabel: "Shared Reference",
   },
   {
@@ -111,7 +111,7 @@ export const GUIDE_SOURCES = [
     route: "/advanced-orders/shared",
     segments: ["advanced-orders", "shared"],
     stepOrder: [],
-    updatedAt: "2026-09-10",
+    updatedAt: "2026-09-14",
     variantLabel: "Shared Reference",
   },
 
@@ -137,7 +137,7 @@ export const GUIDE_SOURCES = [
     route: "/liquidity-hub",
     segments: ["liquidity-hub"],
     stepOrder: [],
-    updatedAt: "2026-09-10",
+    updatedAt: "2026-09-14",
     variantLabel: "TypeScript SDK",
   },
   {
@@ -169,7 +169,7 @@ export const GUIDE_SOURCES = [
     route: "/liquidity-hub/direct",
     segments: ["liquidity-hub", "direct"],
     stepOrder: [],
-    updatedAt: "2026-09-10",
+    updatedAt: "2026-09-14",
     variantLabel: "Direct API",
   },
   {
@@ -206,7 +206,7 @@ export const GUIDE_SOURCES = [
       "cancel-order-sink-orders",
       "operational-checklist",
     ],
-    updatedAt: "2026-09-10",
+    updatedAt: "2026-09-14",
     variantLabel: "API Only",
   },
   {
@@ -235,7 +235,7 @@ export const GUIDE_SOURCES = [
     route: "/advanced-orders/typescript",
     segments: ["advanced-orders", "typescript"],
     stepOrder: [],
-    updatedAt: "2026-09-10",
+    updatedAt: "2026-09-14",
     variantLabel: "TypeScript SDK",
   },
   {
@@ -273,7 +273,7 @@ export const GUIDE_SOURCES = [
     route: "/advanced-orders/react",
     segments: ["advanced-orders", "react"],
     stepOrder: [],
-    updatedAt: "2026-09-10",
+    updatedAt: "2026-09-14",
     variantLabel: "React SDK",
   },
 ] as const satisfies readonly GuideSource[];
