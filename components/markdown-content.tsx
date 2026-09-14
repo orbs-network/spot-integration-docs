@@ -307,7 +307,7 @@ export function MarkdownContent({
         }
 
         if (block.type === "code") {
-          return <CodeBlock code={block.code} key={index} language={block.language} />;
+          return <CodeBlock code={block.code} key={index} language={block.language} name={block.name} />;
         }
 
         if (block.type === "codeTabs") {

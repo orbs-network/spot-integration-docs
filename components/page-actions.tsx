@@ -11,6 +11,10 @@ import {
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
+import { DownloadIntegrationButton } from "@/components/download-integration-button";
+import type { Guide } from "@/lib/guides";
+import type { PartnerDocumentationConfig } from "@/features/partner-documentation/partner-documentation";
+
 type CopyStatus =
   | "copied-codex"
   | "copied-page"
@@ -34,9 +38,13 @@ async function fetchMarkdownBlob(markdownPath: string): Promise<Blob> {
 export function PageActions({
   markdownPath,
   pagePath,
+  guide,
+  partnerConfig,
 }: {
   markdownPath: string;
   pagePath: string;
+  guide: Guide;
+  partnerConfig?: PartnerDocumentationConfig;
 }) {
   const menuRef = useRef<HTMLDivElement>(null);
   const menuTriggerRef = useRef<HTMLButtonElement>(null);
@@ -106,6 +114,7 @@ export function PageActions({
 
   return (
     <div className="page-actions">
+      <DownloadIntegrationButton guide={guide} partnerConfig={partnerConfig} />
       <button
         aria-label={
           copied

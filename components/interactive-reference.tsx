@@ -33,12 +33,7 @@ function getReferenceExample(
 
   return {
     ...example,
-    files: example.files
-      .filter((file) => file.kind)
-      .map((file) => ({
-        ...file,
-        name: file.kind === "request" ? "Request" : "Response",
-      })),
+    files: example.files.filter((file) => file.kind),
   };
 }
 

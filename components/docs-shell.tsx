@@ -12,6 +12,7 @@ import {
   ExternalLink,
   Github,
   Search,
+  X,
 } from "lucide-react";
 import {
   type FormEvent,
@@ -428,6 +429,21 @@ function DocsShellContent({
   const stepRefs = useRef<(HTMLAnchorElement | null)[]>([]);
   const mobileStepRefs = useRef<(HTMLAnchorElement | null)[]>([]);
   const searchInputRef = useRef<HTMLInputElement>(null);
+  const searchDialogRef = useRef<HTMLDialogElement>(null);
+  const searchTriggerRef = useRef<HTMLButtonElement>(null);
+  const restoringSearchFocus = useRef(false);
+
+  const showSearch = () => {
+    if (restoringSearchFocus.current) return;
+    if (!searchDialogRef.current?.open) searchDialogRef.current?.showModal();
+    searchInputRef.current?.focus();
+  };
+  const closeSearch = () => {
+    restoringSearchFocus.current = true;
+    searchDialogRef.current?.close();
+    searchTriggerRef.current?.focus({ preventScroll: true });
+    queueMicrotask(() => { restoringSearchFocus.current = false; });
+  };
   const searchResultRefs = useRef<(HTMLAnchorElement | null)[]>([]);
   const [search, setSearch] = useState("");
   const [highlightQuery, setHighlightQuery] = useState("");
@@ -485,6 +501,7 @@ function DocsShellContent({
   };
 
   const openSearchResult = (result: GuideSearchEntry) => {
+    closeSearch();
     if (result.guideId !== activeGuide.id) {
       setHighlightQuery("");
       setSearch("");
@@ -513,8 +530,7 @@ function DocsShellContent({
   ) => {
     if (event.key === "Escape") {
       event.preventDefault();
-      setSearch("");
-      searchInputRef.current?.focus();
+      closeSearch();
       return;
     }
 
@@ -532,12 +548,7 @@ function DocsShellContent({
         const searchInput = searchInputRef.current;
         if (!searchInput) return;
 
-        searchInput.scrollIntoView({
-          behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches
-            ? "auto"
-            : "smooth",
-          block: "center",
-        });
+        if (!searchDialogRef.current?.open) searchDialogRef.current?.showModal();
         searchInput.focus({ preventScroll: true });
         searchInput.select();
       }
@@ -580,7 +591,103 @@ function DocsShellContent({
 
   return (
     <>
-      <AppHeader />
+      <AppHeader search={
+        <button className="navbar-search-trigger" type="button" ref={searchTriggerRef}
+          aria-label="Search all docs" aria-haspopup="dialog" onFocus={showSearch} onClick={showSearch}>
+          <Search aria-hidden="true" size={16} />
+          <span>Search all docs…</span><kbd aria-hidden="true">⌘K</kbd>
+        </button>
+      } />
+      <dialog className="docs-search-dialog" ref={searchDialogRef} aria-label="Search all documentation"
+        onCancel={(event) => { event.preventDefault(); closeSearch(); }}
+        onClick={(event) => { if (event.target === event.currentTarget) { const box = event.currentTarget.getBoundingClientRect(); if (event.clientX < box.left || event.clientX > box.right || event.clientY < box.top || event.clientY > box.bottom) closeSearch(); } }}>
+        <div className="docs-search-dialog-heading"><strong>Search documentation</strong>
+          <button type="button" aria-label="Close search" onClick={closeSearch}><X aria-hidden="true" size={18} /></button>
+        </div>
+              <form className="guide-search" onSubmit={submitSearch} role="search">
+                <label>
+                  <span className="sr-only">Search all integration documentation</span>
+                  <Search aria-hidden="true" size={16} />
+                  <input
+                    aria-controls="guide-search-results"
+                    autoComplete="off"
+                    name="guide-search"
+                    onChange={(event) => {
+                      setSearch(event.target.value);
+                      setHighlightQuery("");
+                    }}
+                    onKeyDown={(event) => {
+                      if (event.key === "Escape") {
+                        event.preventDefault();
+                        closeSearch();
+                        return;
+                      }
+                      if (event.key === "ArrowDown" && searchResults.length) {
+                        event.preventDefault();
+                        searchResultRefs.current[0]?.focus();
+                      }
+                    }}
+                    placeholder="Search all docs…"
+                    ref={searchInputRef}
+                    type="search"
+                    value={search}
+                  />
+                  <kbd aria-hidden="true">⌘K</kbd>
+                </label>
+                {deferredSearch ? (
+                  <div className="search-results" id="guide-search-results">
+                    <p aria-live="polite">
+                      {matchingSearchResults.length} {matchingSearchResults.length === 1 ? "section" : "sections"} found across all guides
+                      {matchingSearchResults.length > searchResults.length
+                        ? ` · showing first ${searchResults.length}`
+                        : ""}
+                    </p>
+                    {searchResults.length ? (
+                      <ul>
+                        {searchResults.map((result, resultIndex) => {
+                          return (
+                            <li key={`${result.guideId}-${result.stepId}`}>
+                              <a
+                                aria-label={`${result.title}, ${result.guideLabel}`}
+                                href={createPartnerDocumentationHref(
+                                  result.route,
+                                  partnerRequest,
+                                  result.stepId,
+                                )}
+                                onClick={(event) => {
+                                  if (isModifiedClick(event)) return;
+                                  event.preventDefault();
+                                  openSearchResult(result);
+                                }}
+                                onKeyDown={(event) => navigateSearchResults(event, resultIndex)}
+                                ref={(element) => {
+                                  searchResultRefs.current[resultIndex] = element;
+                                }}
+                              >
+                                <span>{result.stepIndex + 1}</span>
+                                <span>
+                                  <strong><HighlightedText query={deferredSearch} text={result.title} /></strong>
+                                  <em>{result.guideLabel}</em>
+                                  <small>
+                                    <HighlightedText
+                                      query={deferredSearch}
+                                      text={getSearchExcerpt(result.searchText, deferredSearch)}
+                                    />
+                                  </small>
+                                </span>
+                              </a>
+                            </li>
+                          );
+                        })}
+                      </ul>
+                    ) : (
+                      <span className="search-empty">Try a field, endpoint, or lifecycle stage.</span>
+                    )}
+                  </div>
+                ) : null}
+                {!deferredSearch ? <p className="search-empty">Search across Swap and Advanced Orders guides, code, and shared references.</p> : null}
+              </form>
+      </dialog>
       <main className="docs-shell" data-product={activeGuide.product}>
         <div className="docs-page">
           <div className="docs-layout">
@@ -662,100 +769,24 @@ function DocsShellContent({
           tabIndex={-1}
         >
           <header className="guide-header">
-            <p className="eyebrow">
-              {activeGuide.label} · {sectionLabel} {activeStepIndex + 1} of {activeGuide.steps.length}
-            </p>
+            <div className="guide-context-row">
+              <p className="eyebrow">
+                {activeGuide.label} · {sectionLabel} {activeStepIndex + 1} of {activeGuide.steps.length}
+              </p>
+            </div>
             <div className="guide-title-row">
               <div className="guide-heading-row">
-                <h1 id="guide-step-title">
-                  <HighlightedText query={highlightQuery} text={activeStep.title} />
-                </h1>
+              <h1 id="guide-step-title">
+                <HighlightedText query={highlightQuery} text={activeStep.title} />
+              </h1>
                 <PageActions
+                  guide={activeGuide}
+                  partnerConfig={partnerConfig}
                   markdownPath={`${activeGuide.route}.md`}
                   pagePath={activeGuide.route}
                 />
               </div>
-              <form className="guide-search" onSubmit={submitSearch} role="search">
-                <label>
-                  <span className="sr-only">Search all integration documentation</span>
-                  <Search aria-hidden="true" size={16} />
-                  <input
-                    aria-controls="guide-search-results"
-                    autoComplete="off"
-                    name="guide-search"
-                    onChange={(event) => {
-                      setSearch(event.target.value);
-                      setHighlightQuery("");
-                    }}
-                    onKeyDown={(event) => {
-                      if (event.key === "Escape") {
-                        setSearch("");
-                        return;
-                      }
-                      if (event.key === "ArrowDown" && searchResults.length) {
-                        event.preventDefault();
-                        searchResultRefs.current[0]?.focus();
-                      }
-                    }}
-                    placeholder="Search all docs…"
-                    ref={searchInputRef}
-                    type="search"
-                    value={search}
-                  />
-                  <kbd aria-hidden="true">⌘K</kbd>
-                </label>
-                {deferredSearch ? (
-                  <div className="search-results" id="guide-search-results">
-                    <p aria-live="polite">
-                      {matchingSearchResults.length} {matchingSearchResults.length === 1 ? "section" : "sections"} found across all guides
-                      {matchingSearchResults.length > searchResults.length
-                        ? ` · showing first ${searchResults.length}`
-                        : ""}
-                    </p>
-                    {searchResults.length ? (
-                      <ul>
-                        {searchResults.map((result, resultIndex) => {
-                          return (
-                            <li key={`${result.guideId}-${result.stepId}`}>
-                              <a
-                                aria-label={`${result.title}, ${result.guideLabel}`}
-                                href={createPartnerDocumentationHref(
-                                  result.route,
-                                  partnerRequest,
-                                  result.stepId,
-                                )}
-                                onClick={(event) => {
-                                  if (isModifiedClick(event)) return;
-                                  event.preventDefault();
-                                  openSearchResult(result);
-                                }}
-                                onKeyDown={(event) => navigateSearchResults(event, resultIndex)}
-                                ref={(element) => {
-                                  searchResultRefs.current[resultIndex] = element;
-                                }}
-                              >
-                                <span>{result.stepIndex + 1}</span>
-                                <span>
-                                  <strong><HighlightedText query={deferredSearch} text={result.title} /></strong>
-                                  <em>{result.guideLabel}</em>
-                                  <small>
-                                    <HighlightedText
-                                      query={deferredSearch}
-                                      text={getSearchExcerpt(result.searchText, deferredSearch)}
-                                    />
-                                  </small>
-                                </span>
-                              </a>
-                            </li>
-                          );
-                        })}
-                      </ul>
-                    ) : (
-                      <span className="search-empty">Try a field, endpoint, or lifecycle stage.</span>
-                    )}
-                  </div>
-                ) : null}
-              </form>
+
             </div>
           </header>
 

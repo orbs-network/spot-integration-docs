@@ -16,6 +16,7 @@ import {
   useState,
 } from "react";
 
+import { DownloadExampleButton } from "@/components/download-example-button";
 import type { ReferenceFile } from "@/lib/reference-examples";
 
 type CodeViewerFile = Omit<ReferenceFile, "language"> & { language: string };
@@ -181,7 +182,7 @@ function SyntaxHighlightedCode({
   );
 }
 
-export function CodeBlock({ code, language }: { code: string; language: string }) {
+export function CodeBlock({ code, language, name = "example" }: { code: string; language: string; name?: string }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const preRef = useRef<HTMLPreElement>(null);
   const [copyStatus, setCopyStatus] = useCopyStatus();
@@ -227,6 +228,7 @@ export function CodeBlock({ code, language }: { code: string; language: string }
           {language}
         </span>
         <span className="code-actions">
+          <DownloadExampleButton files={[{ name, code, language }]} />
           {fullscreenStatus === "failed" ? (
             <span className="code-error" role="status">
               Full screen unavailable
@@ -423,6 +425,7 @@ export function TabbedCodeViewer({
           })}
         </div>
         <div className="reference-code-actions">
+          <DownloadExampleButton files={files} name={idPrefix} />
           {fullscreenStatus === "failed" ? (
             <span className="reference-code-error" role="status">
               Full screen unavailable
@@ -557,7 +560,7 @@ export function RequestResponseCodeViewer({
                   tabIndex={active ? 0 : -1}
                   type="button"
                 >
-                  {file.name}
+                  {file.kind === "request" ? "Request" : file.kind === "response" ? "Response" : file.name}
                 </button>
               );
             })}
@@ -567,6 +570,7 @@ export function RequestResponseCodeViewer({
           </span>
         </div>
         <div className="request-response-actions">
+          <DownloadExampleButton files={files} name={idPrefix} />
           {request.curl ? (
             <button
               aria-label={
