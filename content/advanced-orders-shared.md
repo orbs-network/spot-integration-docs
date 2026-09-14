@@ -38,7 +38,7 @@ This is a documentation snapshot. Check the linked configuration for updates bef
 
 | Requirement | Supplied by | Ready when |
 | --- | --- | --- |
-| Partner | Orbs; otherwise `"unknown"` / `Partners.Unknown` | Partner configuration is available for the connected chain. |
+| Partner | Orbs; otherwise `"external"` / `Partners.External` | Partner configuration is available for the connected chain. |
 | RPC, chain, account | Host wallet/network layer | Reads, writes, signer, and configured client use the same chain and account. |
 | Tokens and wrapped-native token | Host token registry | Addresses and decimals are correct for that chain. |
 | Input balance and gas | Host balance layer / connected wallet | The full input is available, with gas for wrapping, approval, and later cancellation. |
@@ -180,7 +180,7 @@ A missing display estimate does not establish that an order has no fees. Show es
 
 ### Partner Configuration
 
-Use the exact partner identifier supplied by Orbs, or `"unknown"` when none was supplied. Never infer it from a DEX name, hostname, or chain. In the TypeScript and React SDKs, use `Partners.Unknown` unless Orbs supplied a specific enum member.
+Use the exact partner identifier supplied by Orbs, or `"external"` when none was supplied. Never infer it from a DEX name, hostname, or chain. In the TypeScript and React SDKs, use `Partners.External` unless Orbs supplied a specific enum member.
 
 | Integration | Configuration |
 | --- | --- |

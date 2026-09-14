@@ -43,8 +43,7 @@ import { createClient, Partners } from "@orbs-network/spot-ui";
 
 async function getSpotClient() {
   const chainId = 137;
-  // Replace Unknown only when Orbs provides the integration's partner enum.
-  const partner = Partners.Unknown;
+  const partner = Partners.External;
 
   return createClient(partner, chainId);
 }
@@ -62,8 +61,8 @@ The client exposes these read-only configuration values and operations:
 | `client.spenderAddress` | The RePermit verifying contract. Use it for ERC-20 allowance and approval; it is also the v2 cancellation contract. |
 | `client.exchangeAddress` | The configured exchange adapter automatically included in this client's history requests. |
 | `client.prepareOrder(params)` | Converts a submittable form snapshot into the exact protocol order, signing request, approval request, and fresh timestamps. It performs no wallet or network operation. |
-| `client.signOrder(preparedOrder, signer)` | Gives the prepared EIP-712 request to the host signer and returns the unchanged `0x` signature. It does not submit the order. |
-| `client.submitOrder(preparedOrder, signature)` | Submits that exact prepared order and signature once and returns a normalized `Order`. |
+| `preparedOrder.signingRequest` | Contains `signerAddress` and `typedData` for the host wallet to sign. The client does not expose a `signOrder()` method. |
+| `client.submitOrder(preparedOrder.order, signature)` | Submits the exact signed protocol `order` and signature once and returns a normalized `Order`. |
 | `client.getAccountOrders({ account, ...options })` | Loads normalized history with this client's partner, chain, and exchange. Options include `signal`, zero-based `page`, positive `limit`, and `legacyOrders`. |
 | `client.getCancelOrderRequest(order)` | Builds the correct v1 or v2 contract address, ABI, and arguments. The host wallet sends and confirms the transaction. |
 
@@ -159,6 +158,10 @@ Use `.raw` only for wallet and protocol operations, `.ui` for editable token val
 
 ## Prepare and Submit an Order
 
+The current [Spot client contract](https://github.com/orbs-network/spot-ui/blob/a5dd841afd5216ac09efc7bc5e6d2b5bac4df4bd/packages/spot-ui/src/lib/client.ts) accepts `client.submitOrder(order, signature)`: the first argument is a `RePermitOrder`, not the complete `PreparedOrder` wrapper. Sign `preparedOrder.signingRequest` with the host wallet, then submit `preparedOrder.order` with that same signature. Do not reconstruct or mutate the signed order.
+
+`submitOrder()` returns `Promise<Order>` and rejects on submission failure. By contrast, the React hook's `execution.submitOrder()` takes no arguments and reports progress through execution state and provider callbacks.
+
 Treat one click as one immutable attempt and reject concurrent submissions. Capture the current form, tokens, account, chain, and client. For native input, obtain the chain's wrapped-native `Token` from DEX configuration, wrap the full amount, then use that ERC-20 address for allowance, approval, and order preparation.
 
 This is a plain browser TypeScript example. It creates the Viem clients once at module scope from the active chain and injected wallet provider, while the host passes the connected account with the current order inputs. Replace the example Polygon chain with the chain selected in the wallet.
@@ -210,16 +213,13 @@ export async function submitAdvancedOrder({
     swapperAddress: account,
   });
 
-  const signature = await client.signOrder(
-    preparedOrder,
-    ({ signerAddress, typedData }) =>
-      walletClient.signTypedData({
-        ...typedData,
-        account: signerAddress,
-      }),
-  );
+  const { signerAddress, typedData } = preparedOrder.signingRequest;
+  const signature = await walletClient.signTypedData({
+    ...typedData,
+    account: signerAddress,
+  });
 
-  return client.submitOrder(preparedOrder, signature);
+  return client.submitOrder(preparedOrder.order, signature);
 }
 
 async function wrapNativeToken(account: Address, tokenAddress: Address, amount: string): Promise<void> {
@@ -312,7 +312,7 @@ async function cancelSelectedOrder(order: Order) {
 
 ## Operational Checklist
 
-- Use the partner enum supplied by Orbs; otherwise use `Partners.Unknown`.
+- Use the partner enum supplied by Orbs; otherwise use `Partners.External`.
 - Confirm support with `getPartnerChains(partner)` and cache `createClient()` by partner and chain with a retry path.
 - Keep the existing DEX controls, state, current quote, wallet, chain metadata, routing, and translations.
 - Derive one `CalculatedOrderForm` from current inputs; never mirror it into editable state.

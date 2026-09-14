@@ -44,7 +44,7 @@ const PARTNER_ENUM_BY_ID: Readonly<Record<string, string>> = {
   swapx: "Partners.Swapx",
   teafi: "Partners.Teafi",
   thena: "Partners.Thena",
-  unknown: "Partners.Unknown",
+  external: "Partners.External",
   utila: "Partners.Utila",
   yowie: "Partners.Yowie",
 };
@@ -261,14 +261,14 @@ export function personalizeDocumentationMarkdown(
     markdown,
     new Map([
       [
-        'const partner = "unknown"; // Replace with the partner name supplied by Orbs.',
+        'const partner = "external"; // Replace with the partner name supplied by Orbs.',
         partnerDeclaration,
       ],
-      ['const partner = "unknown";', partnerDeclaration],
+      ['const partner = "external";', partnerDeclaration],
       ...(partnerEnum
-        ? [["const partner = Partners.Unknown;", `const partner = ${partnerEnum};`] as const]
+        ? [["const partner = Partners.External;", `const partner = ${partnerEnum};`] as const]
         : []),
-      ['"partner": "unknown"', partnerJson],
+      ['"partner": "external"', partnerJson],
       ["example-session_137", `example-session_${config.chainId}`],
     ]),
   );
@@ -355,25 +355,25 @@ export function personalizeReferenceExample(
       file.kind === "response" ? config.partner : config.requestedPartner;
     const fileReplacements = new Map(commonReplacements);
     fileReplacements.set(
-      "const partner = \"unknown\";",
+      "const partner = \"external\";",
       `const partner = ${JSON.stringify(partner)};`,
     );
     fileReplacements.set(
-      'LIQUIDITY_HUB_PARTNER = "unknown"',
+      'LIQUIDITY_HUB_PARTNER = "external"',
       `LIQUIDITY_HUB_PARTNER = ${JSON.stringify(partner)}`,
     );
     if (partnerEnum) {
       fileReplacements.set(
-        "const partner = Partners.Unknown;",
+        "const partner = Partners.External;",
         `const partner = ${partnerEnum};`,
       );
     }
     fileReplacements.set(
-      "partner: \"unknown\"",
+      "partner: \"external\"",
       `partner: ${JSON.stringify(partner)}`,
     );
     fileReplacements.set(
-      "\"partner\": \"unknown\"",
+      "\"partner\": \"external\"",
       `\"partner\": ${JSON.stringify(partner)}`,
     );
     return {

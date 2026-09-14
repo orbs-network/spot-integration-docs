@@ -27,7 +27,7 @@ export function buildIntegrationDocument(guide: Guide, sharedMarkdown: string, s
   const dependencyNotes = exampleReadme(allFiles, sourceUrl).split("## Dependencies referenced by the code")[1]
     .replace("Some imports may refer to your host application or another example in the guide. Resolve any missing modules before running; this archive includes only this example panel.", "Resolve host-specific imports and connect examples from the sections above before running.");
   const configuration = {
-    partner: config?.requestedPartner ?? "unknown", chainId: config?.chainId ?? null,
+    partner: config?.requestedPartner ?? "external", chainId: config?.chainId ?? null,
     rpcUrl: "REPLACE_WITH_ACTIVE_CHAIN_RPC", account: "FROM_CONNECTED_WALLET",
     inputToken: {address: "REPLACE", decimals: null}, outputToken: {address: "REPLACE", decimals: null},
     wrappedNativeToken: {address: "REPLACE", decimals: null},

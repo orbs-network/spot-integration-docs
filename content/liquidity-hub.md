@@ -29,8 +29,7 @@ Create one Liquidity Hub client for the active chain and reuse it for quote and 
 ```js
 import { createClient } from "@orbs-network/liquidity-hub-sdk";
 
-// Replace "unknown" only with the partner name supplied by Orbs.
-const partner = "unknown";
+const partner = "external";
 
 function createLiquidityHubClient(chainId) {
   return createClient({
@@ -42,7 +41,7 @@ function createLiquidityHubClient(chainId) {
 
 `createClient()` returns a `LiquidityHubClient` synchronously. It rejects an invalid chain ID or empty partner, normalizes the partner to lowercase, and keeps one session scope for that client.
 
-Use the `partner` name supplied by Orbs. If Orbs has not supplied one, use the lowercase string `"unknown"`.
+Use the `partner` name supplied by Orbs. If Orbs has not supplied one, use the lowercase string `"external"`.
 
 The public client surface is intentionally small:
 
@@ -67,7 +66,7 @@ Request quotes from the active-chain client with `liquidityHubClient.getQuote(qu
 
 The input token cannot be native currency. `fromToken` must be an ERC-20 address. If the user selected the chain's native currency, request the quote with the wrapped token address and wrap the required funds before submission.
 
-The SDK sends the `partner` configured on `createClient()`. Use the exact partner identifier supplied by Orbs; if Orbs has not supplied one, configure the lowercase string `"unknown"`. Do not invent or derive a partner value from the application name or hostname.
+The SDK sends the `partner` configured on `createClient()`. Use the exact partner identifier supplied by Orbs; if Orbs has not supplied one, configure the lowercase string `"external"`. Do not invent or derive a partner value from the application name or hostname.
 
 ```ts
 import type { LiquidityHubClient, Quote, QuoteArgs } from "@orbs-network/liquidity-hub-sdk";
@@ -214,7 +213,7 @@ Errors containing `"not supported"`, `"no liquidity"`, `"tns"`, or `"ldv"` are t
 
 | Check | Action | Expected result | If it fails |
 | --- | --- | --- | --- |
-| Client | Reuse one SDK client for the active chain and use the Orbs-provided partner name or `"unknown"`. | Quote requests use the same chain and partner. | Recreate the client after the chain changes. |
+| Client | Reuse one SDK client for the active chain and use the Orbs-provided partner name or `"external"`. | Quote requests use the same chain and partner. | Recreate the client after the chain changes. |
 | Quote cycle | Request Liquidity Hub during the existing host quote cycle, pass `"-1"` when no DEX minimum exists, debounce inputs, and cancel obsolete requests. | The selected Liquidity Hub quote describes the current wallet, pair, amount, and chain. | Do not enter the Liquidity Hub execution flow. |
 | Preparation | Wrap native input and approve `permit2Address`, checking both receipts. | Prepared ERC-20 balance and allowance cover `quote.inAmount`. | Explain which transaction reverted and stop submission. |
 | Freshness | Refresh a stale quote immediately before signing. | Signing and submission use the same fresh quote object. | Do not submit a stale quote; request another quote and signature. |

@@ -127,8 +127,7 @@ export function AdvancedOrderForm({ module }: { module: Module }) {
     [dex.refetchBalances],
   );
 
-  // Replace Unknown only when Orbs provides the integration's partner enum.
-  const partner = Partners.Unknown;
+  const partner = Partners.External;
 
   return (
     <SpotProvider
@@ -290,7 +289,7 @@ For a native/wrapped-native pair, the provider derives the 1:1 relationship usin
 
 | Prop | Contract |
 | --- | --- |
-| `partner` | Required `Partners` value. Use `Partners.Unknown` unless Orbs provides another member. |
+| `partner` | Required `Partners` value. Use `Partners.External` unless Orbs provides another member. |
 | `module` | `TWAP`, `LIMIT`, `STOP_LOSS`, or `TAKE_PROFIT`. |
 | `inputAmountUi` | Required user-facing input decimal string. |
 | `priceProtectionPercent` | Required percentage; `3` means 3%, not 3 basis points or swap slippage. |
@@ -519,6 +518,21 @@ An explicit TWAP trade count persists after amount changes. If it exceeds the ne
 Mount `SubmitOrderDialog` inside `SpotProvider`. The review button opens the modal; only its confirm button calls `submitOrder()`. These three files adapt the review, progress, and custom result panels from [orbs-spot’s submission UI](https://github.com/orbs-network/orbs-spot/blob/main/components/advanced-order/submit-order.tsx) to the current React SDK.
 
 The linked app currently uses the older `useSpot()` API. These snippets preserve its modal behavior using the current SDK's focused hooks.
+
+### Submission API
+
+Checked against `spot-react` 2.1.5 at [commit a5dd841](https://github.com/orbs-network/spot-ui/blob/a5dd841afd5216ac09efc7bc5e6d2b5bac4df4bd/packages/spot-react/src/hooks/use-execution.ts).
+
+| API | Arguments and result |
+| --- | --- |
+| `useExecution().submitOrder()` | Takes no arguments and returns `void`. Starts the provider's current order attempt. |
+| Host `walletInteractions.signOrder(request)` | Receives the SDK's signing request and returns the wallet signature. Preserve its typed data and signer. |
+| Internal `client.submitOrder(preparedOrder.order, signature)` | Receives only the signed protocol order and signature; returns a normalized `Order`. React runs this operation for you. |
+
+Pass tokens, account, chain, market data, wallet interactions, and `callbacks` through `SpotProvider`; do not pass them to `execution.submitOrder()`. The click handler below explicitly invokes `execution.submitOrder()` without forwarding the React click event.
+
+Do not await `execution.submitOrder()` to detect completion or attach `.then()` / `.catch()` to it. Read `isExecuting`, `isSuccess`, `isFailed`, `isRejected`, and `error` from `useExecution()`. For host side effects, use provider `callbacks.onOrderCreated(order)`, `onSubmitOrderFailed(error)`, and `onSubmitOrderRejected()`. `onOrderCreated` means service acceptance, not that the trade has filled. The internal async execution handles failures and exposes them through that state and those callbacks.
+
 
 The modal example uses Radix Dialog, as the reference app does. Reuse the DEX’s existing accessible dialog and icons, or install `@radix-ui/react-dialog` and `lucide-react` to use these files directly. The utility classes assume the host’s Tailwind styles and theme tokens. `useDexDerivedData().setInputAmount()` is the existing DEX input setter; every order-specific component and helper is shown below.
 
@@ -861,7 +875,7 @@ export function OrderReview() {
         {" "}I accept the{" "}
         <a href={DISCLAIMER_URL} target="_blank" rel="noreferrer">order disclaimer</a>
       </label>
-      <button disabled={!accepted || disabled} onClick={execution.submitOrder} type="button">
+      <button disabled={!accepted || disabled} onClick={() => execution.submitOrder()} type="button">
         {loading ? "Preparing order…" : "Submit order"}
       </button>
     </section>
@@ -1026,7 +1040,7 @@ Store `historyKey` as list/selection identity and resolve the current object fro
 
 ## Integration Checklist
 
-- Default to `Partners.Unknown`; use another enum only when Orbs supplies it.
+- Default to `Partners.External`; use another enum only when Orbs supplies it.
 - Pass the host's `wrappedNativeToken`; `spot-react` has no network registry.
 - Pass required `inputBalanceRaw` and `inputTokenUsdPrice`, using `undefined` only while their values are unavailable.
 - Keep current tokens, input, quote freshness, wallet state, controls, navigation, translations, and modal ownership in the DEX.

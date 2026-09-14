@@ -24,7 +24,7 @@ Send `POST /quote?chainId={chainId}` when the swap input changes. The request an
 
 The input token cannot be native currency. `inToken` must always be an ERC-20 address. If the user selected the chain's native currency, quote with the wrapped token address and wrap the required funds before submission.
 
-Set `partner` to the exact partner identifier supplied by Orbs. If Orbs has not supplied one, send the lowercase string `"unknown"`. Do not invent or derive a partner value from the application name or hostname.
+Set `partner` to the exact partner identifier supplied by Orbs. If Orbs has not supplied one, send the lowercase string `"external"`. Do not invent or derive a partner value from the application name or hostname.
 
 Raw API request fields:
 
@@ -36,7 +36,7 @@ Raw API request fields:
 | `outAmount` | Recommended | Host DEX route's slippage-adjusted minimum output. Send `"-1"` when no DEX minimum is available yet. |
 | `user` | Required for execution | Connected account from the host wallet hook, such as Wagmi's `useAccount()`. |
 | `slippage` | Yes | Percentage tolerance, such as `0.5` for 0.5%. |
-| `partner` | Yes | Stable lowercase partner identifier supplied by Orbs; otherwise `"unknown"`. |
+| `partner` | Yes | Stable lowercase partner identifier supplied by Orbs; otherwise `"external"`. |
 | `qs` | No | URI-encoded source-page query or hash used for diagnostics. Send an empty string when unavailable. |
 | `sessionId` | No | Previous Liquidity Hub session when refreshing the same account, pair, and amount. |
 

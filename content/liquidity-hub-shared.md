@@ -30,7 +30,7 @@ Collect these values before wiring either integration. Contract and token addres
 
 | Requirement | Supplied by | Ready when |
 | --- | --- | --- |
-| Partner identifier | Orbs; use `"unknown"` if none was supplied | The same value is used for quotes and execution. |
+| Partner identifier | Orbs; use `"external"` if none was supplied | The same value is used for quotes and execution. |
 | Chain and RPC | Host wallet/network configuration | Wallet writes and RPC reads target the same supported chain. |
 | Token addresses and decimals | Host token registry | Both tokens resolve on that chain; the wrapped-native address is known. |
 | Account and wallet | Host wallet connection | The account can send transactions and sign EIP-712 typed data. Never put a private key in frontend configuration. |
@@ -72,7 +72,7 @@ Swap uses Liquidity Hub to improve an existing DEX quote with on-chain and off-c
 | Liquidity Hub | Orbs optimization layer that requests liquidity from on-chain and off-chain solvers. It is used only when it improves the user's executable result. |
 | Permit2 | Token permission contract that receives ERC-20 allowance for Liquidity Hub swaps. The current address is `0x000000000022D473030F116dDEE9F6B43aC78BA3`. |
 | Quote signing data | `quote.eip712` is the wallet-ready typed-data payload. Pass its domain, types, primary type, and message unchanged to the wallet signer. |
-| Partner | Partner name supplied by Orbs. If Orbs has not supplied one, use `"unknown"`. |
+| Partner | Partner name supplied by Orbs. If Orbs has not supplied one, use `"external"`. |
 | Session ID | Quote session identifier returned by Liquidity Hub and carried through swap submission and status polling. |
 | Liquidity Hub API | Chain-aware quote and execution service used by the SDK and Direct API. Requests include the active `chainId`. |
 | Protected output | `minAmountOut`, an integer in output-token base units used to compare protected minimums across routes. |
@@ -122,7 +122,7 @@ Wrapping and ERC-20 approval are wallet transactions. Account for their network 
 
 ### Partner Configuration
 
-Use the partner identifier supplied by Orbs, or `"unknown"` when none was supplied. Keep the partner and active chain consistent across quotes and execution.
+Use the partner identifier supplied by Orbs, or `"external"` when none was supplied. Keep the partner and active chain consistent across quotes and execution.
 
 | Integration | Configuration |
 | --- | --- |

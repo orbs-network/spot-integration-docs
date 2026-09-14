@@ -44,7 +44,7 @@ The TypeScript examples use Viem for wallet interactions. The same protocol step
 | `primaryType` | EIP-712 primary type returned by the config API. Currently `"RePermitWitnessTransferFrom"`. |
 | `order` | The message the user signs and the same order object later sent to Order Sink. |
 
-`submitOrder(signature, order)` sends the signed order to Order Sink as `{ signature, order, status: "pending" }`. The complete request appears once in the Create Order snippet.
+`submitOrder(order, signature)` sends the signed order to Order Sink as `{ signature, order, status: "pending" }`. The complete request appears once in the Create Order snippet.
 
 The RePermit contract, reactor, executor, exchange adapter, and fee reference addresses come from the fetched partner configuration. Do not hardcode them in the integration.
 
@@ -77,7 +77,7 @@ Preserve the returned domain and types unchanged. Reject the response when `doma
 4. Submit the returned `order` unchanged as `{ signature, order, status: "pending" }` to `POST /orders/new`.
 5. Require HTTP and API success, then keep the returned `signedOrder` for progress, history, fills, and cancellation.
 
-Use the partner identifier provided by Orbs. If none was provided, send the exact value `"unknown"`. Token amounts must be integer strings in base units, the signer must match `order.witness.swapper`, and the active chain must match both the EIP-712 domain and witness chain IDs.
+Use the partner identifier provided by Orbs. If none was provided, send the exact value `"external"`. Token amounts must be integer strings in base units, the signer must match `order.witness.swapper`, and the active chain must match both the EIP-712 domain and witness chain IDs.
 
 Do not recreate the EIP-712 domain, types, protocol contracts, or exchange fields locally. Do not rebuild or mutate the order after signing. Store the returned order hash for tracking and `metadata.repermitDigest` for cancellation.
 
@@ -168,7 +168,7 @@ The transaction sender should be the same address that signed the original order
 
 | Check | Action | Expected result | If it fails |
 | --- | --- | --- | --- |
-| Configuration | Fetch `/config` with the Orbs partner value or `"unknown"`; preserve its domain, types, protocol contracts, and exchange fields. | Domain and witness chain IDs equal the connected wallet chain. | Block signing and surface a partner/chain configuration error. |
+| Configuration | Fetch `/config` with the Orbs partner value or `"external"`; preserve its domain, types, protocol contracts, and exchange fields. | Domain and witness chain IDs equal the connected wallet chain. | Block signing and surface a partner/chain configuration error. |
 | Strategy math | Apply the selected recipe with integer base-unit strings and one fresh shared nonce. | Total amount, per-fill amount, epoch, deadline, limit, and triggers satisfy the recipe invariants. | Keep review disabled and identify the invalid field. |
 | Funding | Read allowance for signer → `domain.verifyingContract`; wrap native input and approve the complete amount when required. | Both receipts succeed and allowance covers `permitted.amount`. | Keep the order unsubmitted; show the reverted preparation step. |
 | Signature | Set `witness.swapper` to the signer and sign the final message once. | The exact signed message is retained unchanged. | Discard the signature and rebuild from current state. |
