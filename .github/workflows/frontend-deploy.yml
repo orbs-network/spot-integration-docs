@@ -24,7 +24,6 @@ on:
         default: default
         options:
           - default
-          - katana
 
 concurrency:
   group: frontend-deploy-${{ github.ref }}
@@ -44,17 +43,13 @@ jobs:
         run: |
           set -euo pipefail
           default_target='{"partner":"default","name":"default","vercelProjectId":"prj_uMBZSztD2z9Oaoi0n4gMmznXj2cl"}'
-          katana_target='{"partner":"katana","name":"VERCEL_PARTNER_KATANA","vercelProjectId":"prj_nzSej5ScRhLPS3qPACCAz4ntfYCD"}'
 
           case "$FRONTEND_PARTNER" in
             default)
               matrix="{\"target\":[$default_target]}"
               ;;
-            katana)
-              matrix="{\"target\":[$katana_target]}"
-              ;;
             all)
-              matrix="{\"target\":[$default_target,$katana_target]}"
+              matrix="{\"target\":[$default_target]}"
               ;;
             *)
               echo "Unsupported frontend partner: $FRONTEND_PARTNER" >&2
