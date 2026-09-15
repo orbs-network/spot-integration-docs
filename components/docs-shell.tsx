@@ -261,7 +261,15 @@ function GuideNavigation({
           })}
         </div>
       </CategoryAccordion>
-
+      <CategoryAccordion
+        className="guide-category"
+        title="Private and Sealed Orders"
+      >
+        <p className="category-contact-copy">
+          Contact the Orbs team for access and integration guidance for Private
+          and Sealed Orders.
+        </p>
+      </CategoryAccordion>
     </nav>
   );
 }

@@ -2615,7 +2615,7 @@ tr:last-child td {
   justify-content: space-between;
   gap: 12px;
   padding: 22px 24px;
-  border-radius: inherit;
+  border-radius: 11px;
   list-style: none;
 }
 
@@ -2692,11 +2692,23 @@ summary.category-summary:focus-visible {
 
 .category-accordion[open] > .category-summary {
   border-bottom: 1px solid var(--border);
-  border-radius: 12px 12px 0 0;
+  border-radius: 11px 11px 0 0;
 }
 
 .category-content {
   padding: 20px;
+}
+
+.category-contact-copy {
+  margin: 0;
+  color: var(--muted-strong);
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+.guide-category .category-contact-copy {
+  padding: 4px;
+  font-size: 12px;
 }
 
 .docs-home-category + .docs-home-category {

@@ -3,6 +3,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 
 import { AppHeader } from "@/components/app-header";
+import { CategoryAccordion } from "@/components/category-accordion";
 import {
   parsePartnerDocumentationQuery,
   type PartnerDocumentationRequest,
@@ -146,6 +147,15 @@ export default async function HomePage({
               })}
             </div>
           </section>
+          <CategoryAccordion
+            className="docs-home-category"
+            title="Private and Sealed Orders"
+          >
+            <p className="category-contact-copy">
+              Contact the Orbs team for access and integration guidance for
+              Private and Sealed Orders.
+            </p>
+          </CategoryAccordion>
 
           <footer className="docs-home-footer">
             <span>

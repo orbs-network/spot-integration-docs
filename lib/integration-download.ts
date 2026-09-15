@@ -43,3 +43,46 @@ export function buildIntegrationDocument(guide: Guide, sharedMarkdown: string, s
     `# Dependencies and Host Imports\n\nFollow the installation instructions above and use compatible versions from your existing application.\n\n## Dependencies referenced by the code${dependencyNotes}`,
   ].filter(Boolean).join("\n\n") + "\n";
 }
+
+function commentLines(text: string): string {
+  return text.trim().split("\n").map(line => line ? `// ${line}` : "//").join("\n");
+}
+
+export function buildIntegrationTypeScript(
+  guide: Guide,
+  sharedMarkdown: string,
+  sourceUrl: string,
+  config?: PartnerDocumentationConfig,
+): string {
+  const document = buildIntegrationDocument(guide, sharedMarkdown, sourceUrl, config);
+  const supportsJsx = guide.id === "advanced-orders-react";
+  const sections = [commentLines(
+    `${guide.title} — integration source reference\n` +
+    "Examples are separated by their original filenames and guide sections.\n" +
+    "Split them into the indicated files and resolve host imports before running.\n" +
+    "Some sections show alternative implementations; do not execute all examples together.",
+  )];
+  const seenCode = new Set<string>();
+  const fences = /^(`{3,})([\w-]+)?(?:[^\n]*)\n([\s\S]*?)^\1[ \t]*$/gm;
+  let cursor = 0;
+  for (const match of document.matchAll(fences)) {
+    const prose = document.slice(cursor, match.index).trim();
+    if (prose) sections.push(commentLines(prose));
+    const language = match[2] ?? "text";
+    const code = match[3].trim();
+    const executable = ["ts", "typescript", "js", "javascript"].includes(language)
+      || (supportsJsx && ["tsx", "jsx"].includes(language));
+    if (executable && !seenCode.has(code)) {
+      sections.push(code);
+      seenCode.add(code);
+    } else if (executable) {
+      sections.push("// This example is already included above.");
+    } else {
+      sections.push(commentLines(`${language} reference:\n${code}`));
+    }
+    cursor = match.index + match[0].length;
+  }
+  const remaining = document.slice(cursor).trim();
+  if (remaining) sections.push(commentLines(remaining));
+  return sections.join("\n\n") + "\n";
+}
