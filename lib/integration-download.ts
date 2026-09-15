@@ -1,88 +1,40 @@
 import type { Guide } from "./guides";
-import { REFERENCE_EXAMPLES, type ReferenceExample } from "./reference-examples";
-import { downloadFilename, exampleReadme, type DownloadFile } from "./example-download";
+import type { ReferenceExample } from "./reference-examples";
+import { exampleReadme } from "./example-download";
 import { personalizeDocumentationMarkdown, personalizeReferenceExample, type PartnerDocumentationConfig } from "../features/partner-documentation/partner-documentation";
 
-function fencedCode(file: DownloadFile): string {
-  const longestFence = Math.max(2, ...[...file.code.matchAll(/`+/g)].map(match => match[0].length));
-  const fence = "`".repeat(longestFence + 1);
-  return `### File: ${downloadFilename(file)}\n\n${fence}${file.language}\n${file.code}\n${fence}`;
-}
-
-export function buildIntegrationDocument(guide: Guide, sharedMarkdown: string, sourceUrl: string, config?: PartnerDocumentationConfig): string {
-  const personalize = (text: string) => config ? personalizeDocumentationMarkdown(text, config) : text;
-  const allFiles: DownloadFile[] = [];
-  const sections = guide.steps.map(step => {
-    const original = REFERENCE_EXAMPLES[`${guide.id}:${step.id}` as keyof typeof REFERENCE_EXAMPLES] as ReferenceExample | undefined;
-    const example = original && config ? personalizeReferenceExample(guide.id, original, config) : original;
-    const files = example?.files.filter(file => example.format !== "request-response" || file.kind) ?? [];
-    allFiles.push(...files);
-    const content = personalize(step.content);
-    for (const match of content.matchAll(/^```([\w-]+)?(?:\s+title="([^"]+)")?\s*\n([\s\S]*?)^```\s*$/gm)) {
-      allFiles.push({name: match[2] ?? step.id, language: match[1] ?? "text", code: match[3]});
-    }
-    const examples = files.map(file => [fencedCode(file), file.curl ? fencedCode({name: `${downloadFilename(file)}.curl.sh`, language: "bash", code: file.curl}) : ""].filter(Boolean).join("\n\n")).join("\n\n");
-    return `## ${step.title}\n\n${examples ? `${examples}\n\n` : ""}${content}`;
-  });
-  const dependencyNotes = exampleReadme(allFiles, sourceUrl).split("## Dependencies referenced by the code")[1]
-    .replace("Some imports may refer to your host application or another example in the guide. Resolve any missing modules before running; this archive includes only this example panel.", "Resolve host-specific imports and connect examples from the sections above before running.");
-  const configuration = {
-    partner: config?.requestedPartner ?? "external", chainId: config?.chainId ?? null,
-    rpcUrl: "REPLACE_WITH_ACTIVE_CHAIN_RPC", account: "FROM_CONNECTED_WALLET",
-    inputToken: {address: "REPLACE", decimals: null}, outputToken: {address: "REPLACE", decimals: null},
-    wrappedNativeToken: {address: "REPLACE", decimals: null},
-  };
-  return [
-    `# ${guide.title} — complete integration\n\nSource: ${sourceUrl}`,
-    "All instructions and code examples are included in this single document, with the page's applied partner configuration. Code blocks retain their original filenames where provided. This is an integration reference; supply your application's wallet, market data, state, and callbacks before running the examples.",
-    "## Setup\n\nFollow the guide below in order. Use the dependency list and configuration template at the end, and consult Shared Reference for chains, units, fees, and wallet actions. Examples may build on earlier snippets or show alternative implementations; do not concatenate their code blocks into one executable module.",
-    personalize(guide.intro), personalize(guide.introReference), ...sections,
-    "---\n\n# Shared Reference", personalize(sharedMarkdown).replace(/^# .+\n/, ""),
-    "# Configuration Template\n\nReplace these placeholders with host configuration and wire them into the examples. Fetch current protocol configuration as directed above; this template does not configure the application automatically.",
-    fencedCode({name: "config.example.json", language: "json", code: JSON.stringify(configuration, null, 2)}),
-    `# Dependencies and Host Imports\n\nFollow the installation instructions above and use compatible versions from your existing application.\n\n## Dependencies referenced by the code${dependencyNotes}`,
-  ].filter(Boolean).join("\n\n") + "\n";
-}
-
-function commentLines(text: string): string {
-  return text.trim().split("\n").map(line => line ? `// ${line}` : "//").join("\n");
-}
-
-export function buildIntegrationTypeScript(
+// Generated at build time from canonical source files, with local imports
+// resolved and colliding bindings renamed through TypeScript's symbol table.
+export async function buildIntegrationTypeScript(
   guide: Guide,
   sharedMarkdown: string,
   sourceUrl: string,
   config?: PartnerDocumentationConfig,
-): string {
-  const document = buildIntegrationDocument(guide, sharedMarkdown, sourceUrl, config);
-  const supportsJsx = guide.id === "advanced-orders-react";
-  const sections = [commentLines(
-    `${guide.title} — integration source reference\n` +
-    "Examples are separated by their original filenames and guide sections.\n" +
-    "Split them into the indicated files and resolve host imports before running.\n" +
-    "Some sections show alternative implementations; do not execute all examples together.",
-  )];
-  const seenCode = new Set<string>();
-  const fences = /^(`{3,})([\w-]+)?(?:[^\n]*)\n([\s\S]*?)^\1[ \t]*$/gm;
-  let cursor = 0;
-  for (const match of document.matchAll(fences)) {
-    const prose = document.slice(cursor, match.index).trim();
-    if (prose) sections.push(commentLines(prose));
-    const language = match[2] ?? "text";
-    const code = match[3].trim();
-    const executable = ["ts", "typescript", "js", "javascript"].includes(language)
-      || (supportsJsx && ["tsx", "jsx"].includes(language));
-    if (executable && !seenCode.has(code)) {
-      sections.push(code);
-      seenCode.add(code);
-    } else if (executable) {
-      sections.push("// This example is already included above.");
-    } else {
-      sections.push(commentLines(`${language} reference:\n${code}`));
-    }
-    cursor = match.index + match[0].length;
-  }
-  const remaining = document.slice(cursor).trim();
-  if (remaining) sections.push(commentLines(remaining));
-  return sections.join("\n\n") + "\n";
+): Promise<string> {
+  const { default: sources } = await import("./generated-integration-sources.json");
+  const source = sources[guide.id as keyof typeof sources];
+  if (!source) throw new Error("No integration source for this guide");
+  const example: ReferenceExample = {
+    files: [{ name: "integration.ts", language: "typescript", code: source }],
+    help: "", label: "", purpose: "", title: guide.title,
+    includePartnerContextFile: false,
+  };
+  const code = config ? personalizeReferenceExample(guide.id, example, config).files[0].code : source;
+  const notes = [
+    `${guide.title} — integration source`,
+    `Source: ${sourceUrl}`,
+    "Canonical examples merged into one module. Supply the documented host imports and dependencies.",
+    "Browser examples require an injected wallet and active-chain RPC configuration.",
+    "Follow the guide for installation, input validation, and acceptance checks.",
+    `Shared reference: /${guide.product}/shared`,
+    // Preserve setup/reference instructions as comments, never executable alternatives.
+    "Dependencies referenced by the code" + exampleReadme([{ name: "integration.ts", language: "typescript", code }], sourceUrl)
+      .split("## Dependencies referenced by the code")[1]
+      .replace("Some imports may refer to your host application or another example in the guide. Resolve any missing modules before running; this archive includes only this example panel.", "Supply the listed host adapters before compiling in your application."),
+    [guide.intro, guide.introReference, ...guide.steps.map(step => `${step.title}\n\n${step.content}`), sharedMarkdown]
+      .map(text => config ? personalizeDocumentationMarkdown(text, config) : text)
+      .join("\n\n")
+      .replace(/^```[^\n]*\n[\s\S]*?^```[ \t]*$/gm, ""),
+  ].join("\n\n").split("\n").map(line => `// ${line}`).join("\n");
+  return `${notes}\n\n${code}`;
 }

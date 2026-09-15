@@ -10,7 +10,7 @@ import {
 } from "@/features/partner-documentation/partner-documentation";
 import { createPartnerDocumentationHref } from "@/features/partner-documentation/query-state";
 import { GUIDE_SOURCES, type GuideProductId } from "@/lib/guides";
-import { ADVANCED_ORDERS_SKILL_URL, SITE_DESCRIPTION } from "@/lib/site";
+import { ORBS_SUPPORT_URL, ADVANCED_ORDERS_SKILL_URL, SITE_DESCRIPTION } from "@/lib/site";
 
 export const metadata: Metadata = {
   alternates: { canonical: "/" },
@@ -152,7 +152,8 @@ export default async function HomePage({
             title="Private and Sealed Orders"
           >
             <p className="category-contact-copy">
-              Contact the Orbs team for access and integration guidance for
+              <a href={ORBS_SUPPORT_URL} target="_blank" rel="noreferrer">Contact the Orbs team</a>{" "}
+              for access and integration guidance for
               Private and Sealed Orders.
             </p>
           </CategoryAccordion>

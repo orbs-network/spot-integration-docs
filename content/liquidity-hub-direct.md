@@ -1,13 +1,5 @@
 # Swap · Direct API
 
-Swap lets users exchange tokens on the same chain using a current quote. Orbs Liquidity Hub supplies quotes from on-chain and off-chain liquidity providers and coordinates execution. Read the [Product Overview](/liquidity-hub/shared#product-overview) for the user journey and how Swap differs from Advanced Orders.
-
-[Shared Reference](/liquidity-hub/shared) — concepts, lifecycle, input tokens, chains, fees, partner configuration, and resources for every Swap integration.
-
-Use this guide when the host application needs to integrate Liquidity Hub over HTTP and will own request cancellation, quote freshness, Permit2 approval, EIP-712 signing, and status polling itself.
-
-See [Choose an Integration](/liquidity-hub/shared#integration-options) for the SDK comparison and [Integration Lifecycle](/liquidity-hub/shared#how-it-works) for the shared execution sequence.
-
 ## Quickstart
 
 ### Before You Start
@@ -27,6 +19,8 @@ Send `POST /quote?chainId={chainId}` when the swap input changes. The request an
 The input token cannot be native currency. `inToken` must always be an ERC-20 address. If the user selected the chain's native currency, quote with the wrapped token address and wrap the required funds before submission.
 
 Set `partner` to the exact partner identifier supplied by Orbs. If Orbs has not supplied one, send the lowercase string `"external"`. Do not invent or derive a partner value from the application name or hostname.
+
+**Field-name distinction:** request `outAmount` is the host DEX minimum (called `dexMinAmountOut` in the SDK); response `outAmount` is the quoted output. Compare routes using response `minAmountOut`, never by treating those two `outAmount` values as equivalent.
 
 Raw API request fields:
 

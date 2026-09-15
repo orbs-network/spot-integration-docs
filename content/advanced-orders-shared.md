@@ -61,13 +61,17 @@ Protocol coverage and partner availability are separate. Confirm the selected pa
 
 This is a documentation snapshot. Check the linked configuration for updates before enabling a new network.
 
+### Development and Test Networks
+
+The networks listed above are mainnets. These guides do not provide a verified testnet deployment. Before testing on another network, ask [Orbs integration support](https://t.me/dTWAPSupportGroup) for its availability and configuration. Use mocked HTTP and wallet responses for local UI and error-path tests; a live acceptance run on a listed network uses real tokens and gas.
+
 ## Integration Options
 
 ### Before You Start
 
 | Requirement | Supplied by | Ready when |
 | --- | --- | --- |
-| Partner | Orbs; otherwise `"external"` / `Partners.External` | Partner configuration is available for the connected chain. |
+| Partner | Use `"external"` / `Partners.External` directly | Partner configuration is available for the connected chain. |
 | RPC, chain, account | Host wallet/network layer | Reads, writes, signer, and configured client use the same chain and account. |
 | Tokens and wrapped-native token | Host token registry | Addresses and decimals are correct for that chain. |
 | Input balance and gas | Host balance layer / connected wallet | The full input is available, with gas for wrapping, approval, and later cancellation. |
@@ -89,7 +93,13 @@ No private key belongs in frontend configuration. The host wallet supplies signi
 | API-only `slippageBps` | Basis points: `50` means 0.5%. This differs from Swap's percentage-valued `slippage`. |
 | USD price inputs | Price of one whole token, not the price of one base unit. |
 
-Use token-aware decimal parsing and integer arithmetic for protocol amounts. Do not assume input and output tokens share decimals. Example amounts illustrate units only; they may be below a partner's minimum trade size.
+`priceProtectionPercent` uses percentage units in both SDKs: `0.5` means 0.5%. The SDK converts it to `slippageBps = priceProtectionPercent × 100`, which becomes signed `witness.slippage`; `0.5` therefore becomes `50`. Do not multiply an already-converted basis-point value again.
+
+Use token-aware decimal parsing and integer arithmetic for protocol amounts. Do not assume input and output tokens share decimals. Example amounts illustrate units only; verify their USD value before submission.
+
+### Minimum Trade Size
+
+Set `minTradeSizeUsd` to any value of **10 or higher** in `calculateOrderForm()` or `SpotProvider`. The value is the minimum amount in USD for each individual trade: `10` sets a $10 minimum, while `25` sets a $25 minimum. There is no implicit default. For TWAP, this applies to each smaller trade, not the total order. For example, 10 trades with `minTradeSizeUsd` set to `25` require at least $250 of total input at the price used for validation.
 
 ### Choose an Integration
 
@@ -104,22 +114,39 @@ Prefer an SDK when possible: the TypeScript SDK provides framework-neutral contr
 
 ### Integration Resources
 
+
+#### Try the Product
+
 - [Playground](https://orbs-spot.vercel.app/?tab=twap)
+- [Interactive Example](https://orbs-spot.vercel.app/?tab=twap&devMode=true)
+
+#### API Only
+
 - [Direct integration reference](https://github.com/orbs-network/spot-integration-docs)
+
+#### TypeScript SDK
+
 - [TypeScript SDK package](https://github.com/orbs-network/spot-ui/tree/master/packages/spot-ui)
 - [TypeScript SDK API](https://github.com/orbs-network/spot-ui/blob/master/packages/spot-ui/README.md)
 - [Spot TypeScript integration skill](https://github.com/orbs-network/spot-ui/tree/master/skills/spot-integration)
-- [Playground](https://orbs-spot.vercel.app/?tab=twap&devMode=true)
+
+#### React SDK
+
 - [React SDK package](https://github.com/orbs-network/spot-ui/tree/master/packages/spot-react)
 - [Spot React integration skill](https://github.com/orbs-network/spot-ui/tree/master/skills/spot-react-integration)
-- [Reference React implementation](https://github.com/orbs-network/orbs-spot/blob/main/components/advanced-order/spot-provider-shell.tsx)
+- [React SDK example: SpotProvider setup](https://github.com/orbs-network/spot-ui/blob/master/apps/web/components/spot/spot-form.tsx)
+- [Orbs Spot example application](https://github.com/orbs-network/orbs-spot) — additional application example.
 - [Swap UI execution helper](https://www.npmjs.com/package/@orbs-network/swap-ui)
+
+#### Agents and Protocol Configuration
+
 - [MCP Skill](https://github.com/orbs-network/spot/tree/master/skill)
 - [Protocol configuration](https://github.com/orbs-network/spot/blob/master/config.json)
 
 ## How It Works
 
 ### Concepts
+
 
 #### Protocol Concepts
 
@@ -130,6 +157,7 @@ Prefer an SDK when possible: the TypeScript SDK provides framework-neutral contr
 | Reactor | Contract encoded as the signed permit `spender`. It is part of the signed order and is not the ERC-20 allowance spender. |
 | Swapper | User address that owns the order. This must be the EIP-712 signer and is stored at `order.witness.swapper`. |
 | RePermit digest | Order cancellation digest returned by Order Sink as `metadata.repermitDigest`. This is passed to the RePermit `cancel(bytes32[])` function. |
+
 
 #### SDK Concepts
 
@@ -194,6 +222,9 @@ Signed orders spend ERC-20 tokens only. Never use a native-token placeholder in 
 
 ## Fees and Configuration
 
+Use `"external"` as the partner identifier. You can integrate directly without contacting Orbs or requesting a partner identifier. In the TypeScript and React SDKs, use `Partners.External`.
+
+
 ### Fees
 
 Fee configuration is shared across integration methods. The [Spot configuration](https://github.com/orbs-network/spot/blob/master/config.json) contains fee contract addresses; these addresses are not fee percentages. The integration documentation does not establish a universal rate. Confirm applicable terms with Orbs for the selected partner and chain.
@@ -209,7 +240,7 @@ A missing display estimate does not establish that an order has no fees. Show es
 
 ### Partner Configuration
 
-Use the exact partner identifier supplied by Orbs, or `"external"` when none was supplied. Never infer it from a DEX name, hostname, or chain. In the TypeScript and React SDKs, use `Partners.External` unless Orbs supplied a specific enum member.
+Use `"external"` for API requests and `Partners.External` in the TypeScript and React SDKs. No partner registration is required. Never infer the identifier from a DEX name, hostname, or chain.
 
 | Integration | Configuration |
 | --- | --- |

@@ -5,11 +5,13 @@
   "packageManager": "yarn@1.22.22",
   "scripts": {
     "dev": "next dev --port 3004",
-    "build": "next build",
+    "build": "yarn generate:integrations && next build",
     "start": "next start",
     "check:examples": "node --no-warnings --experimental-strip-types scripts/check-framework-neutral.mjs",
-    "lint": "eslint && yarn check:examples",
-    "typecheck": "tsc --noEmit"
+    "lint": "eslint && yarn check:examples && yarn check:integrations",
+    "typecheck": "tsc --noEmit",
+    "generate:integrations": "node --no-warnings --experimental-strip-types scripts/generate-integration-downloads.mjs",
+    "check:integrations": "node --no-warnings --experimental-strip-types scripts/generate-integration-downloads.mjs --check && node scripts/check-integration-downloads.mjs && node --no-warnings --experimental-strip-types scripts/check-integration-behavior.mjs"
   },
   "dependencies": {
     "lucide-react": "^0.555.0",

@@ -16,7 +16,7 @@ export function DownloadIntegrationButton({guide, partnerConfig}: {guide: Guide;
         fetch(`/${guide.product}/shared.md`),
       ]);
       if (!response.ok) throw new Error("Shared reference unavailable");
-      const sourceText = buildIntegrationTypeScript(guide, await response.text(), window.location.href, partnerConfig);
+      const sourceText = await buildIntegrationTypeScript(guide, await response.text(), window.location.href, partnerConfig);
       const url = URL.createObjectURL(new Blob([sourceText], {type: "text/plain;charset=utf-8"}));
       const anchor = document.createElement("a");
       anchor.href = url; anchor.download = `${guide.id}-integration.${guide.id === "advanced-orders-react" ? "tsx" : "ts"}`;

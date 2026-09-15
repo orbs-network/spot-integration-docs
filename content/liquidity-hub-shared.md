@@ -22,7 +22,7 @@ Choose Swap for a trade the user wants to execute from a current quote. Choose [
 
 ## Supported Chains
 
-Use these networks for Swap integrations through the TypeScript SDK or Direct API.
+Network reference: [Liquidity Hub chain routing](https://github.com/orbs-network/spot-ui/blob/master/packages/liquidity-hub-ui/src/lib/util.ts), checked September 15, 2026. Confirm current deployment availability with Orbs before enabling a chain. Use these networks for Swap integrations through the TypeScript SDK or Direct API.
 
 | Chain ID | Network |
 | --- | --- |
@@ -40,6 +40,10 @@ Use these networks for Swap integrations through the TypeScript SDK or Direct AP
 
 Before enabling a network, provide its wrapped-native-token address and wallet/RPC support for sending and confirming transactions. Both integration methods use the active chain ID; a listed network does not guarantee a quote for every token pair or amount.
 
+### Development and Test Networks
+
+The networks listed above are mainnets. These guides do not provide a verified testnet deployment. Before testing on another network, ask [Orbs integration support](https://t.me/dTWAPSupportGroup) for its availability and configuration. Use mocked HTTP and wallet responses for local UI and error-path tests; a live acceptance run on a listed network uses real tokens and gas.
+
 ## Integration Options
 
 ### Before You Start
@@ -48,7 +52,7 @@ Collect these values before wiring either integration. Contract and token addres
 
 | Requirement | Supplied by | Ready when |
 | --- | --- | --- |
-| Partner identifier | Orbs; use `"external"` if none was supplied | The same value is used for quotes and execution. |
+| Partner identifier | Use `"external"` directly | The same value is used for quotes and execution. |
 | Chain and RPC | Host wallet/network configuration | Wallet writes and RPC reads target the same supported chain. |
 | Token addresses and decimals | Host token registry | Both tokens resolve on that chain; the wrapped-native address is known. |
 | Account and wallet | Host wallet connection | The account can send transactions and sign EIP-712 typed data. Never put a private key in frontend configuration. |
@@ -77,7 +81,8 @@ Swap uses Liquidity Hub to improve an existing DEX quote with on-chain and off-c
 - [Interactive Example](https://orbs-spot.vercel.app/?devMode=true)
 - [Liquidity Hub Integration Skill](https://github.com/orbs-network/spot-ui/tree/master/skills/liquidity-hub-integration) — implementation workflow and package guardrails for coding agents.
 - [Liquidity Hub SDK and examples](https://github.com/orbs-network/spot-ui/tree/master/packages/liquidity-hub-ui)
-- [Production React implementation](https://github.com/orbs-network/orbs-spot/blob/main/components/best-trade-form.tsx)
+- [React example application](https://github.com/orbs-network/spot-ui/blob/master/apps/web/components/best-trade-form.tsx)
+- [Orbs Spot example application](https://github.com/orbs-network/orbs-spot) — additional application example.
 - [Quote request implementation](https://github.com/orbs-network/spot-ui/blob/master/packages/liquidity-hub-ui/src/lib/quote.ts)
 - [Swap submission and polling implementation](https://github.com/orbs-network/spot-ui/blob/master/packages/liquidity-hub-ui/src/lib/swap.ts)
 
@@ -90,7 +95,7 @@ Swap uses Liquidity Hub to improve an existing DEX quote with on-chain and off-c
 | Liquidity Hub | Orbs optimization layer that requests liquidity from on-chain and off-chain solvers. It is used only when it improves the user's executable result. |
 | Permit2 | Token permission contract that receives ERC-20 allowance for Liquidity Hub swaps. The current address is `0x000000000022D473030F116dDEE9F6B43aC78BA3`. |
 | Quote signing data | `quote.eip712` is the wallet-ready typed-data payload. Pass its domain, types, primary type, and message unchanged to the wallet signer. |
-| Partner | Partner name supplied by Orbs. If Orbs has not supplied one, use `"external"`. |
+| Partner | Use `"external"` as the partner identifier. |
 | Session ID | Quote session identifier returned by Liquidity Hub and carried through swap submission and status polling. |
 | Liquidity Hub API | Chain-aware quote and execution service used by the SDK and Direct API. Requests include the active `chainId`. |
 | Protected output | `minAmountOut`, an integer in output-token base units used to compare protected minimums across routes. |
@@ -130,6 +135,9 @@ Quotes and execution use an ERC-20 input address. When the user selects native c
 
 ## Fees and Configuration
 
+Use `"external"` as the partner identifier. You can integrate directly without contacting Orbs or requesting a partner identifier.
+
+
 ### Fees
 
 The existing Swap documentation does not specify a universal fee percentage. Confirm the applicable fee terms with Orbs for your partner configuration before displaying a fixed rate.
@@ -140,7 +148,7 @@ Wrapping and ERC-20 approval are wallet transactions. Account for their network 
 
 ### Partner Configuration
 
-Use the partner identifier supplied by Orbs, or `"external"` when none was supplied. Keep the partner and active chain consistent across quotes and execution.
+Set the partner identifier to `"external"`. Keep the partner and active chain consistent across quotes and execution.
 
 | Integration | Configuration |
 | --- | --- |

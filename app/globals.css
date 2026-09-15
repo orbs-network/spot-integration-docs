@@ -253,7 +253,8 @@ a[href] {
   outline-offset: 2px;
 }
 
-.theme-toggle {
+.theme-toggle,
+.github-nav-link {
   position: relative;
   display: inline-grid;
   width: 40px;
@@ -270,13 +271,15 @@ a[href] {
   transition: background-color 150ms ease, border-color 150ms ease, color 150ms ease;
 }
 
-.theme-toggle:hover {
+.theme-toggle:hover,
+.github-nav-link:hover {
   border-color: var(--border-strong);
   background: var(--panel-raised);
   color: var(--text);
 }
 
-.theme-toggle:focus-visible {
+.theme-toggle:focus-visible,
+.github-nav-link:focus-visible {
   outline: 2px solid var(--primary);
   outline-offset: 2px;
 }
@@ -2603,9 +2606,11 @@ tr:last-child td {
 }
 
 .category-accordion {
+  --category-radius: 12px;
+  --category-inner-radius: calc(var(--category-radius) - 1px);
   min-width: 0;
   border: 1px solid var(--border);
-  border-radius: 12px;
+  border-radius: var(--category-radius);
   background: var(--home-card-background);
 }
 
@@ -2615,7 +2620,7 @@ tr:last-child td {
   justify-content: space-between;
   gap: 12px;
   padding: 22px 24px;
-  border-radius: 11px;
+  border-radius: var(--category-inner-radius);
   list-style: none;
 }
 
@@ -2692,7 +2697,7 @@ summary.category-summary:focus-visible {
 
 .category-accordion[open] > .category-summary {
   border-bottom: 1px solid var(--border);
-  border-radius: 11px 11px 0 0;
+  border-radius: var(--category-inner-radius) var(--category-inner-radius) 0 0;
 }
 
 .category-content {
@@ -2708,7 +2713,7 @@ summary.category-summary:focus-visible {
 
 .guide-category .category-contact-copy {
   padding: 4px;
-  font-size: 12px;
+  font-size: 14px;
 }
 
 .docs-home-category + .docs-home-category {

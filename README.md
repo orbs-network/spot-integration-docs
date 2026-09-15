@@ -34,6 +34,8 @@ yarn typecheck
 yarn build
 ```
 
+`yarn generate:integrations` regenerates the `.ts`/`.tsx` downloads after editing guide examples. The build runs it automatically; lint rejects stale generated sources and runs download binding and execution-behavior checks. Downloads merge the canonical code into one module; host adapters and package dependencies still come from the integrating application.
+
 Guide content lives in `content/`. Each level-2 Markdown heading becomes a navigable step with a stable hash link.
 
 ## Documentation endpoints

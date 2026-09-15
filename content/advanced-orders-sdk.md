@@ -1,16 +1,10 @@
 # Advanced Orders · TypeScript SDK
 
-Advanced Orders lets users schedule trades over time with TWAP or set price conditions with limit, stop-loss, and take-profit orders. Read the [Product Overview](/advanced-orders/shared#product-overview) for an explanation of each order type and the user journey before choosing an integration.
-
-[Shared Reference](/advanced-orders/shared) — concepts, lifecycle, input tokens, chains, fees, partner configuration, and resources for every Advanced Orders integration.
-
-Use `@orbs-network/spot-ui` when the host needs Advanced Orders calculation and protocol operations without React. It is framework-neutral and works with Vue, Angular, Svelte, vanilla TypeScript, and server-side TypeScript while the host keeps ownership of UI, wallet access, state, caching, and routing.
-
-See [Concepts](/advanced-orders/shared#how-it-works) for the shared client and form model, and [Input Tokens](/advanced-orders/shared#how-it-works) before preparing an order.
-
 ## Quickstart
 
 ### Before You Start
+
+Pass `minTradeSizeUsd` to `calculateOrderForm()` with any value of **10 or higher**, such as `10`, `25`, or `50`. This is the minimum amount in USD for each individual trade. For example, `minTradeSizeUsd: 25` means every trade must be worth at least $25. For TWAP orders, each smaller trade must meet this minimum; it is not the total order amount.
 
 Complete the shared [setup requirements](/advanced-orders/shared#integration-options). Install the SDK below and Viem for the wallet example. Supply the connected account/provider, active-chain RPC, token metadata, raw balance, and a current quote for the full input amount.
 
@@ -43,8 +37,7 @@ The package has no React or wallet-library dependency. Import only from the pack
 ```typescript
 import { createClient, Partners } from "@orbs-network/spot-ui";
 
-async function getSpotClient() {
-  const chainId = 137;
+export async function getSpotClient(chainId: number) {
   const partner = Partners.External;
 
   return createClient(partner, chainId);
@@ -77,42 +70,13 @@ Use `calculateOrderForm()` as the only calculation entry point. It is synchronou
 ```typescript
 import { calculateOrderForm, Module, type CalculateOrderFormParams } from "@orbs-network/spot-ui";
 
-function getCalculatedOrderForm() {
-  const params = {
-    module: Module.TWAP,
-    inputTokenDecimals: inputToken.decimals,
-    outputTokenDecimals: outputToken.decimals,
-
-    // Raw output-token quote for this complete input amount and token pair.
-    quotedOutputAmountRaw,
-    inputTokenUsdPrice,
-    outputTokenUsdPrice,
-    minTradeSizeUsd,
-    priceProtectionPercent: 3,
-    displayFeePercent,
-    inputBalanceRaw,
-
-    userInput: {
-      inputAmountUi,
-      isMarketOrder: true,
-      tradeCount,
-      tradeInterval,
-      orderDuration,
-      limitPriceUi,
-      limitPricePercent,
-      triggerPriceUi,
-      triggerPricePercent,
-      isPriceInverted,
-    },
-  } satisfies CalculateOrderFormParams;
-
-  const form = calculateOrderForm(params);
-
-  if (!form.canSubmit) {
-    renderValidationError(form.errors.primary);
+export function getCalculatedOrderForm(params: CalculateOrderFormParams) {
+  // Supply form inputs and current market data from the host application.
+  // Render form.errors.primary when form.canSubmit is false.
+  if (!Number.isFinite(params.minTradeSizeUsd) || params.minTradeSizeUsd < 10) {
+    throw new Error("minTradeSizeUsd must be 10 or higher");
   }
-
-  return form;
+  return calculateOrderForm(params);
 }
 ```
 
@@ -124,7 +88,7 @@ function getCalculatedOrderForm() {
 | `inputTokenDecimals` / `outputTokenDecimals` | Actual token decimal precision; zero is valid. |
 | `quotedOutputAmountRaw` | Current output-token base-unit quote for the complete `userInput.inputAmountUi`. Omit it while the quote is loading or stale. |
 | `inputTokenUsdPrice` / `outputTokenUsdPrice` | USD value of exactly one whole token, as decimal strings. |
-| `minTradeSizeUsd` | Positive minimum USD value for one fill, approved for this partner/product. |
+| `minTradeSizeUsd` | Minimum amount in USD for each individual trade. Accepts any value of `10` or higher. For TWAP, the configured minimum applies to each smaller trade. |
 | `priceProtectionPercent` | Execution protection in percentage units; `3` means 3%, or 300 basis points. It is separate from the normal swap slippage setting. |
 | `displayFeePercent` | Optional display-only estimate used for `form.fees`; it does not collect or subtract a fee. |
 | `inputBalanceRaw` | Current input-token balance as an integer base-unit string. |
@@ -195,7 +159,7 @@ export async function submitAdvancedOrder({
   outputToken,
   wrappedNativeToken,
 }: SubmitAdvancedOrderParams) {
-  const client = await getSpotClient();
+  const client = await getSpotClient(chain.id);
   if (!form.canSubmit) throw new Error("Order form is not ready");
 
   const amount = form.inputAmount.raw;
@@ -218,6 +182,7 @@ export async function submitAdvancedOrder({
   const { signerAddress, typedData } = preparedOrder.signingRequest;
   const signature = await walletClient.signTypedData({
     ...typedData,
+    message: { ...typedData.message },
     account: signerAddress,
   });
 
@@ -285,11 +250,9 @@ Return the wallet's original `0x`-prefixed EIP-712 signature. Do not split it in
 Use the initialized client so partner, chain, and exchange remain aligned with submission. Omit `page` to fetch all available pages.
 
 ```typescript
-async function fetchOrders() {
-  return client.getAccountOrders({
-    account,
-    signal: abortController.signal,
-  });
+export async function fetchOrders(account: Address, signal?: AbortSignal) {
+  const client = await getSpotClient(chain.id);
+  return client.getAccountOrders({ account, signal });
 }
 ```
 
@@ -302,11 +265,19 @@ Pass the selected order returned by `fetchOrders()` to the same initialized clie
 ```typescript
 import type { Order } from "@orbs-network/spot-ui";
 
-async function cancelSelectedOrder(order: Order) {
+export async function cancelSelectedOrder(order: Order, account: Address) {
+  const client = await getSpotClient(chain.id);
   const request = client.getCancelOrderRequest(order);
-  const txHash = await wallet.cancelOrder(request);
-  await refreshOrders();
-  return txHash;
+  const txHash = await walletClient.writeContract({
+    address: request.contractAddress as Address,
+    abi: request.abi,
+    args: request.args,
+    functionName: "cancel",
+    account,
+    chain: walletClient.chain,
+  });
+  await waitForSuccessfulReceipt(txHash);
+  return { txHash, orders: await client.getAccountOrders({ account }) };
 }
 ```
 

@@ -1,17 +1,5 @@
 # Swap · TypeScript SDK
 
-Swap lets users exchange tokens on the same chain using a current quote. Orbs Liquidity Hub supplies quotes from on-chain and off-chain liquidity providers and coordinates execution. Read the [Product Overview](/liquidity-hub/shared#product-overview) for the user journey and how Swap differs from Advanced Orders.
-
-[Shared Reference](/liquidity-hub/shared) — concepts, lifecycle, input tokens, chains, fees, partner configuration, and resources for every Swap integration.
-
-This guide is for teams that want to add Orbs Liquidity Hub to an existing DEX, swap application, or trading service without adopting a specific UI framework.
-
-Start with the shared [Integration Lifecycle](/liquidity-hub/shared#how-it-works); this guide implements it with the SDK.
-
-The `@orbs-network/liquidity-hub-sdk` package is framework-neutral TypeScript and has no React dependency. The client, quote, route-selection, and full execution examples below work in any JavaScript or TypeScript application. React and Wagmi adapters are optional host concerns.
-
-See [Choose an Integration](/liquidity-hub/shared#integration-options) for the SDK and Direct API comparison.
-
 ## Install and Initialize
 
 ### Before You Start
@@ -58,7 +46,7 @@ The SDK selects the standard chain endpoint when `apiUrl` is omitted. For a same
 
 The Submit Swap reference initializes Viem `publicClient` and `walletClient` instances in the same file. They handle token reads, wallet transactions, EIP-712 signing, and receipt confirmation without requiring React or Wagmi.
 
-For React, the source repository provides a two-file TanStack Query reference: [`liquidity-hub.ts`](https://github.com/orbs-network/spot-ui/blob/master/packages/liquidity-hub-ui/examples/react/liquidity-hub.ts) contains the framework-neutral client and execution flow, while [`liquidity-hub-react.tsx`](https://github.com/orbs-network/spot-ui/blob/master/packages/liquidity-hub-ui/examples/react/liquidity-hub-react.tsx) contains the provider, quote query, and swap mutation. Reuse an existing `QueryClientProvider` instead of adding a second provider. The [`best-trade-form.tsx`](https://github.com/orbs-network/orbs-spot/blob/main/components/best-trade-form.tsx) production example shows how an application can compose its execution hook with `SwapFlow` for review, progress, failure, and success states.
+For React, the source repository provides a two-file TanStack Query reference: [`liquidity-hub.ts`](https://github.com/orbs-network/spot-ui/blob/master/packages/liquidity-hub-ui/examples/react/liquidity-hub.ts) contains the framework-neutral client and execution flow, while [`liquidity-hub-react.tsx`](https://github.com/orbs-network/spot-ui/blob/master/packages/liquidity-hub-ui/examples/react/liquidity-hub-react.tsx) contains the provider, quote query, and swap mutation. Reuse an existing `QueryClientProvider` instead of adding a second provider. The [`best-trade-form.tsx`](https://github.com/orbs-network/spot-ui/blob/master/apps/web/components/best-trade-form.tsx) example application shows how an application can compose its execution hook with `SwapFlow` for review, progress, failure, and success states.
 
 See [Supported Chains](/liquidity-hub/shared#supported-chains) for the shared network list and requirements.
 
@@ -143,9 +131,13 @@ Use this step only when Liquidity Hub runs alongside an existing DEX router. Liq
 If the current DEX minimum output is already available, pass it as `dexMinAmountOut`. If both routes must start at the same time, pass `"-1"` and compare the two protected outputs after both settle. Use the public helper so malformed values safely lose route selection:
 
 ```ts
-import { isLiquidityHubBetter } from "@orbs-network/liquidity-hub-sdk";
+import { isLiquidityHubBetter, type Quote } from "@orbs-network/liquidity-hub-sdk";
 
-function selectLiquidityHubWhenBetter(quote, dexMinAmountOut) {
+export function selectLiquidityHubWhenBetter(
+  quote: Quote,
+  dexMinAmountOut: string,
+  selectLiquidityHubRoute: (quote: Quote) => void,
+) {
   if (!isLiquidityHubBetter(quote, dexMinAmountOut)) return false;
 
   selectLiquidityHubRoute(quote);

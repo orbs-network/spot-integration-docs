@@ -50,7 +50,7 @@ import type {
   GuideSummary,
 } from "@/lib/guides";
 import { hasReferenceExample } from "@/lib/reference-keys";
-import { ADVANCED_ORDERS_SKILL_URL } from "@/lib/site";
+import { ORBS_SUPPORT_URL, ADVANCED_ORDERS_SKILL_URL } from "@/lib/site";
 
 const InteractiveReference = dynamic(() =>
   import("@/components/interactive-reference").then(
@@ -266,7 +266,8 @@ function GuideNavigation({
         title="Private and Sealed Orders"
       >
         <p className="category-contact-copy">
-          Contact the Orbs team for access and integration guidance for Private
+          <a href={ORBS_SUPPORT_URL} target="_blank" rel="noreferrer">Contact the Orbs team</a>{" "}
+              for access and integration guidance for Private
           and Sealed Orders.
         </p>
       </CategoryAccordion>
@@ -838,7 +839,7 @@ function DocsShellContent({
           <aside className="implementation-callout">
             <span>
               <strong>Ready to Implement?</strong>
-              <small>Use the reference implementation, then contact Orbs if partner configuration is missing.</small>
+              <small>Use the reference implementation with the external partner configuration.</small>
             </span>
             <span className="resource-links">
               <a href={resources.sourceHref} rel="noreferrer" target="_blank">

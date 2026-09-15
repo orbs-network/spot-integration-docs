@@ -1,3 +1,4 @@
+export const ORBS_SUPPORT_URL = "https://t.me/dTWAPSupportGroup";
 export const SITE_NAME = "Spot Integration Docs";
 export const SITE_DESCRIPTION =
   "Integration guides for Orbs Swap and Advanced Orders.";

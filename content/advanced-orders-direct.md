@@ -1,22 +1,12 @@
 # Advanced Orders · API Only
 
-Advanced Orders lets users schedule trades over time with TWAP or set price conditions with limit, stop-loss, and take-profit orders. Read the [Product Overview](/advanced-orders/shared#product-overview) for an explanation of each order type and the user journey before choosing an integration.
-
-[Shared Reference](/advanced-orders/shared) — concepts, lifecycle, input tokens, chains, fees, partner configuration, and resources for every Advanced Orders integration.
-
-Use this guide when the application should integrate Advanced Orders without installing an Orbs package. The host application owns the interface, wallet integration, request flow, and order lifecycle while calling the Order Sink APIs directly.
-
-This path has no Orbs package dependency and works with any frontend or backend stack. The HTTP and EIP-712 contract is canonical.
-
-See [Choose an Integration](/advanced-orders/shared#integration-options) for the SDK comparison and [Input Tokens](/advanced-orders/shared#how-it-works) for the shared ERC-20 requirement.
-
 ## Quickstart
 
 ### Before You Start
 
 Complete the shared [setup requirements](/advanced-orders/shared#integration-options). This path requires no Orbs runtime package, but the TypeScript examples use Viem for wallet and contract operations. Supply the `WalletContext`, chain-specific wrapped-token address, and a validated `OrderInput` from your host form.
 
-Implement in this order: configuration fetch, strategy derivation, the four [Create Order reference files](/advanced-orders/direct#create-order), history, then cancellation. The host owns strategy math, protocol field validation, HTTP requests, and wallet transactions.
+Implement in this order: configuration fetch, strategy derivation, the five [Create Order reference files](/advanced-orders/direct#create-order), history, then cancellation. The host owns strategy math, protocol field validation, HTTP requests, and wallet transactions.
 
 Start with the shared [Partner Configuration](/advanced-orders/shared#fees-and-configuration) and [Input Tokens](/advanced-orders/shared#how-it-works) requirements, then implement these API operations.
 
@@ -26,27 +16,22 @@ The API-only integration uses these HTTP and on-chain operations:
 | --- | --- |
 | Fetch configuration | `GET https://order-sink-v2.orbs.network/config?partner={partner}&chain={chainId}` with `Accept: application/json`. |
 | Create order | `POST https://order-sink-v2.orbs.network/orders/new` with JSON `{ signature, order, status: "pending" }`. `order` must be the exact EIP-712 message that produced `signature`. |
-| Fetch history | `GET https://order-sink-v2.orbs.network/orders?swapper={account}&chainId={chainId}&exchange={adapter}`. The adapter comes from the configuration response. |
+| Fetch history | `GET https://order-sink-v2.orbs.network/orders?swapper={account}&chainId={chainId}&exchange={adapter}&page=1&limit=100`. The adapter comes from the configuration response. |
 | Cancel | Send the on-chain transaction `cancel([metadata.repermitDigest])` to `domain.verifyingContract`; cancellation is not an Order Sink HTTP request. |
 
 ### Function Contracts
 
-This document describes the behavior of three functions. Your implementation can be in Java, Python, TypeScript, Go, or any other stack.
+The five Create Order files are `config.ts`, `create-order-flow.ts`, `build-order.ts`, `sign-order.ts`, and `order-types.ts`. They provide the following functions; equivalent HTTP and wallet operations can be implemented in another language.
 
-The TypeScript examples use Viem for wallet interactions. The same protocol steps can be implemented with another wallet or backend stack.
-
-`fetchRePermitData(partner, chainId)` fetches the server-controlled EIP-712 domain, types, primary type, and order template for one partner and chain.
-
-`buildRePermitOrderData(...)` builds the EIP-712 payload the user signs. It returns:
-
-| Field | Purpose |
+| Function | Contract |
 | --- | --- |
-| `domain` | EIP-712 domain returned by the config API. Pass it through unchanged. |
-| `types` | EIP-712 type definitions returned by the config API. Pass them through unchanged. |
-| `primaryType` | EIP-712 primary type returned by the config API. Currently `"RePermitWitnessTransferFrom"`. |
-| `order` | The message the user signs and the same order object later sent to Order Sink. |
+| `fetchDefaultPermitData(partnerId, chainId)` | Fetches and validates the partner-chain configuration; returns `PermitData` containing `domain`, `types`, `primaryType`, and the base `order`. |
+| `validateOrderInput(orderInput)` | Rejects invalid amount, fill-count, interval, and slippage values before wallet prompts. |
+| `buildOrderFromDerivedValues({ account, chainId, orderInput, wTokenAddress })` | Fetches fresh configuration, validates the schedule, and returns `{ order, permitData }`. |
+| `signOrder({ account, chainId, orderInput, walletClient, wTokenAddress })` | Builds the order, signs its EIP-712 payload, and returns `{ order, signature }`. |
+| `submitOrdersSinkOrder({ orderInput, wallet, wTokenAddress })` | Prepares funds, calls `signOrder`, and returns the accepted `OrderResponse`. Its internal `submitOrder(order, signature)` helper posts the unchanged signed message to Order Sink. |
 
-`submitOrder(order, signature)` sends the signed order to Order Sink as `{ signature, order, status: "pending" }`. The complete request appears once in the Create Order snippet.
+Set the partner once in `config.ts`; creation, history, and cancellation share it. The host supplies the active account and chain to each operation.
 
 The RePermit contract, reactor, executor, exchange adapter, and fee reference addresses come from the fetched partner configuration. Do not hardcode them in the integration.
 
@@ -61,11 +46,15 @@ All amounts below are integer strings in token base units. Start from the truste
 | Stop Loss | Use one fill and `epoch = 0`. Set `triggerLower` to the lower trigger amount per fill and `triggerUpper = "0"`. Set `output.limit` to the post-trigger minimum, or `"0"` for market execution. |
 | Take Profit | Use one fill and `epoch = 0`. Set `triggerUpper` to the upper trigger amount per fill and `triggerLower = "0"`. Set `output.limit` to the post-trigger minimum, or `"0"` for market execution. |
 
+For TWAP, calculate `srcAmountPerFill = totalInputAmount / totalTrades` with integer division, then set the actual signed total to `srcAmountPerFill × totalTrades`. Show that adjusted total before signing; the remainder stays in the wallet. For example, 1,000 USDC (6 decimals) over 3 fills becomes 333.333333 USDC per fill, a total of 999.999999 USDC, and a remainder of 0.000001 USDC. Reject a zero per-fill amount. The builder rejects totals that do not match this multiplication and deadlines that cannot accommodate the schedule.
+
 Build the order close to signing time. The live Spot builder generates one nonce from the current Unix time in milliseconds and uses that same value for both `order.nonce` and `order.witness.nonce`. Preserve the complete built order unchanged through signing, submission, storage, and retry.
 
 ## Create Order
 
 The framework-neutral reference above contains the complete flow. `create-order-flow.ts` exports `submitOrdersSinkOrder()` and prepares funds; `build-order.ts` fetches trusted permit data and constructs the order; `sign-order.ts` signs it; `order-types.ts` defines the shared contracts. Supply `OrderInput`, `WalletContext`, and the wrapped-token address from the host application. No React hooks are required.
+
+The two configuration fetches are intentional: the first resolves the approval spender before preparing funds; signing fetches a fresh trusted template rather than accepting a caller-supplied permit. If configuration changes during wallet preparation, stop and recheck allowance for the new spender before retrying.
 
 ### Fetch Partner Config
 
@@ -97,7 +86,7 @@ Do not recreate the EIP-712 domain, types, protocol contracts, or exchange field
 | `dstMinAmountPerFill` | Minimum destination amount accepted for one fill, in destination-token base units. Use `"0"` when the strategy has no limit. |
 | `deadlineMillis` | Absolute order deadline as Unix time in milliseconds. The helper converts it to Unix seconds. |
 | `fillDelayMillis` | Delay between eligible fills in milliseconds. The helper converts it to `witness.epoch` seconds. |
-| `totalTrades` | Number of expected fills. Values of `0` or `1` produce `witness.epoch = 0`. |
+| `totalTrades` | Number of expected fills. `1` produces `witness.epoch = 0`; the example rejects `0`. |
 | `slippageBps` | Execution slippage in basis points; `100` means 1%. |
 | `freshnessSeconds` | Maximum accepted age of execution price data in seconds. Use `60` unless Orbs explicitly supplied another value. |
 | `triggerLower` | Lower strategy trigger in destination-token base units. Use `"0"` when unused. |
@@ -125,6 +114,9 @@ Do not recreate the EIP-712 domain, types, protocol contracts, or exchange field
 | `metadata.repermitDigest` | On-chain digest required to cancel the order. Preserve it with the created order. |
 
 ## Fetch Order Sink Orders
+
+Call `fetchOrders({ account, chainId, page: 1, limit: 100 })` with the connected wallet context. `page` is **one-based for the raw API**; `limit` is a positive integer page size. The response retains `orders`, `page`, `limit`, `total`, and `totalPages`. Increment `page` until it reaches `totalPages`, or expose a Load more control. Use the response's actual page size if the service caps the requested limit. The SDK uses zero-based pages and performs this conversion internally.
+
 
 Fetch RePermit orders from Order Sink with the swapper address, chain ID, and exchange adapter from the fetched template. The `swapper` query value is the order owner address, matching `order.witness.swapper`. The `exchange` query value should be `permitDataResponse.order.witness.exchange.adapter`.
 
@@ -183,7 +175,7 @@ Ready to launch when every row passes on each supported chain.
 ### End-to-End Acceptance Run
 
 1. Resolve partner/chain configuration and select a strategy from [Strategy Recipes](/advanced-orders/direct#strategy-recipes). Fill `OrderInput` with real token metadata and validated raw amounts; example addresses and response objects are not executable fixtures.
-2. Copy all four [Create Order files](/advanced-orders/direct#create-order) together: `create-order-flow.ts`, `build-order.ts`, `sign-order.ts`, and `order-types.ts`. Supply host Viem clients/account in `WalletContext` and the correct wrapped-native address.
+2. Copy all five [Create Order files](/advanced-orders/direct#create-order) together: `config.ts`, `create-order-flow.ts`, `build-order.ts`, `sign-order.ts`, and `order-types.ts`. Supply host Viem clients/account in `WalletContext` and the correct wrapped-native address.
 3. Call `submitOrdersSinkOrder({ orderInput, wallet, wTokenAddress })` from one guarded confirmation handler. Start with insufficient allowance; verify RePermit approval confirms before the EIP-712 prompt. Repeat with native input to verify wrapping occurs first.
 4. Require HTTP and API success, retain the returned `signedOrder`, and show “Order submitted”. Fetch history using the same account, chain, and configured adapter; match the returned order hash. Acceptance alone is not a fill.
 5. Select an open order from history and exercise [Cancel Order Sink Orders](/advanced-orders/direct#cancel-order-sink-orders). Use its `metadata.repermitDigest`, confirm the transaction, then refresh until history reflects the result.

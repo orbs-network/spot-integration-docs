@@ -4,9 +4,10 @@ import type { ReactNode } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { ExternalLink } from "lucide-react";
+import { ExternalLink, Github } from "lucide-react";
 
 import { ThemeToggle } from "@/components/theme-toggle";
+import { SITE_REPOSITORY } from "@/lib/site";
 
 export function AppHeader({ search }: { search?: ReactNode }) {
   const pathname = usePathname();
@@ -40,6 +41,16 @@ export function AppHeader({ search }: { search?: ReactNode }) {
         >
           Playground
           <ExternalLink aria-hidden="true" size={14} />
+        </a>
+        <a
+          aria-label="Open integration docs on GitHub in a new tab"
+          className="github-nav-link"
+          href={SITE_REPOSITORY}
+          rel="noopener noreferrer"
+          target="_blank"
+          title="View on GitHub"
+        >
+          <Github aria-hidden="true" size={18} />
         </a>
         <ThemeToggle />
       </div>

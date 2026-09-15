@@ -1,16 +1,16 @@
 # Advanced Orders · React SDK
 
-Advanced Orders lets users schedule trades over time with TWAP or set price conditions with limit, stop-loss, and take-profit orders. Read the [Product Overview](/advanced-orders/shared#product-overview) for an explanation of each order type and the user journey before choosing an integration.
-
-[Shared Reference](/advanced-orders/shared) — concepts, lifecycle, input tokens, chains, fees, partner configuration, and resources for every Advanced Orders integration.
-
-Use `@orbs-network/spot-react` when an existing React DEX wants provider-scoped Advanced Orders state and focused hooks. The host keeps its swap state, wallet access, components, styling, translations, routing, chain metadata, and modal shell. `SpotProvider` owns the calculated form, configured client, execution state, history, and cancellation state.
-
-The package uses `@orbs-network/spot-ui` internally. See [Choose an Integration](/advanced-orders/shared#integration-options) for the API and SDK comparison.
-
 ## Quickstart
 
+### React SDK Examples
+
+- [React SDK example in spot-ui](https://github.com/orbs-network/spot-ui/tree/master/apps/web/components/spot) — form, order submission, history, and cancellation components.
+- [SpotProvider setup example](https://github.com/orbs-network/spot-ui/blob/master/apps/web/components/spot/spot-form.tsx).
+- [Orbs Spot example application](https://github.com/orbs-network/orbs-spot).
+
 ### Before You Start
+
+Set `minTradeSizeUsd` on `SpotProvider` to any value of **10 or higher**, such as `10`, `25`, or `50`. This is the minimum amount in USD for each individual trade. For example, `minTradeSizeUsd: 25` means every trade must be worth at least $25. For TWAP orders, each smaller trade must meet this minimum; it is not the total order amount.
 
 Complete the shared [setup requirements](/advanced-orders/shared#integration-options). Use the host application's existing wallet connection, token registry, quote, balance, and price sources. Install the packages below and the dependencies imported by the wallet adapter example.
 
@@ -30,7 +30,7 @@ Follow the shared [Input Tokens](/advanced-orders/shared#how-it-works) requireme
 | Balance | Raw input-token integer string, or `undefined` while disconnected/loading. |
 | USD prices | USD value of exactly one whole token. Input price is required but may be `undefined` while loading. |
 | Wallet | Connected `chainId`, `account`, and five `walletInteractions` methods. |
-| Product policy | Orbs-provided partner enum, positive `minTradeSizeUsd`, and `priceProtectionPercent`. |
+| Product policy | Orbs-provided partner enum, `minTradeSizeUsd` of at least `10`, and `priceProtectionPercent`. |
 
 Apply the shared [Partner Configuration](/advanced-orders/shared#fees-and-configuration) requirements. If the wallet or supported network is unavailable, keep the form visible and replace only the submit area with the DEX's connect-wallet or switch-network control.
 
@@ -49,6 +49,8 @@ npm install @orbs-network/swap-ui@latest
 # or: yarn add @orbs-network/spot-react@latest
 # optional: yarn add @orbs-network/swap-ui@latest
 ```
+
+The wallet adapter examples target **Wagmi v3**, including `useConnection`. Wagmi v2 applications should adapt their existing `useAccount`-based wallet layer to the same `walletInteractions` contract. Wagmi is supplied by the host and is not required by the headless SDK.
 
 The host must provide React `^18 || ^19`. Zustand is internal; Viem, Wagmi, and Ethers are not package dependencies. The package publishes a `"use client"` entry for Next.js App Router.
 
@@ -143,7 +145,7 @@ export function AdvancedOrderForm({ module }: { module: Module }) {
       inputToken={inputToken}
       inputTokenUsdPrice={dex.inputTokenUsdPrice}
       marketQuote={marketQuote}
-      minTradeSizeUsd={5}
+      minTradeSizeUsd={10}
       module={module}
       outputToken={outputToken}
       outputTokenUsdPrice={dex.outputTokenUsdPrice}
@@ -295,7 +297,7 @@ For a native/wrapped-native pair, the provider derives the 1:1 relationship usin
 | `module` | `TWAP`, `LIMIT`, `STOP_LOSS`, or `TAKE_PROFIT`. |
 | `inputAmountUi` | Required user-facing input decimal string. |
 | `priceProtectionPercent` | Required percentage; `3` means 3%, not 3 basis points or swap slippage. |
-| `minTradeSizeUsd` | Required positive USD threshold approved for the partner; there is no SDK default. |
+| `minTradeSizeUsd` | Required minimum amount in USD for each individual trade. Accepts any value of `10` or higher; there is no SDK default. For TWAP, the configured minimum applies to each smaller trade. |
 | `marketQuote` | Required `{ quotedOutputAmountRaw?, isLoading?, noLiquidity? }` for the current DEX quote. |
 | `walletInteractions` | Required five-method wallet adapter. |
 | `wrappedNativeToken` | Required host-provided `Token`; pass `undefined` only before a chain is known. |
@@ -517,7 +519,7 @@ An explicit TWAP trade count persists after amount changes. If it exceeds the ne
 
 ## Submit and Track Execution
 
-Mount `SubmitOrderDialog` inside `SpotProvider`. The review button opens the modal; only its confirm button calls `submitOrder()`. These three files adapt the review, progress, and custom result panels from [orbs-spot’s submission UI](https://github.com/orbs-network/orbs-spot/blob/main/components/advanced-order/submit-order.tsx) to the current React SDK.
+Mount `SubmitOrderDialog` inside `SpotProvider`. The review button opens the modal; only its confirm button calls `submitOrder()`. These three files adapt the review, progress, and custom result panels from [the spot-ui submission example](https://github.com/orbs-network/spot-ui/blob/master/apps/web/components/spot/submit-order-dialog.tsx) to the current React SDK.
 
 The linked app currently uses the older `useSpot()` API. These snippets preserve its modal behavior using the current SDK's focused hooks.
 
