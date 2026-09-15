@@ -54,11 +54,11 @@ The client exposes these read-only configuration values and operations:
 | `client.chainId` | The EVM chain captured by this client. Create or retrieve another keyed client when the wallet chain changes. |
 | `client.rePermitData` | The validated, trusted RePermit configuration, including the EIP-712 domain/types, base order, and protocol addresses. Treat it as read-only. |
 | `client.spenderAddress` | The RePermit verifying contract. Use it for ERC-20 allowance and approval; it is also the v2 cancellation contract. |
-| `client.exchangeAddress` | The configured exchange adapter automatically included in this client's history requests. |
+| `client.exchangeAddress` | The configured exchange adapter used for order execution; it is not a v2 history query parameter. |
 | `client.prepareOrder(params)` | Converts a submittable form snapshot into the exact protocol order, signing request, approval request, and fresh timestamps. It performs no wallet or network operation. |
 | `preparedOrder.signingRequest` | Contains `signerAddress` and `typedData` for the host wallet to sign. The client does not expose a `signOrder()` method. |
 | `client.submitOrder(preparedOrder.order, signature)` | Submits the exact signed protocol `order` and signature once and returns a normalized `Order`. |
-| `client.getAccountOrders({ account, ...options })` | Loads normalized history with this client's partner, chain, and exchange. Options include `signal`, zero-based `page`, positive `limit`, and `legacyOrders`. |
+| `client.getAccountOrders({ account, ...options })` | Loads normalized history with this client's partner and chain. Options include `signal` and `legacyOrders`; `page` and `limit` apply only to legacy v1 history. |
 | `client.getCancelOrderRequest(order)` | Builds the correct v1 or v2 contract address, ABI, and arguments. The host wallet sends and confirms the transaction. |
 
 Do not fetch or reconstruct RePermit configuration in host code. The client rejects chain mismatches and malformed or zero critical addresses before exposing approval, signing, history, or cancellation values.
@@ -366,7 +366,7 @@ Return the wallet's original `0x`-prefixed EIP-712 signature. Do not split it in
 
 ### Fetch Orders
 
-Use the initialized client so partner, chain, and exchange remain aligned with submission. Omit `page` to fetch all available pages.
+Use the initialized client so partner and chain remain aligned with submission. V2 history fetches all orders in one request per configured endpoint, sending only `swapper`, `chainId`, and `partner`. The client supplies partner and chain automatically; do not add `exchange`, `page`, `limit`, or a page-fetching loop. The public `page` and `limit` options apply only to legacy v1 history. `legacyOrders` defaults to `true`.
 
 ```typescript
 export async function fetchOrders(account: Address, signal?: AbortSignal) {

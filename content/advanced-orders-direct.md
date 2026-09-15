@@ -16,7 +16,7 @@ The API-only integration uses these HTTP and on-chain operations:
 | --- | --- |
 | Fetch configuration | `GET https://order-sink-v2.orbs.network/config?partner={partner}&chain={chainId}` with `Accept: application/json`. |
 | Create order | `POST https://order-sink-v2.orbs.network/orders/new` with JSON `{ signature, order, status: "pending" }`. `order` must be the exact EIP-712 message that produced `signature`. |
-| Fetch history | `GET https://order-sink-v2.orbs.network/orders?swapper={account}&chainId={chainId}&exchange={adapter}&page=1&limit=100`. The adapter comes from the configuration response. |
+| Fetch history | `GET https://order-sink-v2.orbs.network/orders?swapper={account}&chainId={chainId}&partner={partner}`. Returns all matching v2 orders in one request. |
 | Cancel | Send the on-chain transaction `cancel([metadata.repermitDigest])` to `domain.verifyingContract`; cancellation is not an Order Sink HTTP request. |
 
 ### Function Contracts
@@ -30,7 +30,7 @@ The two Create Order files are `create-order-flow.ts` and `order-types.ts`. They
 | `signOrder({ orderInput, permitData, inputTokenAddress })` | Builds the order, signs its EIP-712 payload, and returns `{ order, signature }`. |
 | `submitOrdersSinkOrder({ orderInput, wTokenAddress })` | Prepares funds, calls `signOrder`, and returns the accepted `OrderResponse`. Its internal `submitOrder(order, signature)` helper posts the unchanged signed message to Order Sink. |
 
-Use your DEX partner ID in each `fetchDefaultPermitData` call for creation, history, and cancellation; use `"external"` if you do not have one. The host supplies the active account and chain to each operation.
+Use your DEX partner ID in each `fetchDefaultPermitData` call for creation and cancellation, and the `partner` query parameter for history; use `"external"` if you do not have one. The host supplies the active account and chain to each operation.
 
 The RePermit contract, reactor, executor, exchange adapter, and fee reference addresses come from the fetched partner configuration. Do not hardcode them in the integration.
 
@@ -135,12 +135,11 @@ For a single limit, stop-loss, or take-profit order, use `totalTrades: 1`, `fill
 
 ## Fetch Order Sink Orders
 
-**Where does `exchange` come from?** First call [Fetch Config](/advanced-orders/direct#fetch-config) with your partner and selected chain. Read `order.witness.exchange.adapter` from its JSON response and pass that address as the `exchange` query parameter. The `0x8888…8888` address in the request example is a placeholder; replace it with the returned adapter address.
+Call `fetchOrders({ account, chainId, partner })` with the connected wallet context and the same partner ID used for submission. Use your existing DEX partner ID, or `"external"` if you do not have one.
 
-Call `fetchOrders({ account, chainId, page: 1, limit: 100 })` with the connected wallet context. `page` is **one-based for the raw API**; `limit` is a positive integer page size. The response retains `orders`, `page`, `limit`, `total`, and `totalPages`. Increment `page` until it reaches `totalPages`, or expose a Load more control. Use the response's actual page size if the service caps the requested limit. The SDK uses zero-based pages and performs this conversion internally.
+The v2 history query contains only `swapper`, `chainId`, and `partner`. `swapper` is the order owner address, matching `order.witness.swapper`. Do not send `exchange`, `page`, or `limit`: v2 returns all matching orders in one request, so no page-fetching loop is needed. Fetching history does not require a configuration request to resolve an adapter.
 
-
-Fetch RePermit orders from Order Sink with the swapper address, chain ID, and exchange adapter from the fetched template. The `swapper` query value is the order owner address, matching `order.witness.swapper`. The `exchange` query value should be `permitDataResponse.order.witness.exchange.adapter`.
+For example, [fetch Thena orders on BNB Chain](https://order-sink.orbs.network/orders?swapper=0x50015A452E644F5511fbeeac6B2aD2bf154E40E4&chainId=56&partner=thena).
 
 Use the Request and Response tabs in the `Fetch Order History` reference. The Request tab shows the HTTP method, endpoint, and complete query parameters. The Response tab contains the successful `orders` JSON returned by Order Sink.
 

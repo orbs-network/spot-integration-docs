@@ -127,12 +127,9 @@ that the duplication is deliberate — it reads like a bug.
 
 **Action:** one sentence in the Create Order prose noting the second fetch is intentional.
 
-### 8. History pagination is undocumented for API-only
+### 8. History query contract — resolved
 
-`FetchOrdersResponse` includes `page`, `limit`, `total` and `totalPages`, but the endpoint contract
-table only lists `swapper`, `chainId` and `exchange`. The SDK path documents `page`/`limit`.
-
-**Action:** document the pagination query parameters for `GET /orders`.
+V2 history now accepts `swapper`, `chainId`, and `partner`, returning all matching orders in one request. The API-only and SDK guides and downloadable examples reflect this contract. Do not send `exchange`, `page`, or `limit`; SDK pagination options apply only to legacy v1 history.
 
 ### 9. No testnet story
 

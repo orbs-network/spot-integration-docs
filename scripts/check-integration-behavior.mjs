@@ -57,20 +57,21 @@ const wrappedToken = '0x1111111111111111111111111111111111111111';
 const nativeOrder = api.buildOrderFromDerivedValues({ permitData: config, inputTokenAddress: wrappedToken, orderInput: { ...input, sourceIsNative: true } });
 assert.equal(nativeOrder.order.permitted.token, wrappedToken);
 assert.equal(nativeOrder.order.witness.input.token, wrappedToken);
-let historyUrl;
+const historyUrls = [];
 const history = { orders: [], page: 2, limit: 20, total: 25, totalPages: 2 };
 const historyApi = load(sources['advanced-orders-direct'], {
   ...apiClientContext,
   fetch: async url => {
-    if (url.includes('/config?')) return { ok: true, json: async () => config };
-    historyUrl = new URL(url);
+    historyUrls.push(new URL(url));
     return { ok: true, json: async () => history };
   },
 });
-assert.equal(await historyApi.fetchOrders({ account, chainId: 137, page: 2, limit: 20 }), history);
-assert.equal(historyUrl.searchParams.get('page'), '2');
-assert.equal(historyUrl.searchParams.get('limit'), '20');
-assert.equal(historyUrl.searchParams.get('swapper'), account);
-assert.equal(historyUrl.searchParams.get('exchange'), account);
-await assert.rejects(historyApi.fetchOrders({ account, chainId: 137, page: 0 }), /one-based/);
-console.log('Swap receipt, polling cleanup, TWAP schedule and pagination checks passed.');
+assert.equal(await historyApi.fetchOrders({ account, chainId: 56, partner: 'thena' }), history);
+assert.equal(historyUrls.length, 1);
+assert.equal(historyUrls[0].pathname, '/orders');
+assert.deepEqual(Object.fromEntries(historyUrls[0].searchParams), {
+  swapper: account,
+  chainId: '56',
+  partner: 'thena',
+});
+console.log('Swap receipt, polling cleanup, TWAP schedule and partner-scoped history checks passed.');

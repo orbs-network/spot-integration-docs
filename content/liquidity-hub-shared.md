@@ -77,8 +77,8 @@ Swap uses Liquidity Hub to improve an existing DEX quote with on-chain and off-c
 
 ### Integration Resources
 
-- [Playground](https://orbs-spot.vercel.app)
-- [Interactive Example](https://orbs-spot.vercel.app/?devMode=true)
+- [Playground](https://spot-app.orbs.com/)
+- [Interactive Example](https://spot-app.orbs.com/?devMode=true)
 - [Liquidity Hub Integration Skill](https://github.com/orbs-network/spot-ui/tree/master/skills/liquidity-hub-integration) — implementation workflow and package guardrails for coding agents.
 - [Liquidity Hub SDK and examples](https://github.com/orbs-network/spot-ui/tree/master/packages/liquidity-hub-ui)
 - [React example application](https://github.com/orbs-network/spot-ui/blob/master/apps/web/components/best-trade-form.tsx)

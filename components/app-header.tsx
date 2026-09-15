@@ -16,8 +16,8 @@ export function AppHeader({ search, partnerRequest }: { search?: ReactNode; part
   const homeHref = createPartnerDocumentationHref("/", partnerRequest);
   const advancedOrders = pathname.startsWith("/advanced-orders");
   const playgroundUrl = advancedOrders
-    ? "http://localhost:3000/?devMode=true&tab=twap"
-    : "https://orbs-spot.vercel.app/";
+    ? "https://spot-app.orbs.com/?devMode=true&tab=twap"
+    : "https://spot-app.orbs.com/";
   return (
     <header className={`app-header${search ? " app-header-with-search" : ""}`}>
       <Link
