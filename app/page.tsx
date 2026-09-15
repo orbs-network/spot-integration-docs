@@ -10,7 +10,7 @@ import {
 } from "@/features/partner-documentation/partner-documentation";
 import { createPartnerDocumentationHref } from "@/features/partner-documentation/query-state";
 import { GUIDE_SOURCES, type GuideProductId } from "@/lib/guides";
-import { ORBS_SUPPORT_URL, ADVANCED_ORDERS_SKILL_URL, SITE_DESCRIPTION } from "@/lib/site";
+import { ADVANCED_ORDERS_SKILL_URL, SITE_DESCRIPTION } from "@/lib/site";
 
 export const metadata: Metadata = {
   alternates: { canonical: "/" },
@@ -63,17 +63,19 @@ export default async function HomePage({
     getSearchParam(params.chainId),
   );
   const partnerRequest: PartnerDocumentationRequest | undefined =
-    parsedPartnerQuery.kind === "valid" ? parsedPartnerQuery.request : undefined;
+    parsedPartnerQuery.kind === "valid" || parsedPartnerQuery.kind === "partner-only"
+      ? parsedPartnerQuery.request
+      : undefined;
   const guideHref = (route: string) =>
     createPartnerDocumentationHref(route, partnerRequest);
 
   return (
     <>
-      <AppHeader />
+      <AppHeader partnerRequest={partnerRequest} />
       <main className="docs-home" id="guide-content" tabIndex={-1}>
         <div className="docs-home-shell">
           <header className="docs-home-hero">
-            <p className="eyebrow">Orbs Spot Docs</p>
+            <p className="eyebrow">Orbs Spot Docs{partnerRequest ? ` for ${partnerRequest.partner.charAt(0).toUpperCase() + partnerRequest.partner.slice(1)}` : ""}</p>
             <h1>Choose Your Integration Guide</h1>
             <p>
               Production-focused references for adding Orbs protocols to an
@@ -152,7 +154,7 @@ export default async function HomePage({
             title="Private and Sealed Orders"
           >
             <p className="category-contact-copy">
-              <a href={ORBS_SUPPORT_URL} target="_blank" rel="noreferrer">Contact the Orbs team</a>{" "}
+              Contact the Orbs team{" "}
               for access and integration guidance for
               Private and Sealed Orders.
             </p>

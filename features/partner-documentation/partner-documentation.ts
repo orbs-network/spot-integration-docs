@@ -59,7 +59,7 @@ const DIRECT_API_PLACEHOLDERS = {
 } as const;
 
 export interface PartnerDocumentationRequest {
-  chainId: number;
+  chainId?: number;
   partner: string;
 }
 
@@ -81,10 +81,17 @@ export interface PartnerDocumentationConfig {
   requestedPartner: string;
 }
 
+export type PartnerDocumentationContext = PartnerDocumentationConfig | {
+  partner: string;
+  requestedPartner: string;
+  chainId?: undefined;
+};
+
 export type PartnerDocumentationQuery =
   | { kind: "none" }
   | { kind: "invalid" }
-  | { kind: "valid"; request: PartnerDocumentationRequest };
+  | { kind: "partner-only"; request: PartnerDocumentationRequest }
+  | { kind: "valid"; request: Required<PartnerDocumentationRequest> };
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -165,25 +172,28 @@ export function parsePartnerDocumentationQuery(
   chainIdValue: string | null,
 ): PartnerDocumentationQuery {
   if (partnerValue === null && chainIdValue === null) return { kind: "none" };
-  if (partnerValue === null || chainIdValue === null) return { kind: "invalid" };
+  if (partnerValue === null) return { kind: "invalid" };
 
   const partner = partnerValue.trim();
   if (
     !partner ||
     partner.length > 80 ||
-    !PARTNER_PATTERN.test(partner) ||
-    !CHAIN_ID_PATTERN.test(chainIdValue)
+    !PARTNER_PATTERN.test(partner)
   ) {
     return { kind: "invalid" };
   }
 
+  if (chainIdValue === null) {
+    return { kind: "partner-only", request: { partner } };
+  }
+  if (!CHAIN_ID_PATTERN.test(chainIdValue)) return { kind: "invalid" };
   const chainId = Number(chainIdValue);
   if (!Number.isSafeInteger(chainId)) return { kind: "invalid" };
   return { kind: "valid", request: { chainId, partner } };
 }
 
 export async function fetchPartnerDocumentationConfig(
-  request: PartnerDocumentationRequest,
+  request: Required<PartnerDocumentationRequest>,
   signal?: AbortSignal,
 ): Promise<PartnerDocumentationConfig> {
   const query = new URLSearchParams({
@@ -250,7 +260,7 @@ function replaceAll(code: string, replacements: ReadonlyMap<string, string>): st
 
 export function personalizeDocumentationMarkdown(
   markdown: string,
-  config: PartnerDocumentationConfig,
+  config: PartnerDocumentationContext,
 ): string {
   const partnerDeclaration = `const partner = ${JSON.stringify(config.requestedPartner)};`;
   const partnerJson = `"partner": ${JSON.stringify(config.requestedPartner)}`;
@@ -269,20 +279,23 @@ export function personalizeDocumentationMarkdown(
         ? [["const partner = Partners.External;", `const partner = ${partnerEnum};`] as const]
         : []),
       ['"partner": "external"', partnerJson],
-      ["example-session_137", `example-session_${config.chainId}`],
+      ["?partner={partner}", `?partner=${encodeURIComponent(config.requestedPartner)}`],
+      ...(config.chainId !== undefined
+        ? [["example-session_137", `example-session_${config.chainId}`] as const]
+        : []),
     ]),
   );
 }
 
 function createPartnerContextFile(
   guideId: GuideId,
-  config: PartnerDocumentationConfig,
+  config: PartnerDocumentationContext,
 ): ReferenceFile {
   const context = {
     chainId: config.chainId,
     partner: config.requestedPartner,
     partnerName: config.partner,
-    ...(guideId === "advanced-orders-direct"
+    ...(guideId === "advanced-orders-direct" && config.chainId !== undefined
       ? {
           ordersSink: {
             addresses: config.addresses,
@@ -302,12 +315,12 @@ function createPartnerContextFile(
 export function personalizeReferenceExample(
   guideId: GuideId,
   example: ReferenceExample,
-  config: PartnerDocumentationConfig,
+  config: PartnerDocumentationContext,
 ): ReferenceExample {
   const partnerEnum =
     PARTNER_ENUM_BY_ID[normalizePartner(config.requestedPartner)] ??
     PARTNER_ENUM_BY_ID[normalizePartner(config.partner)];
-  const commonReplacements = new Map<string, string>([
+  const commonReplacements = new Map<string, string>(config.chainId !== undefined ? [
     ["const chainId = 137;", `const chainId = ${config.chainId};`],
     ["chain: \"137\"", `chain: \"${config.chainId}\"`],
     ["chainId: \"137\"", `chainId: \"${config.chainId}\"`],
@@ -315,10 +328,11 @@ export function personalizeReferenceExample(
     ["\"chainId\": 137", `\"chainId\": ${config.chainId}`],
     ["\"chainid\": 137", `\"chainid\": ${config.chainId}`],
     ["chainId=137", `chainId=${config.chainId}`],
+    ["chain=137", `chain=${config.chainId}`],
     ["example-session_137", `example-session_${config.chainId}`],
-  ]);
+  ] : []);
 
-  if (guideId === "advanced-orders-direct") {
+  if (guideId === "advanced-orders-direct" && config.chainId !== undefined) {
     commonReplacements.set(
       DIRECT_API_PLACEHOLDERS.adapter,
       config.addresses.adapter,
@@ -354,6 +368,11 @@ export function personalizeReferenceExample(
     const partner =
       file.kind === "response" ? config.partner : config.requestedPartner;
     const fileReplacements = new Map(commonReplacements);
+    fileReplacements.set("partner=external", `partner=${encodeURIComponent(partner)}`);
+    fileReplacements.set(
+      'fetchDefaultPermitData("external",',
+      `fetchDefaultPermitData(${JSON.stringify(partner)},`,
+    );
     fileReplacements.set(
       "const partner = \"external\";",
       `const partner = ${JSON.stringify(partner)};`,

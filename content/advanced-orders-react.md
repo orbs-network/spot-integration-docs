@@ -30,7 +30,7 @@ Follow the shared [Input Tokens](/advanced-orders/shared#how-it-works) requireme
 | Balance | Raw input-token integer string, or `undefined` while disconnected/loading. |
 | USD prices | USD value of exactly one whole token. Input price is required but may be `undefined` while loading. |
 | Wallet | Connected `chainId`, `account`, and five `walletInteractions` methods. |
-| Product policy | Orbs-provided partner enum, `minTradeSizeUsd` of at least `10`, and `priceProtectionPercent`. |
+| Product policy | Your DEX’s `Partners` enum member, or `Partners.External`, `minTradeSizeUsd` of at least `10`, and `priceProtectionPercent`. |
 
 Apply the shared [Partner Configuration](/advanced-orders/shared#fees-and-configuration) requirements. If the wallet or supported network is unavailable, keep the form visible and replace only the submit area with the DEX's connect-wallet or switch-network control.
 

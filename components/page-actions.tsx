@@ -13,7 +13,7 @@ import { useEffect, useRef, useState } from "react";
 
 import { DownloadIntegrationButton } from "@/components/download-integration-button";
 import type { Guide } from "@/lib/guides";
-import type { PartnerDocumentationConfig } from "@/features/partner-documentation/partner-documentation";
+import type { PartnerDocumentationContext } from "@/features/partner-documentation/partner-documentation";
 
 type CopyStatus =
   | "copied-codex"
@@ -44,7 +44,7 @@ export function PageActions({
   markdownPath: string;
   pagePath: string;
   guide: Guide;
-  partnerConfig?: PartnerDocumentationConfig;
+  partnerConfig?: PartnerDocumentationContext;
 }) {
   const menuRef = useRef<HTMLDivElement>(null);
   const menuTriggerRef = useRef<HTMLButtonElement>(null);

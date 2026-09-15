@@ -12,7 +12,7 @@ Build one partner/chain client cache, one `calculateOrderForm()` adapter, one gu
 
 ### Quickstart
 
-Install `@orbs-network/spot-ui`, create one client for the Orbs-provided partner and connected chain, derive the form from current DEX inputs, then prepare, sign, and submit one immutable attempt. Reuse the same client for history and cancellation.
+Install `@orbs-network/spot-ui`, create one client for your existing DEX partner (or `Partners.External`) and connected chain, derive the form from current DEX inputs, then prepare, sign, and submit one immutable attempt. Reuse the same client for history and cancellation.
 
 See [Integration Lifecycle](/advanced-orders/shared#how-it-works) for the host and SDK responsibilities.
 
@@ -67,18 +67,137 @@ Do not fetch or reconstruct RePermit configuration in host code. The client reje
 
 Use `calculateOrderForm()` as the only calculation entry point. It is synchronous and time-independent, so derive it from the exact primitive form and market inputs in the host's existing computed state or memoization layer. Store only editable inputs; do not copy the calculated result into writable state.
 
-```typescript
-import { calculateOrderForm, Module, type CalculateOrderFormParams } from "@orbs-network/spot-ui";
+```typescript title="calculate-order-form.ts"
+import { calculateOrderForm, type CalculateOrderFormParams, type CalculatedOrderForm } from "@orbs-network/spot-ui";
 
-export function getCalculatedOrderForm(params: CalculateOrderFormParams) {
+export function getCalculatedOrderForm(params: CalculateOrderFormParams): CalculatedOrderForm {
   // Supply form inputs and current market data from the host application.
   // Render form.errors.primary when form.canSubmit is false.
   if (!Number.isFinite(params.minTradeSizeUsd) || params.minTradeSizeUsd < 10) {
     throw new Error("minTradeSizeUsd must be 10 or higher");
   }
-  return calculateOrderForm(params);
+  return calculateOrderForm({
+    // Strategy: TWAP, LIMIT, STOP_LOSS, or TAKE_PROFIT.
+    module: params.module,
+
+    // Decimals from the host token registry (for example, USDC: 6, WETH: 18).
+    inputTokenDecimals: params.inputTokenDecimals,
+    outputTokenDecimals: params.outputTokenDecimals,
+
+    // Quote for the full input amount, in output-token base units.
+    // Leave undefined while loading or when the quote is stale.
+    quotedOutputAmountRaw: params.quotedOutputAmountRaw,
+
+    // USD price of one whole token, supplied as decimal strings.
+    inputTokenUsdPrice: params.inputTokenUsdPrice,
+    outputTokenUsdPrice: params.outputTokenUsdPrice,
+
+    // Minimum USD amount for each individual trade: any value >= 10.
+    minTradeSizeUsd: params.minTradeSizeUsd,
+    // Percentage units: 3 means 3%, not 3 basis points.
+    priceProtectionPercent: params.priceProtectionPercent,
+    // Optional display-only fee percentage; does not collect a fee.
+    displayFeePercent: params.displayFeePercent,
+    // Spendable input-token balance, as an integer base-unit string.
+    inputBalanceRaw: params.inputBalanceRaw,
+
+    userInput: {
+      // User-entered token amount, for example "100" USDC.
+      inputAmountUi: params.userInput.inputAmountUi,
+      isMarketOrder: params.userInput.isMarketOrder,
+
+      // TWAP schedule: count and { value, unit: TimeUnit } durations.
+      tradeCount: params.userInput.tradeCount,
+      tradeInterval: params.userInput.tradeInterval,
+      orderDuration: params.userInput.orderDuration,
+
+      // Price conditions in the user's selected display direction.
+      limitPriceUi: params.userInput.limitPriceUi,
+      limitPricePercent: params.userInput.limitPricePercent,
+      triggerPriceUi: params.userInput.triggerPriceUi,
+      triggerPricePercent: params.userInput.triggerPricePercent,
+      isPriceInverted: params.userInput.isPriceInverted,
+    },
+  });
 }
+
+/*
+Response: CalculatedOrderForm (returned synchronously, not an HTTP response).
+
+Amount objects contain:
+  { raw: string, ui: string, usd: string }
+  raw = integer token base units, ui = human-readable token amount,
+  usd = USD value. These strings avoid floating-point rounding.
+
+{
+  module,              // Selected strategy: TWAP, LIMIT, STOP_LOSS, TAKE_PROFIT.
+  isInverted,          // Whether prices are displayed in the inverse direction.
+  inputAmount: {
+    raw, ui, usd,      // Total source amount.
+    isEmpty,           // Whether the user has entered an input amount.
+  },
+  outputAmount: { raw, ui, usd }, // Calculated destination amount.
+  marketPrice: { raw, ui, usd },  // Current market-price representations.
+  trades: {
+    totalTrades,       // Selected/calculated number of fills.
+    maxTrades,         // Maximum fill count allowed by the calculation.
+    inputAmountPerTrade: { raw, ui, usd },
+    minOutputAmountPerTrade: { raw, ui, usd },
+    triggerOutputAmountPerTrade: { raw, ui, usd },
+    error,             // Optional trade-count validation error.
+  },
+  schedule: {
+    totalTrades,
+    fillDelay,         // Interval as { value, unit: TimeUnit }.
+    fillDelayMillis,   // The same interval in milliseconds.
+    duration,          // Order lifetime as { value, unit: TimeUnit }.
+    durationMillis,    // The same lifetime in milliseconds.
+    fillDelayError,    // Optional interval validation error.
+    durationError,     // Optional duration validation error.
+  },
+  triggerPrice: {
+    raw,               // Canonical trigger value for execution.
+    typedValue,        // Optional price entered by the user.
+    percentage,        // Percentage offset represented as a string.
+    isTypedValue,      // Whether an explicit price was entered.
+    enabled,           // Whether this strategy uses a trigger.
+    display: { raw, ui, usd },
+    error,             // Optional trigger-price validation error.
+  },
+  limitPrice: {
+    raw, typedValue, percentage, isTypedValue,
+    display: { raw, ui, usd },
+    error,             // Optional limit-price validation error.
+  },
+  minOutputAmountTotal: { raw, ui, usd }, // Minimum output across all fills.
+  tradePrice: { raw, ui, usd },          // Calculated execution price.
+  fees: {
+    raw, ui, usd, percentage, // Display-only fee estimate; does not collect fees.
+  },
+  values: {
+    // Flattened calculated values consumed by order preparation.
+    orderType, isMarketOrder, isTriggerPrice, slippageBps,
+    totalTrades, fillDelay, fillDelayMillis, duration, durationMillis,
+    inputAmount, outputAmount, inputAmountPerTrade,
+    minOutputAmountPerTrade, minOutputAmountTotal, triggerOutputAmountPerTrade,
+    tradePrice, marketPrice, limitPrice, triggerPrice,
+    displayFeeAmount, displayFeePercent,
+  },
+  errors: {
+    primary,           // Optional main InputError to show to the user.
+    all,               // Array of all InputError values.
+    minTradeSize, triggerPrice, limitPrice, trades,
+    fillDelay, duration, balance, // Optional errors for individual fields.
+  },
+  isReady,             // Required calculation inputs are available.
+  canSubmit,           // Ready and valid; use this to enable the submit action.
+}
+*/
 ```
+
+`calculateOrderForm()` returns `CalculatedOrderForm` synchronously. The comment below the function explains the returned fields. Use `errors.primary` for the main validation message and `canSubmit` to enable submission.
+
+The example lists every `CalculateOrderFormParams` field explicitly. Supply values from the current host form and market data; optional fields may be `undefined` when unavailable or unused by the selected strategy.
 
 ### Input Values
 
@@ -94,11 +213,11 @@ export function getCalculatedOrderForm(params: CalculateOrderFormParams) {
 | `inputBalanceRaw` | Current input-token balance as an integer base-unit string. |
 | `userInput.inputAmountUi` | User-entered decimal token amount, such as `"1.25"`. The SDK derives raw and USD values. |
 | `userInput.isMarketOrder` | Whether the chosen strategy uses market execution. `Module.LIMIT` remains a limit order. |
-| `tradeCount` | Explicit number of TWAP fills. Preserve a user selection across amount changes; surface validation instead of silently clamping it. |
-| `tradeInterval` / `orderDuration` | Controlled `{ value, unit: TimeUnit }` values. The SDK resolves their millisecond forms and validates the schedule. |
-| `limitPriceUi` / `triggerPriceUi` | User-entered price in the current display direction. |
-| `limitPricePercent` / `triggerPricePercent` | Percentage offset used when no explicit corresponding price was entered. |
-| `isPriceInverted` | Whether the displayed price direction is input-per-output. Protocol values remain canonical. |
+| `userInput.tradeCount` | Explicit number of TWAP fills. Preserve a user selection across amount changes; surface validation instead of silently clamping it. |
+| `userInput.tradeInterval` / `userInput.orderDuration` | Controlled `{ value, unit: TimeUnit }` values. The SDK resolves their millisecond forms and validates the schedule. |
+| `userInput.limitPriceUi` / `userInput.triggerPriceUi` | User-entered price in the current display direction. |
+| `userInput.limitPricePercent` / `userInput.triggerPricePercent` | Percentage offset used when no explicit corresponding price was entered. |
+| `userInput.isPriceInverted` | Whether the displayed price direction is input-per-output. Protocol values remain canonical. |
 
 Track the amount and token pair that produced the DEX quote. As soon as any of them changes, omit `quotedOutputAmountRaw` until the replacement quote arrives; never calculate from a previous quote or treat it as a one-token price.
 

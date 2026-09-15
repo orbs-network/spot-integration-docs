@@ -23,7 +23,7 @@ export function createPartnerDocumentationHref(
 ): string {
   const href = request
     ? serializePartnerDocumentation(route, {
-        chainId: String(request.chainId),
+        chainId: request.chainId === undefined ? null : String(request.chainId),
         partner: request.partner,
       })
     : route;
@@ -67,9 +67,13 @@ export function normalizePartnerDocumentationLocation(
     }
   }
 
-  if (parsedQuery.kind === "valid") {
+  if (parsedQuery.kind === "valid" || parsedQuery.kind === "partner-only") {
     url.searchParams.set("partner", parsedQuery.request.partner);
-    url.searchParams.set("chainId", String(parsedQuery.request.chainId));
+    if (parsedQuery.request.chainId !== undefined) {
+      url.searchParams.set("chainId", String(parsedQuery.request.chainId));
+    } else {
+      url.searchParams.delete("chainId");
+    }
   } else {
     url.searchParams.delete("partner");
     url.searchParams.delete("chainId");

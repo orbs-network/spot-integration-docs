@@ -7,6 +7,7 @@ import {
   fetchPartnerDocumentationConfig,
   parsePartnerDocumentationQuery,
   type PartnerDocumentationConfig,
+  type PartnerDocumentationContext,
   type PartnerDocumentationRequest,
 } from "@/features/partner-documentation/partner-documentation";
 import {
@@ -17,8 +18,9 @@ import {
 export type PartnerDocumentationState =
   | { kind: "none" }
   | { kind: "loading"; request: PartnerDocumentationRequest }
+  | { kind: "error"; request: PartnerDocumentationRequest }
   | {
-      config: PartnerDocumentationConfig;
+      config: PartnerDocumentationContext;
       kind: "ready";
       request: PartnerDocumentationRequest;
     };
@@ -82,7 +84,6 @@ export function usePartnerDocumentation(): PartnerDocumentationState {
       () => {
         if (!active || controller.signal.aborted) return;
         setSettledRequest({ key: requestKey, kind: "error" });
-        void setPartnerQuery(null);
       },
     );
 
@@ -92,11 +93,21 @@ export function usePartnerDocumentation(): PartnerDocumentationState {
     };
   }, [requestChainId, requestKey, requestPartner, setPartnerQuery]);
 
+  if (query.kind === "partner-only") {
+    return {
+      kind: "ready",
+      request: query.request,
+      config: {
+        partner: query.request.partner,
+        requestedPartner: query.request.partner,
+      },
+    };
+  }
   if (query.kind !== "valid") return { kind: "none" };
   if (!settledRequest || settledRequest.key !== requestKey) {
     return { kind: "loading", request: query.request };
   }
-  if (settledRequest.kind === "error") return { kind: "none" };
+  if (settledRequest.kind === "error") return { kind: "error", request: query.request };
   return {
     config: settledRequest.config,
     kind: "ready",

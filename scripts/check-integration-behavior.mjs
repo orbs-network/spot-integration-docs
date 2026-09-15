@@ -45,19 +45,22 @@ for (const mode of ['submission', 'polling', 'reverted', 'submission-error']) {
   assert.equal(timers.size, 0, 'Polling timer must be cleared');
 }
 const config = { domain: { chainId: 137, verifyingContract: account }, order: { spender: account, witness: { chainid: 137, exchange: { adapter: account }, reactor: account, executor: account } } };
-const api = load(sources['advanced-orders-direct'], { require: () => ({ parseAbi: () => [] }), fetch: async () => ({ ok: true, json: async () => config }) });
+const apiClientContext = { window: { ethereum: {} }, require: () => ({ parseAbi: () => [], custom: provider => provider, createPublicClient: () => ({}), createWalletClient: () => ({}) }) };
+// Expose the private builder only inside this test harness.
+const api = load(`${sources['advanced-orders-direct']}\nexport { buildOrderFromDerivedValues };`, { ...apiClientContext, fetch: async () => ({ ok: true, json: async () => config }) });
 const input = { totalInputAmount: '999999999', srcAmountPerFill: '333333333', totalTrades: 3, dstMinAmountPerFill: '0', triggerLower: '0', triggerUpper: '0', deadlineMillis: Date.now() + 60000, fillDelayMillis: 10000, slippageBps: 50, inputToken: { address: account }, dstToken: account };
-api.validateOrderInput(input);
-for (const change of [{ totalInputAmount: '1000000000' }, { srcAmountPerFill: '0' }, { totalTrades: 0 }, { fillDelayMillis: 0 }, { slippageBps: 0.5 }, { triggerLower: '1' }]) assert.throws(() => api.validateOrderInput({ ...input, ...change }));
-await assert.rejects(api.buildOrderFromDerivedValues({ account, chainId: 137, wTokenAddress: account, orderInput: { ...input, deadlineMillis: Date.now() + 1000 } }), /Deadline/);
-const built = await api.buildOrderFromDerivedValues({ account, chainId: 137, wTokenAddress: account, orderInput: input });
+assert.throws(() => api.buildOrderFromDerivedValues({ permitData: config, inputTokenAddress: account, orderInput: { ...input, deadlineMillis: Date.now() + 1000 } }), /Deadline/);
+const built = api.buildOrderFromDerivedValues({ permitData: config, inputTokenAddress: account, orderInput: input });
 assert.equal(built.order.permitted.amount, '999999999');
 assert.equal(built.order.witness.epoch, 10);
-await assert.rejects(api.fetchDefaultPermitData('external', 1), /mismatched chain/);
+const wrappedToken = '0x1111111111111111111111111111111111111111';
+const nativeOrder = api.buildOrderFromDerivedValues({ permitData: config, inputTokenAddress: wrappedToken, orderInput: { ...input, sourceIsNative: true } });
+assert.equal(nativeOrder.order.permitted.token, wrappedToken);
+assert.equal(nativeOrder.order.witness.input.token, wrappedToken);
 let historyUrl;
 const history = { orders: [], page: 2, limit: 20, total: 25, totalPages: 2 };
 const historyApi = load(sources['advanced-orders-direct'], {
-  require: () => ({ parseAbi: () => [] }),
+  ...apiClientContext,
   fetch: async url => {
     if (url.includes('/config?')) return { ok: true, json: async () => config };
     historyUrl = new URL(url);
@@ -70,4 +73,4 @@ assert.equal(historyUrl.searchParams.get('limit'), '20');
 assert.equal(historyUrl.searchParams.get('swapper'), account);
 assert.equal(historyUrl.searchParams.get('exchange'), account);
 await assert.rejects(historyApi.fetchOrders({ account, chainId: 137, page: 0 }), /one-based/);
-console.log('Swap receipt, polling cleanup, TWAP validation, schedule, config-chain, and pagination checks passed.');
+console.log('Swap receipt, polling cleanup, TWAP schedule and pagination checks passed.');

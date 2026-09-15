@@ -4,13 +4,16 @@ import type { ReactNode } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { createPartnerDocumentationHref } from "@/features/partner-documentation/query-state";
+import type { PartnerDocumentationRequest } from "@/features/partner-documentation/partner-documentation";
 import { ExternalLink, Github } from "lucide-react";
 
 import { ThemeToggle } from "@/components/theme-toggle";
 import { SITE_REPOSITORY } from "@/lib/site";
 
-export function AppHeader({ search }: { search?: ReactNode }) {
+export function AppHeader({ search, partnerRequest }: { search?: ReactNode; partnerRequest?: PartnerDocumentationRequest }) {
   const pathname = usePathname();
+  const homeHref = createPartnerDocumentationHref("/", partnerRequest);
   const advancedOrders = pathname.startsWith("/advanced-orders");
   const playgroundUrl = advancedOrders
     ? "http://localhost:3000/?devMode=true&tab=twap"
@@ -20,7 +23,7 @@ export function AppHeader({ search }: { search?: ReactNode }) {
       <Link
         aria-label="Orbs Spot"
         className="app-logo-link"
-        href="/"
+        href={homeHref}
       >
         <Image
           alt="Orbs Swap"

@@ -52,7 +52,7 @@ Collect these values before wiring either integration. Contract and token addres
 
 | Requirement | Supplied by | Ready when |
 | --- | --- | --- |
-| Partner identifier | Use `"external"` directly | The same value is used for quotes and execution. |
+| Partner identifier | Your existing DEX partner ID, or `"external"` | The same value is used for quotes and execution. |
 | Chain and RPC | Host wallet/network configuration | Wallet writes and RPC reads target the same supported chain. |
 | Token addresses and decimals | Host token registry | Both tokens resolve on that chain; the wrapped-native address is known. |
 | Account and wallet | Host wallet connection | The account can send transactions and sign EIP-712 typed data. Never put a private key in frontend configuration. |
@@ -95,7 +95,7 @@ Swap uses Liquidity Hub to improve an existing DEX quote with on-chain and off-c
 | Liquidity Hub | Orbs optimization layer that requests liquidity from on-chain and off-chain solvers. It is used only when it improves the user's executable result. |
 | Permit2 | Token permission contract that receives ERC-20 allowance for Liquidity Hub swaps. The current address is `0x000000000022D473030F116dDEE9F6B43aC78BA3`. |
 | Quote signing data | `quote.eip712` is the wallet-ready typed-data payload. Pass its domain, types, primary type, and message unchanged to the wallet signer. |
-| Partner | Use `"external"` as the partner identifier. |
+| Partner | Use your existing DEX partner ID, or `"external"` if you do not have one. |
 | Session ID | Quote session identifier returned by Liquidity Hub and carried through swap submission and status polling. |
 | Liquidity Hub API | Chain-aware quote and execution service used by the SDK and Direct API. Requests include the active `chainId`. |
 | Protected output | `minAmountOut`, an integer in output-token base units used to compare protected minimums across routes. |
@@ -135,7 +135,7 @@ Quotes and execution use an ERC-20 input address. When the user selects native c
 
 ## Fees and Configuration
 
-Use `"external"` as the partner identifier. You can integrate directly without contacting Orbs or requesting a partner identifier.
+If your DEX already has a partner ID, use it. Otherwise, use `"external"`; you do not need to request a partner ID to start integrating.
 
 
 ### Fees
@@ -148,7 +148,7 @@ Wrapping and ERC-20 approval are wallet transactions. Account for their network 
 
 ### Partner Configuration
 
-Set the partner identifier to `"external"`. Keep the partner and active chain consistent across quotes and execution.
+Use your existing DEX partner ID, or `"external"` if you do not have one. Keep the partner and active chain consistent across quotes and execution.
 
 | Integration | Configuration |
 | --- | --- |

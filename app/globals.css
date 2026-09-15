@@ -3122,3 +3122,68 @@ body:has(.docs-search-dialog[open]) { overflow: hidden; }
     transform: none;
   }
 }
+
+/* Field help stays outside the scrolling code panel. */
+.code-field-trigger {
+  appearance: none;
+  display: inline;
+  padding: 0;
+  margin: 0;
+  border: 0;
+  border-radius: 3px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  line-height: inherit;
+  cursor: help;
+  text-decoration-line: underline;
+  text-decoration-style: dotted;
+  text-decoration-color: color-mix(in srgb, currentColor 55%, transparent);
+  text-underline-offset: 4px;
+}
+.code-field-trigger:hover,
+.code-field-trigger:focus-visible {
+  background: color-mix(in srgb, currentColor 14%, transparent);
+  outline: none;
+  box-shadow: 0 0 0 2px color-mix(in srgb, currentColor 25%, transparent);
+}
+.code-field-tooltip {
+  z-index: 10000;
+  box-sizing: border-box;
+  width: 320px;
+  max-width: calc(100vw - 24px);
+  padding: 12px 14px;
+  border: 1px solid #3a3d48;
+  border-radius: 10px;
+  background: #24262e;
+  color: #f4f4f6;
+  box-shadow: 0 8px 28px #0005;
+  white-space: normal;
+  font-family: system-ui, sans-serif;
+  font-size: 13px;
+  line-height: 1.5;
+}
+.code-field-tooltip strong {
+  display: block;
+  margin-bottom: 5px;
+  font-family: monospace;
+  font-size: 13px;
+}
+.code-field-tooltip span { color: #d1d3dc; }
+
+.ui-tooltip-content {
+  z-index: 10000;
+  transform-origin: var(--radix-tooltip-content-transform-origin);
+  max-height: var(--radix-tooltip-content-available-height);
+}
+.ui-tooltip-content[data-state="delayed-open"],
+.ui-tooltip-content[data-state="instant-open"] {
+  animation: tooltip-appear 100ms ease-out;
+}
+@keyframes tooltip-appear {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .ui-tooltip-content { animation: none !important; }
+}

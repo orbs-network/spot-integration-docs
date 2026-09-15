@@ -250,7 +250,7 @@ export const GUIDE_SOURCES = [
       "fetch-orders": "fetch-order-sink-orders",
       "build-the-order": "create-order",
       "generated-order-fields": "create-order",
-      "fetch-partner-config": "create-order",
+      "fetch-partner-config": "fetch-config",
       overview: "quickstart",
       prerequisites: "quickstart",
       "output-limit-and-trigger-rules": "create-order",
@@ -268,6 +268,7 @@ export const GUIDE_SOURCES = [
     stepOrder: [
       "quickstart",
       "strategy-recipes",
+      "fetch-config",
       "create-order",
       "fetch-order-sink-orders",
       "cancel-order-sink-orders",

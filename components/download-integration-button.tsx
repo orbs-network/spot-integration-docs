@@ -3,9 +3,9 @@
 import { Download } from "lucide-react";
 import { useState } from "react";
 import type { Guide } from "@/lib/guides";
-import type { PartnerDocumentationConfig } from "@/features/partner-documentation/partner-documentation";
+import type { PartnerDocumentationContext } from "@/features/partner-documentation/partner-documentation";
 
-export function DownloadIntegrationButton({guide, partnerConfig}: {guide: Guide; partnerConfig?: PartnerDocumentationConfig}) {
+export function DownloadIntegrationButton({guide, partnerConfig}: {guide: Guide; partnerConfig?: PartnerDocumentationContext}) {
   const [status, setStatus] = useState<"idle" | "loading" | "failed">("idle");
   if (guide.id.endsWith("-shared")) return null;
   const download = async () => {

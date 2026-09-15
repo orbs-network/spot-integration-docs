@@ -39,7 +39,7 @@ import {
 } from "@/features/partner-documentation/query-state";
 import {
   personalizeDocumentationMarkdown,
-  type PartnerDocumentationConfig,
+  type PartnerDocumentationContext,
   type PartnerDocumentationRequest,
 } from "@/features/partner-documentation/partner-documentation";
 import type {
@@ -50,7 +50,7 @@ import type {
   GuideSummary,
 } from "@/lib/guides";
 import { hasReferenceExample } from "@/lib/reference-keys";
-import { ORBS_SUPPORT_URL, ADVANCED_ORDERS_SKILL_URL } from "@/lib/site";
+import { ADVANCED_ORDERS_SKILL_URL } from "@/lib/site";
 
 const InteractiveReference = dynamic(() =>
   import("@/components/interactive-reference").then(
@@ -121,7 +121,9 @@ function createInteractiveExampleHref(
 
   const url = new URL(href);
   url.searchParams.set("partner", request.partner);
-  url.searchParams.set("chainId", String(request.chainId));
+  if (request.chainId !== undefined) {
+    url.searchParams.set("chainId", String(request.chainId));
+  }
   return url.toString();
 }
 
@@ -266,7 +268,7 @@ function GuideNavigation({
         title="Private and Sealed Orders"
       >
         <p className="category-contact-copy">
-          <a href={ORBS_SUPPORT_URL} target="_blank" rel="noreferrer">Contact the Orbs team</a>{" "}
+          Contact the Orbs team{" "}
               for access and integration guidance for Private
           and Sealed Orders.
         </p>
@@ -425,11 +427,11 @@ function DocsShellContent({
     partnerDocumentation.kind === "none"
       ? undefined
       : partnerDocumentation.request;
-  const partnerConfig: PartnerDocumentationConfig | undefined =
+  const partnerConfig: PartnerDocumentationContext | undefined =
     partnerDocumentation.kind === "ready"
       ? partnerDocumentation.config
       : undefined;
-  const partnerName = partnerConfig?.partner;
+  const partnerName = partnerConfig?.partner ?? partnerRequest?.partner;
   const activeStepIndex = getStepIndex(activeGuide, hash);
   const activeStep = activeGuide.steps[activeStepIndex] ?? activeGuide.steps[0];
   const previousStep = activeGuide.steps[activeStepIndex - 1];
@@ -600,7 +602,7 @@ function DocsShellContent({
 
   return (
     <>
-      <AppHeader search={
+      <AppHeader partnerRequest={partnerRequest} search={
         <button className="navbar-search-trigger" type="button" ref={searchTriggerRef}
           aria-label="Search all docs" aria-haspopup="dialog" onFocus={showSearch} onClick={showSearch}>
           <Search aria-hidden="true" size={16} />
@@ -737,12 +739,12 @@ function DocsShellContent({
             <div className="brand-lockup">
               <span aria-hidden="true" className="brand-mark"><BookOpen size={17} /></span>
               <span>
-                <small>Orbs Spot Docs</small>
+                <small>Orbs Spot Docs{partnerName ? ` for ${partnerName.charAt(0).toUpperCase() + partnerName.slice(1)}` : ""}</small>
                 <strong>
                   {partnerName ? (
                     <>
                       <span className="sidebar-partner-name" translate="no">
-                        {partnerName}
+                        {partnerName.charAt(0).toUpperCase() + partnerName.slice(1)}
                       </span>{" "}
                     </>
                   ) : null}
@@ -839,7 +841,7 @@ function DocsShellContent({
           <aside className="implementation-callout">
             <span>
               <strong>Ready to Implement?</strong>
-              <small>Use the reference implementation with the external partner configuration.</small>
+              <small>Use your DEX partner ID if you have one; otherwise, use external.</small>
             </span>
             <span className="resource-links">
               <a href={resources.sourceHref} rel="noreferrer" target="_blank">

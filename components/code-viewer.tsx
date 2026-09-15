@@ -16,7 +16,9 @@ import {
   useState,
 } from "react";
 
+import { CodeFieldTooltip } from "@/components/code-field-tooltip";
 import { DownloadExampleButton } from "@/components/download-example-button";
+import { getConfigFieldTooltips, getOrderFieldTooltips } from "@/lib/order-field-tooltips";
 import type { ReferenceFile } from "@/lib/reference-examples";
 
 type CodeViewerFile = Omit<ReferenceFile, "language"> & { language: string };
@@ -120,6 +122,8 @@ function useCopyStatus() {
 function SyntaxHighlightedCode({
   code,
   labelledBy,
+  orderFieldTooltips = false,
+  configFieldTooltips = false,
   language,
   panelId,
   preRef,
@@ -127,11 +131,16 @@ function SyntaxHighlightedCode({
 }: {
   code: string;
   labelledBy?: string;
+  orderFieldTooltips?: boolean;
+  configFieldTooltips?: boolean;
   language: string;
   panelId?: string;
   preRef: RefObject<HTMLPreElement | null>;
   role?: "tabpanel";
 }) {
+  const fieldTooltips = configFieldTooltips
+    ? getConfigFieldTooltips(code)
+    : orderFieldTooltips ? getOrderFieldTooltips(code) : undefined;
   const syntaxLanguage = LANGUAGE_ALIASES[language] ?? language;
 
   return (
@@ -161,13 +170,21 @@ function SyntaxHighlightedCode({
                   <span className="code-line">
                     {line.map((token, tokenIndex) => {
                       const tokenProps = getTokenProps({ token });
+                      const field = fieldTooltips?.get(lineIndex);
+                      const help = field && token.content.trim() === field.key
+                        && line.slice(0, tokenIndex).every((part) => !part.content.trim())
+                        ? field.description : undefined;
                       return (
                         <span
                           className={tokenProps.className}
                           key={`token-${lineIndex}-${tokenIndex}`}
                           style={tokenProps.style}
                         >
-                          {token.content}
+                          {help ? <>
+                            {token.content.match(/^\s*/)?.[0]}
+                            <CodeFieldTooltip name={token.content.trim()} description={help} />
+                            {token.content.match(/\s*$/)?.[0]}
+                          </> : token.content}
                         </span>
                       );
                     })}
@@ -476,6 +493,8 @@ export function TabbedCodeViewer({
       </div>
       <SyntaxHighlightedCode
         code={activeFile.code}
+        configFieldTooltips={idPrefix === "reference-advanced-orders-direct-fetch-config" && activeFile.name === "config-response.json"}
+        orderFieldTooltips={idPrefix.startsWith("reference-advanced-orders-direct-") && activeFile.name === "create-order-flow.ts"}
         labelledBy={`${idPrefix}-file-${activeFileIndex}`}
         language={activeFile.language}
         panelId={panelId}
@@ -645,6 +664,8 @@ export function RequestResponseCodeViewer({
       </div>
       <SyntaxHighlightedCode
         code={activeFile.code}
+        configFieldTooltips={idPrefix === "reference-advanced-orders-direct-fetch-config" && activeFile.name === "config-response.json"}
+        orderFieldTooltips={idPrefix.startsWith("reference-advanced-orders-direct-") && activeFile.name === "create-order-flow.ts"}
         labelledBy={`${idPrefix}-file-${activeFileIndex}`}
         language={activeFile.language}
         panelId={panelId}

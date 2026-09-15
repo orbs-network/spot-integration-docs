@@ -71,7 +71,7 @@ The networks listed above are mainnets. These guides do not provide a verified t
 
 | Requirement | Supplied by | Ready when |
 | --- | --- | --- |
-| Partner | Use `"external"` / `Partners.External` directly | Partner configuration is available for the connected chain. |
+| Partner | Your existing DEX partner ID, or `"external"` / `Partners.External` | Partner configuration is available for the connected chain. |
 | RPC, chain, account | Host wallet/network layer | Reads, writes, signer, and configured client use the same chain and account. |
 | Tokens and wrapped-native token | Host token registry | Addresses and decimals are correct for that chain. |
 | Input balance and gas | Host balance layer / connected wallet | The full input is available, with gas for wrapping, approval, and later cancellation. |
@@ -222,7 +222,7 @@ Signed orders spend ERC-20 tokens only. Never use a native-token placeholder in 
 
 ## Fees and Configuration
 
-Use `"external"` as the partner identifier. You can integrate directly without contacting Orbs or requesting a partner identifier. In the TypeScript and React SDKs, use `Partners.External`.
+If your DEX already has a partner ID, use it. Otherwise, use `"external"`; you do not need to request a partner ID to start integrating. In the TypeScript and React SDKs, use the matching `Partners` enum member for your DEX, or `Partners.External` if you do not have a partner ID.
 
 
 ### Fees
@@ -240,7 +240,7 @@ A missing display estimate does not establish that an order has no fees. Show es
 
 ### Partner Configuration
 
-Use `"external"` for API requests and `Partners.External` in the TypeScript and React SDKs. No partner registration is required. Never infer the identifier from a DEX name, hostname, or chain.
+For API requests, use your existing DEX partner ID, or `"external"` if you do not have one. In the TypeScript and React SDKs, use the matching `Partners` enum member, or `Partners.External`. You do not need to request a new partner ID. Never infer the identifier from a DEX name, hostname, or chain.
 
 | Integration | Configuration |
 | --- | --- |

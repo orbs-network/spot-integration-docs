@@ -1,7 +1,7 @@
 import type { Guide } from "./guides";
 import type { ReferenceExample } from "./reference-examples";
 import { exampleReadme } from "./example-download";
-import { personalizeDocumentationMarkdown, personalizeReferenceExample, type PartnerDocumentationConfig } from "../features/partner-documentation/partner-documentation";
+import { personalizeDocumentationMarkdown, personalizeReferenceExample, type PartnerDocumentationContext } from "../features/partner-documentation/partner-documentation";
 
 // Generated at build time from canonical source files, with local imports
 // resolved and colliding bindings renamed through TypeScript's symbol table.
@@ -9,7 +9,7 @@ export async function buildIntegrationTypeScript(
   guide: Guide,
   sharedMarkdown: string,
   sourceUrl: string,
-  config?: PartnerDocumentationConfig,
+  config?: PartnerDocumentationContext,
 ): Promise<string> {
   const { default: sources } = await import("./generated-integration-sources.json");
   const source = sources[guide.id as keyof typeof sources];

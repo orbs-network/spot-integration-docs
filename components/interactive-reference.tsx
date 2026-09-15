@@ -18,7 +18,7 @@ import {
 import type { GuideId } from "@/lib/guides";
 import {
   personalizeReferenceExample,
-  type PartnerDocumentationConfig,
+  type PartnerDocumentationContext,
 } from "@/features/partner-documentation/partner-documentation";
 
 function getReferenceExample(
@@ -43,7 +43,7 @@ export function InteractiveReference({
   stepId,
 }: {
   guideId: GuideId;
-  partnerConfig?: PartnerDocumentationConfig;
+  partnerConfig?: PartnerDocumentationContext;
   stepId: string;
 }) {
   const referenceKey = `${guideId}:${stepId}`;
@@ -91,10 +91,10 @@ export function InteractiveReference({
           {partnerConfig ? (
             <span
               className="partner-example-label"
-              title={`${partnerConfig.partner} · Chain ${partnerConfig.chainId}`}
+              title={`${partnerConfig.partner}${partnerConfig.chainId === undefined ? "" : ` · Chain ${partnerConfig.chainId}`}`}
               translate="no"
             >
-              {partnerConfig.partner} · Chain {partnerConfig.chainId}
+              {partnerConfig.partner}{partnerConfig.chainId !== undefined ? ` · Chain ${partnerConfig.chainId}` : ""}
             </span>
           ) : null}
         </div>

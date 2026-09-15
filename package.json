@@ -14,6 +14,7 @@
     "check:integrations": "node --no-warnings --experimental-strip-types scripts/generate-integration-downloads.mjs --check && node scripts/check-integration-downloads.mjs && node --no-warnings --experimental-strip-types scripts/check-integration-behavior.mjs"
   },
   "dependencies": {
+    "@radix-ui/react-tooltip": "^1.2.16",
     "lucide-react": "^0.555.0",
     "next": "^16.1.0",
     "nuqs": "^2.10.1",

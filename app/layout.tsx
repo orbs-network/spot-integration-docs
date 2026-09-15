@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import localFont from "next/font/local";
 import { NuqsAdapter } from "nuqs/adapters/next/app";
+import { TooltipProvider } from "@/components/ui/tooltip";
 import { ProductBackground } from "@/components/product-background";
 
 import { getSiteUrl, SITE_DESCRIPTION, SITE_NAME } from "@/lib/site";
@@ -79,7 +80,9 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
         <a className="skip-link" href="#guide-content">
           Skip to main content
         </a>
-        <NuqsAdapter>{children}</NuqsAdapter>
+        <TooltipProvider delayDuration={200} skipDelayDuration={100}>
+          <NuqsAdapter>{children}</NuqsAdapter>
+        </TooltipProvider>
       </body>
     </html>
   );

@@ -6,6 +6,7 @@ const REFERENCE_KEYS = {
   "liquidity-hub-direct:submit-swap": true,
   "advanced-orders-direct:cancel-order-sink-orders": true,
   "advanced-orders-direct:create-order": true,
+  "advanced-orders-direct:fetch-config": true,
   "advanced-orders-direct:fetch-order-sink-orders": true,
   "liquidity-hub:fetch-quote": true,
   "liquidity-hub:submit-swap": true,
