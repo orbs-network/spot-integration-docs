@@ -1,5 +1,7 @@
 # Swap · Direct API
 
+Swap lets users exchange tokens on the same chain using a current quote. Orbs Liquidity Hub supplies quotes from on-chain and off-chain liquidity providers and coordinates execution. Read the [Product Overview](/liquidity-hub/shared#product-overview) for the user journey and how Swap differs from Advanced Orders.
+
 [Shared Reference](/liquidity-hub/shared) — concepts, lifecycle, input tokens, chains, fees, partner configuration, and resources for every Swap integration.
 
 Use this guide when the host application needs to integrate Liquidity Hub over HTTP and will own request cancellation, quote freshness, Permit2 approval, EIP-712 signing, and status polling itself.

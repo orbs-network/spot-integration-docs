@@ -1,5 +1,7 @@
 # Advanced Orders · React SDK
 
+Advanced Orders lets users schedule trades over time with TWAP or set price conditions with limit, stop-loss, and take-profit orders. Read the [Product Overview](/advanced-orders/shared#product-overview) for an explanation of each order type and the user journey before choosing an integration.
+
 [Shared Reference](/advanced-orders/shared) — concepts, lifecycle, input tokens, chains, fees, partner configuration, and resources for every Advanced Orders integration.
 
 Use `@orbs-network/spot-react` when an existing React DEX wants provider-scoped Advanced Orders state and focused hooks. The host keeps its swap state, wallet access, components, styling, translations, routing, chain metadata, and modal shell. `SpotProvider` owns the calculated form, configured client, execution state, history, and cancellation state.

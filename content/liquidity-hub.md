@@ -1,5 +1,7 @@
 # Swap · TypeScript SDK
 
+Swap lets users exchange tokens on the same chain using a current quote. Orbs Liquidity Hub supplies quotes from on-chain and off-chain liquidity providers and coordinates execution. Read the [Product Overview](/liquidity-hub/shared#product-overview) for the user journey and how Swap differs from Advanced Orders.
+
 [Shared Reference](/liquidity-hub/shared) — concepts, lifecycle, input tokens, chains, fees, partner configuration, and resources for every Swap integration.
 
 This guide is for teams that want to add Orbs Liquidity Hub to an existing DEX, swap application, or trading service without adopting a specific UI framework.

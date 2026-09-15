@@ -2,6 +2,35 @@
 
 Shared details for API Only, TypeScript SDK, React SDK, and MCP Skill integrations of the Spot protocol.
 
+## Product Overview
+
+### What Are Advanced Orders?
+
+Advanced Orders lets users define **when and under what conditions tokens should be exchanged**, using the Orbs Spot protocol. Instead of executing a swap from a current quote, a user signs an order with a schedule or price condition. The order is submitted to the Order Sink service and can fill as its execution conditions are met. A fill is an executed trade that spends some or all of the order's input tokens.
+
+Use this product to add scheduled trades and conditional orders to a DEX or trading application. The API Only, TypeScript SDK, and React SDK integrations expose the same product with different levels of help for order calculation, submission, and application state.
+
+### Order Types
+
+| Type | What it does | Example user intent |
+| --- | --- | --- |
+| TWAP (time-weighted average price) | Splits a total amount into smaller trades spaced over time, spreading execution across multiple fills. An optional limit can require a minimum output per fill. | “Exchange 1,000 USDC for WETH in 10 trades of 100 USDC, spaced 10 minutes apart.” |
+| Limit | Waits until the input can be exchanged for at least the user-specified minimum output before the order expires. | “Exchange 1 WETH only if I can receive at least 3,000 USDC.” |
+| Stop Loss | Makes an order eligible when the lower price trigger is reached. The order can use market execution or a separate minimum output after triggering. | “Trigger a sale of my WETH if its price falls to my lower threshold.” |
+| Take Profit | Makes an order eligible when the upper price trigger is reached. The order can use market execution or a separate minimum output after triggering. | “Trigger a sale of my WETH if its price rises to my target.” |
+
+These examples explain behavior, not recommended trading settings. A trigger makes an order eligible for execution; it does not guarantee a fill at the trigger price. Available liquidity, the order's execution constraints, and its deadline still matter. TWAP fills may execute at different prices, and an order can remain partially filled or unfilled.
+
+### Example User Journey
+
+A user selects TWAP, chooses a token pair, and sets the total amount, number of trades, interval, and deadline. Your app previews the schedule, prepares token permissions, and asks the user to sign the order. Once the service accepts it, show “Order submitted.” Track individual fills and remaining progress in order history, and let the user cancel future execution. Cancellation does not undo completed fills.
+
+### What You Build
+
+Your application provides the strategy controls, token and price data, wallet connection, order review, history, and cancellation interface. The protocol and order service handle the signed order lifecycle; the SDKs help prepare orders and access that lifecycle. A successful submission is the beginning of tracking, not proof that the trade has completed.
+
+Choose Advanced Orders when execution depends on time or price conditions. Choose [Swap](/liquidity-hub/shared#product-overview) when the user wants to exchange tokens from a current quote.
+
 ## Supported Chains
 
 These 19 networks are listed in the [Spot configuration](https://github.com/orbs-network/spot/blob/master/config.json), checked on September 9, 2026. The numeric top-level keys identify chains; the `"*"` entry contains shared defaults and is not a network.

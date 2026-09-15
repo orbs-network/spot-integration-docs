@@ -2,6 +2,13 @@
 
 Standalone documentation for integrating Orbs products into an existing DEX or swap application.
 
+## Products
+
+- **Swap (Orbs Liquidity Hub)** exchanges tokens on the same chain using a current quote. It sources liquidity from on-chain and off-chain providers and can be compared with an existing DEX route to select the higher protected minimum output. See the [Swap product overview](content/liquidity-hub-shared.md#product-overview).
+- **Advanced Orders (Orbs Spot)** lets users schedule trades over time with TWAP or set price conditions with limit, stop-loss, and take-profit orders. Users submit a signed order, track its fills, and can cancel future execution. See the [Advanced Orders product overview](content/advanced-orders-shared.md#product-overview).
+
+The SDK and API guides below are different integration methods for these two products.
+
 ## Guides
 
 - Liquidity Hub TypeScript SDK: quote comparison, execution, analytics, and fallback behavior.

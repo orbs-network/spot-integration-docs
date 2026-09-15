@@ -2,6 +2,24 @@
 
 Shared details for the TypeScript SDK and Direct API integrations. Use this reference for concepts, lifecycle, input requirements, chains, fees, partner configuration, and integration resources.
 
+## Product Overview
+
+### What Is Swap?
+
+Swap lets a user exchange one token for another on the same blockchain using a current quote. It is powered by **Orbs Liquidity Hub**, a service that requests quotes from on-chain and off-chain liquidity providers, called solvers, and coordinates execution of the selected quote.
+
+Use it to add swaps to an application or improve routing in an existing decentralized exchange (DEX). When the application already has a DEX router, request both quotes and select the route with the higher protected minimum output: the least amount of the destination token the user agrees to receive. Keep the existing DEX route available when Liquidity Hub has no usable quote or does not improve that minimum.
+
+### Example User Journey
+
+A user wants to exchange 100 USDC for WETH. Your app requests a Liquidity Hub quote and, if available, its existing DEX quote for the same inputs. It compares their protected minimum outputs, shows the selected route for review, and asks the user to authorize the swap. Show success after confirming the on-chain transaction receipt.
+
+### What You Build
+
+Your application provides the token and amount inputs, wallet connection, quote display, route selection, and transaction status. Liquidity Hub provides the quote and signed-swap submission service. The TypeScript SDK and Direct API are two ways to integrate this same product; neither requires replacing your application's interface.
+
+Choose Swap for a trade the user wants to execute from a current quote. Choose [Advanced Orders](/advanced-orders/shared#product-overview) when the user wants to split a trade over time or wait for a price condition.
+
 ## Supported Chains
 
 Use these networks for Swap integrations through the TypeScript SDK or Direct API.

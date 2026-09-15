@@ -1,5 +1,7 @@
 # Advanced Orders · TypeScript SDK
 
+Advanced Orders lets users schedule trades over time with TWAP or set price conditions with limit, stop-loss, and take-profit orders. Read the [Product Overview](/advanced-orders/shared#product-overview) for an explanation of each order type and the user journey before choosing an integration.
+
 [Shared Reference](/advanced-orders/shared) — concepts, lifecycle, input tokens, chains, fees, partner configuration, and resources for every Advanced Orders integration.
 
 Use `@orbs-network/spot-ui` when the host needs Advanced Orders calculation and protocol operations without React. It is framework-neutral and works with Vue, Angular, Svelte, vanilla TypeScript, and server-side TypeScript while the host keeps ownership of UI, wallet access, state, caching, and routing.

@@ -1,5 +1,7 @@
 # Advanced Orders · API Only
 
+Advanced Orders lets users schedule trades over time with TWAP or set price conditions with limit, stop-loss, and take-profit orders. Read the [Product Overview](/advanced-orders/shared#product-overview) for an explanation of each order type and the user journey before choosing an integration.
+
 [Shared Reference](/advanced-orders/shared) — concepts, lifecycle, input tokens, chains, fees, partner configuration, and resources for every Advanced Orders integration.
 
 Use this guide when the application should integrate Advanced Orders without installing an Orbs package. The host application owns the interface, wallet integration, request flow, and order lifecycle while calling the Order Sink APIs directly.
