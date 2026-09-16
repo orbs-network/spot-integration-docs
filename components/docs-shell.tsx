@@ -200,9 +200,9 @@ function GuideNavigation({
 
   return (
     <nav aria-label="Integration guides" className="guide-tree">
-      <section data-product="perpetual-hub" aria-label="Perpetual Hub" className="category-accordion guide-category category-upcoming">
+      <section data-product="perps" aria-label="Perps" className="category-accordion guide-category category-upcoming">
         <div className="category-summary">
-          <h2>Perpetual Hub</h2>
+          <h2>Perps</h2>
           <span className="coming-soon-badge">Coming soon</span>
         </div>
       </section>
@@ -262,17 +262,17 @@ function GuideNavigation({
               </div>
             );
           })}
+          <CategoryAccordion
+            className="guide-private-orders"
+            headingLevel={3}
+            title="Private and Sealed Orders"
+          >
+            <p className="category-contact-copy">
+              Contact the Orbs team for access and integration guidance for
+              Private and Sealed Orders.
+            </p>
+          </CategoryAccordion>
         </div>
-      </CategoryAccordion>
-      <CategoryAccordion
-        className="guide-category"
-        title="Private and Sealed Orders"
-      >
-        <p className="category-contact-copy">
-          Contact the Orbs team{" "}
-              for access and integration guidance for Private
-          and Sealed Orders.
-        </p>
       </CategoryAccordion>
     </nav>
   );

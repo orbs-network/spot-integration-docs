@@ -2642,7 +2642,7 @@ summary.category-summary:focus-visible {
   outline-offset: 3px;
 }
 
-.category-summary h2 {
+.category-summary :is(h2, h3) {
   margin: 0;
   color: var(--text);
   font-size: 22px;
@@ -2716,8 +2716,8 @@ summary.category-summary:focus-visible {
   font-size: 14px;
 }
 
-.docs-home-category + .docs-home-category {
-  margin-top: 12px;
+.home-private-orders {
+  margin-top: 20px;
 }
 
 .docs-home-category .docs-home-product {
@@ -2738,7 +2738,7 @@ summary.category-summary:focus-visible {
   padding: 12px;
 }
 
-.guide-category .category-summary h2 {
+.guide-category .category-summary :is(h2, h3) {
   font-size: 13px;
   letter-spacing: -0.01em;
 }
@@ -2779,7 +2779,7 @@ summary.category-summary:focus-visible {
     padding: 8px;
   }
 
-  .docs-home-category .category-summary h2 {
+  .docs-home-category .category-summary :is(h2, h3) {
     font-size: 20px;
   }
 }
@@ -2812,7 +2812,7 @@ summary.category-summary:focus-visible {
   --product-text-light: #4855a8;
 }
 
-[data-product="perpetual-hub"] {
+[data-product="perps"] {
   --product-color: #dc8ae0;
   --product-gradient-end: #7a89e9;
   --product-text-light: #8b468f;

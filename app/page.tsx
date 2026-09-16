@@ -85,8 +85,8 @@ export default async function HomePage({
           </header>
 
           <nav aria-label="Product categories" className="home-category-badges">
-            <span className="home-category-badge home-category-badge-upcoming" data-product="perpetual-hub">
-              Perpetual Hub
+            <span className="home-category-badge home-category-badge-upcoming" data-product="perps">
+              Perps
               <span className="coming-soon-badge">Coming soon</span>
             </span>
             <a aria-current="location" className="home-category-badge home-category-badge-active" href="#spot-guides">
@@ -148,17 +148,17 @@ export default async function HomePage({
                 );
               })}
             </div>
+            <CategoryAccordion
+              className="home-private-orders"
+              headingLevel={3}
+              title="Private and Sealed Orders"
+            >
+              <p className="category-contact-copy">
+                Contact the Orbs team for access and integration guidance for
+                Private and Sealed Orders.
+              </p>
+            </CategoryAccordion>
           </section>
-          <CategoryAccordion
-            className="docs-home-category"
-            title="Private and Sealed Orders"
-          >
-            <p className="category-contact-copy">
-              Contact the Orbs team{" "}
-              for access and integration guidance for
-              Private and Sealed Orders.
-            </p>
-          </CategoryAccordion>
 
           <footer className="docs-home-footer">
             <span>

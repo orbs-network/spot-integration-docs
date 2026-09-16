@@ -7,15 +7,18 @@ export function CategoryAccordion({
   children,
   className,
   description,
+  headingLevel = 2,
   selected = false,
   title,
 }: {
   children: ReactNode;
   className: string;
   description?: string;
+  headingLevel?: 2 | 3;
   selected?: boolean;
   title: string;
 }) {
+  const Heading = headingLevel === 3 ? "h3" : "h2";
   const animationRef = useRef<Animation | null>(null);
   const targetOpenRef = useRef(true);
 
@@ -69,10 +72,10 @@ export function CategoryAccordion({
   return (
     <details className={`category-accordion ${className}${selected ? " category-selected" : ""}`} open>
       <summary className="category-summary" onClick={toggleCategory}>
-        <h2 className="category-summary-copy">
+        <Heading className="category-summary-copy">
           {title}
           {description ? <span>{description}</span> : null}
-        </h2>
+        </Heading>
         <ChevronDown aria-hidden="true" className="category-chevron" size={18} />
       </summary>
       <div className="category-content">{children}</div>
