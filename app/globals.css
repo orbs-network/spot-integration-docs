@@ -2888,10 +2888,6 @@ summary.category-summary:focus-visible {
     color: var(--primary);
   }
 
-  .docs-home-category .docs-home-product:hover {
-    background: var(--primary-soft);
-    box-shadow: inset 0 0 0 1px var(--primary-border);
-  }
 }
 
 .docs-home-category .docs-home-product::before {
