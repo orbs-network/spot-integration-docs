@@ -18,6 +18,7 @@ import {
   type FormEvent,
   type KeyboardEvent,
   type MouseEvent,
+  type ReactNode,
   Suspense,
   useDeferredValue,
   useEffect,
@@ -179,10 +180,12 @@ function getSearchExcerpt(
 
 function GuideNavigation({
   activeGuide,
+  children,
   guides,
   partnerRequest,
 }: {
   activeGuide: Guide;
+  children: ReactNode;
   guides: GuideSummary[];
   partnerRequest?: PartnerDocumentationRequest;
 }) {
@@ -201,12 +204,6 @@ function GuideNavigation({
 
   return (
     <nav aria-label="Integration guides" className="guide-tree">
-      <section data-product="perps" aria-label="Perps" className="category-accordion guide-category category-upcoming">
-        <div className="category-summary">
-          <h2>Perps</h2>
-          <span className="coming-soon-badge">Coming soon</span>
-        </div>
-      </section>
       <CategoryAccordion
         className="guide-category"
         selected
@@ -235,19 +232,31 @@ function GuideNavigation({
                 <div className="variant-list">
                   {variants.map((guide) => {
                     const active = guide.id === activeGuide.id;
+                    if (active) {
+                      return (
+                        <details className="guide-variant" key={guide.id} open>
+                          <summary aria-current="page" className="variant-link variant-link-active">
+                            <span aria-hidden="true" className="variant-link-marker" />
+                            <span>{guide.variantLabel}</span>
+                            <ChevronDown aria-hidden="true" className="variant-chevron" size={14} />
+                          </summary>
+                          <div className="guide-variant-steps">{children}</div>
+                        </details>
+                      );
+                    }
                     return (
-                      <Link
-                        aria-current={active ? "page" : undefined}
-                        className={`variant-link${guide.id.endsWith("-shared") ? " variant-link-reference" : ""}${active ? " variant-link-active" : ""}`}
-                        href={createPartnerDocumentationHref(
-                          guide.route,
-                          partnerRequest,
-                        )}
-                        key={guide.id}
-                      >
-                        <span aria-hidden="true" className="variant-link-marker" />
-                        <span>{guide.variantLabel}</span>
-                      </Link>
+                      <div className="guide-variant" key={guide.id}>
+                        <Link
+                          className={`variant-link${guide.id.endsWith("-shared") ? " variant-link-reference" : ""}`}
+                          href={createPartnerDocumentationHref(
+                            guide.route,
+                            partnerRequest,
+                          )}
+                        >
+                          <span aria-hidden="true" className="variant-link-marker" />
+                          <span>{guide.variantLabel}</span>
+                        </Link>
+                      </div>
                     );
                   })}
                   {product.id === "advanced-orders" ? (
@@ -279,6 +288,12 @@ function GuideNavigation({
           </CategoryAccordion>
         </div>
       </CategoryAccordion>
+      <section data-product="perps" aria-label="Perps" className="category-accordion guide-category category-upcoming">
+        <div className="category-summary">
+          <h2>Perps</h2>
+          <span className="coming-soon-badge">Coming soon</span>
+        </div>
+      </section>
     </nav>
   );
 }
@@ -712,14 +727,14 @@ function DocsShellContent({
                 activeGuide={activeGuide}
                 guides={guides}
                 partnerRequest={partnerRequest}
-              />
-              <div className="sidebar-rule" />
-              <StepNavigation
-                activeStepIndex={activeStepIndex}
-                guide={activeGuide}
-                onStepClick={navigateToStep}
-                partnerRequest={partnerRequest}
-              />
+              >
+                <StepNavigation
+                  activeStepIndex={activeStepIndex}
+                  guide={activeGuide}
+                  onStepClick={navigateToStep}
+                  partnerRequest={partnerRequest}
+                />
+              </GuideNavigation>
             </div>
           </details>
 
@@ -744,18 +759,14 @@ function DocsShellContent({
               activeGuide={activeGuide}
               guides={guides}
               partnerRequest={partnerRequest}
-            />
-            <div className="sidebar-rule" />
-            <div className="step-list-heading">
-              <span>{activeGuide.variantLabel}</span>
-              <span>{sectionLabel} {activeStepIndex + 1} of {activeGuide.steps.length}</span>
-            </div>
-            <StepNavigation
-              activeStepIndex={activeStepIndex}
-              guide={activeGuide}
-              onStepClick={navigateToStep}
-              partnerRequest={partnerRequest}
-            />
+            >
+              <StepNavigation
+                activeStepIndex={activeStepIndex}
+                guide={activeGuide}
+                onStepClick={navigateToStep}
+                partnerRequest={partnerRequest}
+              />
+            </GuideNavigation>
           </div>
         </aside>
 

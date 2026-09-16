@@ -311,7 +311,7 @@ a[href] {
 
 .docs-layout {
   display: grid;
-  grid-template-columns: minmax(270px, 300px) minmax(0, 920px);
+  grid-template-columns: minmax(300px, 340px) minmax(0, 920px);
   justify-content: center;
   gap: 32px;
   width: 100%;
@@ -365,7 +365,6 @@ a[href] {
 }
 
 .brand-lockup small,
-.step-list-heading,
 .mobile-menu summary small {
   font-size: 10px;
   font-weight: 600;
@@ -446,9 +445,13 @@ a[href] {
   align-items: center;
   justify-content: space-between;
   gap: 8px;
+  margin: -6px;
+  padding: 6px;
+  border-radius: 7px;
   cursor: pointer;
   list-style: none;
   touch-action: manipulation;
+  transition: background-color 150ms ease;
 }
 
 .guide-product-toggle::-webkit-details-marker {
@@ -460,6 +463,7 @@ a[href] {
 }
 
 .guide-product-toggle:focus-visible {
+  background: var(--primary-soft);
   outline: 2px solid var(--primary);
   outline-offset: 4px;
   border-radius: 3px;
@@ -548,51 +552,70 @@ a[href] {
   outline-offset: 2px;
 }
 
-.sidebar-rule {
-  height: 1px;
-  margin: 16px 0;
-  background: var(--border);
-}
-
-.step-list-heading {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 12px;
-  margin: 0 0 8px;
-  color: var(--muted);
-  font-family: var(--font-sans);
-  line-height: 16px;
-}
-
-.step-list-heading span:first-child {
+.guide-variant {
   min-width: 0;
-  overflow-wrap: anywhere;
 }
 
-.step-list-heading span:last-child {
-  flex: 0 0 auto;
-  font-variant-numeric: tabular-nums;
-  letter-spacing: 0;
+.guide-variant:has(> .variant-link-active) {
+  margin: 6px 0;
+  border: 1px solid var(--primary-border);
+  border-radius: 12px;
+  background: var(--panel-soft);
+}
+
+.guide-variant > .variant-link-active {
+  min-height: 44px;
+  margin: 0;
+  padding: 11px 10px;
+  border: 0;
+  border-radius: 11px;
+  background: var(--primary-soft);
+  cursor: pointer;
+  list-style: none;
+  touch-action: manipulation;
+}
+
+.guide-variant > summary::-webkit-details-marker {
+  display: none;
+}
+
+.guide-variant[open] > .variant-link-active {
+  border-bottom: 1px solid var(--primary-border);
+  border-radius: 11px 11px 0 0;
+}
+
+.variant-chevron {
+  margin-left: auto;
+  flex-shrink: 0;
+  color: var(--muted);
+  transform: rotate(-90deg);
+}
+
+.guide-variant[open] > .variant-link-active .variant-chevron {
+  transform: rotate(0deg);
+}
+
+.guide-variant-steps {
+  padding: 6px;
 }
 
 .step-list {
   display: flex;
   min-width: 0;
   flex-direction: column;
-  gap: 4px;
+  gap: 2px;
 }
 
 .step-link {
   display: grid;
-  grid-template-columns: 28px minmax(0, 1fr);
+  grid-template-columns: 22px minmax(0, 1fr);
   align-items: center;
-  gap: 10px;
-  min-height: 46px;
-  padding: 10px;
+  gap: 8px;
+  min-height: 36px;
+  padding: 8px 8px;
   border-radius: 9px;
   color: var(--muted);
-  font-size: 14px;
+  font-size: 13px;
   line-height: 20px;
   text-decoration: none;
   transition: background-color 150ms ease, color 150ms ease;
@@ -608,8 +631,8 @@ a[href] {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 28px;
-  height: 28px;
+  width: 22px;
+  height: 22px;
   border: 1px solid var(--border);
   border-radius: 999px;
   font-family: var(--font-mono);
@@ -1996,6 +2019,7 @@ tr:last-child td {
   border-radius: var(--radius-lg);
   background: var(--home-card-background);
   box-shadow: inset 0 1px 0 var(--surface-highlight);
+  transition: background-color 150ms ease, box-shadow 150ms ease;
 }
 
 .docs-home-product::before {
@@ -2279,12 +2303,15 @@ tr:last-child td {
   }
 
   .mobile-menu-content {
+    max-height: calc(100dvh - 160px);
+    overflow-y: auto;
+    overscroll-behavior-y: contain;
     padding: 13px;
     border-top: 1px solid var(--border);
   }
 
   .mobile-menu-content .guide-category-products {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-columns: minmax(0, 1fr);
     align-items: start;
   }
 
@@ -2316,24 +2343,10 @@ tr:last-child td {
     font-size: 11px;
   }
 
-  .mobile-menu-content .step-list {
-    margin: 0 -13px;
-    padding: 0 13px 3px;
-    overflow-x: auto;
-    overscroll-behavior-x: contain;
-    flex-direction: row;
-    scroll-snap-type: x proximity;
-    scrollbar-width: none;
-  }
-
-  .mobile-menu-content .step-list::-webkit-scrollbar {
-    display: none;
-  }
-
-  .mobile-menu-content .step-link {
-    width: 210px;
-    flex: 0 0 auto;
-    scroll-snap-align: center;
+  .mobile-menu-content .guide-variant > .variant-link-active {
+    min-height: 44px;
+    padding: 11px 10px;
+    font-size: 12px;
   }
 
   .guide-content {
@@ -2715,6 +2728,8 @@ tr:last-child td {
 
   .skip-link,
   .guide-product,
+  .guide-product-toggle,
+  .docs-home-product,
   .guide-product::before,
   .variant-link,
   .variant-link-marker,
@@ -2859,6 +2874,26 @@ summary.category-summary:focus-visible {
   padding: 16px;
 }
 
+.docs-home-category .docs-home-product:focus-within {
+  background: var(--primary-soft);
+  box-shadow: inset 0 0 0 1px var(--primary-border);
+}
+
+@media (hover: hover) {
+  .guide-product-toggle:hover {
+    background: var(--primary-soft);
+  }
+
+  .guide-product-toggle:hover .guide-product-chevron {
+    color: var(--primary);
+  }
+
+  .docs-home-category .docs-home-product:hover {
+    background: var(--primary-soft);
+    box-shadow: inset 0 0 0 1px var(--primary-border);
+  }
+}
+
 .docs-home-category .docs-home-product::before {
   display: none;
 }
@@ -2963,7 +2998,6 @@ summary.category-summary:focus-visible {
 
 .eyebrow,
 .docs-home-product > header > p,
-.step-list-heading,
 .guide-context-row > .eyebrow {
   font-family: var(--font-sans);
   letter-spacing: 0.08em;

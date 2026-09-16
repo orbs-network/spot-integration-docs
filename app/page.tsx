@@ -85,14 +85,14 @@ export default async function HomePage({
           </header>
 
           <nav aria-label="Product categories" className="home-category-badges">
-            <span className="home-category-badge home-category-badge-upcoming" data-product="perps">
-              Perps
-              <span className="coming-soon-badge">Coming soon</span>
-            </span>
             <a aria-current="location" className="home-category-badge home-category-badge-active" href="#spot-guides">
               <span aria-hidden="true" className="home-category-dot" />
               Spot
             </a>
+            <span className="home-category-badge home-category-badge-upcoming" data-product="perps">
+              Perps
+              <span className="coming-soon-badge">Coming soon</span>
+            </span>
           </nav>
           <section aria-labelledby="spot-heading" className="docs-home-category home-category-panel" id="spot-guides">
             <h2 className="sr-only" id="spot-heading">Spot</h2>
