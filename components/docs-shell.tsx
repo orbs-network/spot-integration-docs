@@ -28,6 +28,7 @@ import {
 
 import { AppHeader } from "@/components/app-header";
 import { CategoryAccordion } from "@/components/category-accordion";
+import { IntegrationFlow } from "@/components/integration-flow";
 import { HighlightedText, MarkdownContent } from "@/components/markdown-content";
 import { PageActions } from "@/components/page-actions";
 import {
@@ -77,7 +78,7 @@ const RESOURCES: Record<
     sourceHref: "https://github.com/orbs-network/spot-ui/tree/master/packages/liquidity-hub-ui",
   },
   "advanced-orders-shared": {
-    primaryHref: "https://spot-app.orbs.com/?tab=twap",
+    primaryHref: "https://swap.orbs.com/?tab=twap",
     primaryLabel: "Open TypeScript SDK Example",
     sourceHref: "https://github.com/orbs-network/spot/blob/master/config.json",
   },
@@ -100,7 +101,7 @@ const RESOURCES: Record<
       "https://github.com/orbs-network/spot-ui/tree/master/packages/spot-ui",
   },
   "advanced-orders-sdk": {
-    primaryHref: "https://spot-app.orbs.com/?tab=twap",
+    primaryHref: "https://swap.orbs.com/?tab=twap",
     primaryLabel: "Open TypeScript SDK Example",
     sourceHref:
       "https://github.com/orbs-network/spot-ui/tree/master/packages/spot-ui",
@@ -217,17 +218,20 @@ function GuideNavigation({
             const variants = guides.filter((guide) => guide.product === product.id);
 
             return (
-              <div
+              <details
                 aria-label={`${product.label} integration methods`}
                 className={`guide-product${activeProduct ? " guide-product-active" : ""}`}
                 data-product={product.id}
-                key={product.id}
-                role="group"
+                key={`${product.id}:${activeGuide.product}`}
+                open={activeProduct}
               >
-                <div className="guide-product-heading">
-                  <strong>{product.label}</strong>
-                  <span>{product.description}</span>
-                </div>
+                <summary className="guide-product-toggle">
+                  <span className="guide-product-heading">
+                    <strong>{product.label}</strong>
+                    <span>{product.description}</span>
+                  </span>
+                  <ChevronDown aria-hidden="true" className="guide-product-chevron" size={15} />
+                </summary>
                 <div className="variant-list">
                   {variants.map((guide) => {
                     const active = guide.id === activeGuide.id;
@@ -259,11 +263,12 @@ function GuideNavigation({
                     </a>
                   ) : null}
                 </div>
-              </div>
+              </details>
             );
           })}
           <CategoryAccordion
             className="guide-private-orders"
+            defaultOpen={false}
             headingLevel={3}
             title="Private and Sealed Orders"
           >
@@ -283,13 +288,11 @@ function StepNavigation({
   guide,
   onStepClick,
   partnerRequest,
-  stepRefs,
 }: {
   activeStepIndex: number;
   guide: Guide;
   onStepClick: (event: MouseEvent<HTMLAnchorElement>, step: GuideStep) => void;
   partnerRequest?: PartnerDocumentationRequest;
-  stepRefs: React.RefObject<(HTMLAnchorElement | null)[]>;
 }) {
   return (
     <nav aria-label={`${guide.label} guide steps`} className="step-list">
@@ -306,9 +309,6 @@ function StepNavigation({
             )}
             key={step.id}
             onClick={(event) => onStepClick(event, step)}
-            ref={(element) => {
-              stepRefs.current[index] = element;
-            }}
           >
             <span className="step-number">{index + 1}</span>
             <span className="step-label">{step.title}</span>
@@ -438,8 +438,6 @@ function DocsShellContent({
   const previousStep = activeGuide.steps[activeStepIndex - 1];
   const nextStep = activeGuide.steps[activeStepIndex + 1];
   const contentRef = useRef<HTMLElement>(null);
-  const stepRefs = useRef<(HTMLAnchorElement | null)[]>([]);
-  const mobileStepRefs = useRef<(HTMLAnchorElement | null)[]>([]);
   const searchInputRef = useRef<HTMLInputElement>(null);
   const searchDialogRef = useRef<HTMLDialogElement>(null);
   const searchTriggerRef = useRef<HTMLButtonElement>(null);
@@ -575,16 +573,6 @@ function DocsShellContent({
     });
     return () => window.cancelAnimationFrame(frame);
   }, [activeGuide.id, activeStep.id]);
-
-  useEffect(() => {
-    const activeLink = stepRefs.current[activeStepIndex];
-    const mobileActiveLink = mobileStepRefs.current[activeStepIndex];
-    const behavior = window.matchMedia("(prefers-reduced-motion: reduce)").matches
-      ? "auto"
-      : "smooth";
-    activeLink?.scrollIntoView({ behavior, block: "nearest" });
-    mobileActiveLink?.scrollIntoView({ behavior, block: "nearest", inline: "center" });
-  }, [activeStepIndex]);
 
   useEffect(() => {
     if (!highlightQuery) return;
@@ -731,7 +719,6 @@ function DocsShellContent({
                 guide={activeGuide}
                 onStepClick={navigateToStep}
                 partnerRequest={partnerRequest}
-                stepRefs={mobileStepRefs}
               />
             </div>
           </details>
@@ -768,7 +755,6 @@ function DocsShellContent({
               guide={activeGuide}
               onStepClick={navigateToStep}
               partnerRequest={partnerRequest}
-              stepRefs={stepRefs}
             />
           </div>
         </aside>
@@ -817,6 +803,9 @@ function DocsShellContent({
           </div>
 
           <article className="guide-article" id={activeStep.id}>
+            {activeGuide.id.endsWith("-shared") && activeStep.id === "product-overview" ? (
+              <IntegrationFlow product={activeGuide.product} />
+            ) : null}
             {hasInteractiveReference ? (
               <InteractiveReference
                 guideId={activeGuide.id}

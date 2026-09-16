@@ -24,7 +24,7 @@ yarn install
 yarn dev
 ```
 
-Open [http://localhost:3004](http://localhost:3004). The root route redirects to the Liquidity Hub guide.
+Open [http://localhost:3004](http://localhost:3004). The root route shows the product and integration-method chooser. Start with Overview & Setup, then follow one SDK or API guide.
 
 ## Validation
 

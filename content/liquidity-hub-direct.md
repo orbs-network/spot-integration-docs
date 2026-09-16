@@ -1,12 +1,16 @@
 # Swap · Direct API
 
+Add the same **Orbs Liquidity Hub** swap flow using HTTP requests and your own wallet integration. Choose this path when you need to own quote validation, submission, and status polling. For a JavaScript or TypeScript app, the [TypeScript SDK](/liquidity-hub) handles more of that work.
+
+Follow the steps below from app setup through receipt confirmation. The goal is one successful on-chain swap, not merely an accepted API request.
+
 ## Quickstart
 
 ### Before You Start
 
-Complete the shared [setup requirements](/liquidity-hub/shared#integration-options). This path additionally requires JSON HTTP requests with cancellation/timeouts, response validation, a wallet typed-data signer, contract read/write support, and a status poller. The TypeScript reference uses Viem; a different stack must implement those same operations.
+Start with a connected wallet, an RPC client on the same chain, real token addresses/decimals, the wrapped-native address, and enough input balance and gas. This path also requires JSON HTTP requests with cancellation/timeouts, response validation, a wallet typed-data signer, contract read/write support, and a status poller. Use your existing wallet provider or library. The TypeScript examples illustrate these operations with Viem; adapt those calls to your wallet setup.
 
-Implement a quote adapter first, then connect the `submit-swap.ts` and `types.ts` reference files in [Submit Swap](/liquidity-hub/direct#submit-swap). Replace example wallet, chain, token, and amount values with host configuration. The host owns the entire HTTP and wallet sequence.
+Implement a quote adapter first, then connect the `submit-swap.ts` and `types.ts` reference files provided in the execution step. Replace example wallet, chain, token, and amount values with host configuration. The host owns the entire HTTP and wallet sequence.
 
 Liquidity Hub exposes one public API origin: `https://hub.orbs.network`. Hardcode it in every request, use it for every supported chain, and pass the active `chainId` in each endpoint's query string.
 
@@ -80,9 +84,9 @@ API-only integrations must validate required string and integer fields, both typ
 
 Debounce typed amount changes by about 300 milliseconds and refresh an active quote about every 10 seconds. Retry transient quote failures at most twice. Treat errors containing `"not supported"`, `"tns"`, `"no liquidity"`, or `"ldv"` as terminal for the current query; retry after the relevant quote inputs change or during a later quote cycle.
 
-### Compare with a DEX Router (Optional)
+### Compare Routes
 
-Use this step only when Liquidity Hub runs alongside an existing DEX router. Liquidity-Hub-only integrations can continue directly to **Submit Swap**.
+Use this step only when Liquidity Hub runs alongside an existing DEX router. If Liquidity Hub is your only route, use its validated quote as the selected route and continue to the next step.
 
 Request both routes for the same input tokens, amount, account, chain, and slippage. Then compare:
 
@@ -93,9 +97,11 @@ Both values must be integer strings in destination-token base units. Select the 
 
 ## Submit Swap
 
-The separate **Fetch Quote** section shows where `quote` comes from. The **Submit Swap** example verifies Permit2 allowance, approves the ERC-20 input when needed, refreshes a stale quote, and then uses that exact quote through signing, submission, status polling, and receipt confirmation.
+Copy `submit-swap.ts` and `types.ts` together from the tabs above. This is the complete execution function; the subsections below explain the phases of this one function. Pass the validated live response from your quote request as its `quote` argument. The **Submit Swap** example verifies Permit2 allowance, approves the ERC-20 input when needed, refreshes a stale quote, and then uses that exact quote through signing, submission, status polling, and receipt confirmation.
 
 ### Wrap and Approve
+
+**Goal:** prepare the input token and wait for successful preparation receipts before requesting a signature.
 
 Liquidity Hub cannot execute a native input token. If the user selected native currency, wrap it first and request a fresh quote using the wrapped token address. Then read the source token allowance for the connected account with Permit2 as spender. When the allowance is below `quote.inAmount`, approve enough to cover the quote and wait for a successful receipt before signing.
 
@@ -103,11 +109,13 @@ Liquidity Hub cannot execute a native input token. If the user selected native c
 
 Pause background quote polling before wallet operations. Pass the host quote layer's `refetchQuote` callback to `submitLiquidityHubSwap()`. Immediately before signing, the example compares `Date.now()` with `quote.timestamp`; after 60 seconds it awaits that callback and uses the returned quote for signing, submission, and status polling. When using a DEX router alongside Liquidity Hub, confirm that the refreshed quote still has the better protected minimum.
 
-Sign the wallet-ready `quote.eip712` payload exactly as returned. Its `domain`, `types`, `primaryType`, and `message` fields can be passed directly to the wallet library. The full flow below includes the signature request.
+Sign the wallet-ready `quote.eip712` payload exactly as returned. Its `domain`, `types`, `primaryType`, and `message` fields can be passed directly to the wallet library. `submitLiquidityHubSwap()` includes this signature request after allowance preparation and quote refresh.
 
 Read `account` from the host wallet hook, such as Wagmi's `useAccount()`, and use it as `user` when requesting the quote, reading allowance, signing, submitting, and polling status. Submit the same quote object that produced the signature; changing the account, tokens, amount, slippage, or any opaque service field invalidates the signed request.
 
 ### Submit and Poll
+
+**Goal:** locate the transaction hash for this signed quote. Keep `sessionId`, account, and chain so a timeout can be reconciled.
 
 Submit the complete, unchanged quote to `POST /swap-async?chainId={chainId}` with the wallet `signature`. Add `dexTx` only when the host has router calldata that Liquidity Hub must receive.
 
@@ -115,7 +123,7 @@ Start submission and poll `POST /swap/status/{sessionId}?chainId={chainId}` with
 
 ### Confirm the Receipt
 
-Receiving `txHash` from the previous step means Liquidity Hub has submitted a transaction. It does **not** prove that the transaction succeeded.
+Receiving `txHash` from submission or polling means Liquidity Hub has submitted a transaction. It does **not** prove that the transaction succeeded.
 
 Get the receipt from the active chain. If the receipt is not available yet, retry after a short delay. When `receipt.status` is `"success"`, the swap is complete. No additional Liquidity Hub API request is required.
 
@@ -149,8 +157,8 @@ If the host cannot own every item in this checklist, use the SDK integration ins
 
 ### End-to-End Acceptance Run
 
-1. Fill the [Fetch Quote request](/liquidity-hub/direct#fetch-quote) with real active-chain tokens, raw amount, connected `user`, partner, and slippage. Example response data is illustrative; never sign a copied response fixture.
-2. Preserve the validated live response and pass it to `submitLiquidityHubSwap(quote, account, refetchQuote)` from [Submit Swap](/liquidity-hub/direct#submit-swap), with `types.ts` alongside it. The callback must return a fresh quote for the same current inputs. Prepare native input in the host before calling this ERC-20 submission flow.
+1. Send the quote request with real active-chain tokens, raw amount, connected `user`, partner, and slippage. Example response data is illustrative; never sign a copied response fixture.
+2. Preserve the validated live response and pass it to `submitLiquidityHubSwap(quote, account, refetchQuote)`, with `types.ts` alongside it. The callback must return a fresh quote for the same current inputs. Prepare native input in the host before calling this ERC-20 submission flow.
 3. Start with insufficient allowance and verify approval confirmation precedes signing. Inspect outgoing submission: the signed quote remains unchanged, with the matching signature.
 4. Exercise both hash-delivery paths: hash returned by submission and hash discovered through status polling. Confirm the returned receipt before rendering success.
 5. Simulate non-JSON quote responses, a rejected signature, and a lost submission response. Verify invalid responses never become executable and uncertain submissions retain their session for reconciliation.

@@ -26,14 +26,14 @@ const PRODUCTS: readonly {
 }[] = [
   {
     description:
-      "Add solver-backed liquidity to an existing swap flow and compare executable output with the host DEX route.",
+      "Swap tokens now using an Orbs quote. Add it to your swap form or compare it with your existing DEX route.",
     id: "liquidity-hub",
     kicker: "Swap Routing",
     title: "Swap",
   },
   {
     description:
-      "Add TWAP, limit, and conditional orders with an API-only, framework-neutral TypeScript, or React integration.",
+      "Let users split trades over time (TWAP), set a limit price, or trade when a stop-loss or take-profit price is reached.",
     id: "advanced-orders",
     kicker: "Scheduled Orders",
     title: "Advanced Orders",
@@ -41,8 +41,8 @@ const PRODUCTS: readonly {
 ];
 
 const GUIDE_BADGES: Partial<Record<(typeof GUIDE_SOURCES)[number]["id"], string>> = {
-  "advanced-orders-react": "Easiest",
-  "advanced-orders-sdk": "Most Flexible",
+  "advanced-orders-react": "For React",
+  "advanced-orders-sdk": "Any Framework",
   "liquidity-hub": "Recommended",
 };
 
@@ -78,9 +78,9 @@ export default async function HomePage({
             <p className="eyebrow">Orbs Spot Docs{partnerRequest ? ` for ${partnerRequest.partner.charAt(0).toUpperCase() + partnerRequest.partner.slice(1)}` : ""}</p>
             <h1>Choose Your Integration Guide</h1>
             <p>
-              Production-focused references for adding Orbs protocols to an
-              existing DEX. Start with the product, then choose how much of the
-              integration lifecycle your application should own.
+              Choose what your users need below, then pick one SDK or API guide.
+              Follow it from setup to a working trade, with the requirements
+              explained along the way.
             </p>
           </header>
 
@@ -138,7 +138,7 @@ export default async function HomePage({
                         >
                           <span>
                             <strong>MCP Skill</strong>
-                            <small>Agent skill and MCP integration resources</small>
+                            <small>Implementation resources for coding agents</small>
                           </span>
                           <ExternalLink aria-hidden="true" size={17} />
                         </a>
@@ -150,6 +150,7 @@ export default async function HomePage({
             </div>
             <CategoryAccordion
               className="home-private-orders"
+              defaultOpen={false}
               headingLevel={3}
               title="Private and Sealed Orders"
             >

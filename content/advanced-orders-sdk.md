@@ -1,26 +1,35 @@
 # Advanced Orders · TypeScript SDK
 
+Add scheduled or price-based trades using the framework-neutral **Orbs Spot** SDK. Despite its name, `@orbs-network/spot-ui` does not render a UI or require React. Your app supplies the form, wallet, and order history screen.
+
+Follow this guide from setup to create one order, find it in history, track its fills, and cancel an open order. An accepted order may execute later; creation is not fill completion.
+
 ## Quickstart
 
 ### TypeScript SDK Example
 
-[Spot App](https://spot-app.orbs.com/?tab=twap) uses the Advanced Orders TypeScript SDK. View the [Spot App source on GitHub](https://github.com/orbs-network/orbs-spot) for an application example.
+[Spot App](https://swap.orbs.com/?tab=twap) uses the Advanced Orders TypeScript SDK. View the [Spot App source on GitHub](https://github.com/orbs-network/orbs-spot) for an application example.
 
 ### Before You Start
 
 Pass `minTradeSizeUsd` to `calculateOrderForm()` with any value of **10 or higher**, such as `10`, `25`, or `50`. This is the minimum amount in USD for each individual trade. For example, `minTradeSizeUsd: 25` means every trade must be worth at least $25. For TWAP orders, each smaller trade must meet this minimum; it is not the total order amount.
 
-Complete the shared [setup requirements](/advanced-orders/shared#integration-options). Install the SDK below and Viem for the wallet example. Supply the connected account/provider, active-chain RPC, token metadata, raw balance, and a current quote for the full input amount.
+Before starting, have these app values ready:
 
-Build one partner/chain client cache, one `calculateOrderForm()` adapter, one guarded confirmation handler, and a history/cancellation view. The SDK prepares and submits protocol data; the host owns application state, current market data, wallet transactions, and polling.
+- A connected wallet account/provider and RPC client on the same chain.
+- Input/output token addresses and decimals, plus the chain’s wrapped-native token.
+- The raw input-token balance, gas balance, a current quote for the full input amount, and token USD prices.
+- Your existing DEX partner enum, or `Partners.External`. Client initialization must succeed for that partner and chain before submission.
 
-### Quickstart
+Install the SDK using the commands below and reuse your existing wallet provider or library.
 
-Install `@orbs-network/spot-ui`, create one client for your existing DEX partner (or `Partners.External`) and connected chain, derive the form from current DEX inputs, then prepare, sign, and submit one immutable attempt. Reuse the same client for history and cancellation.
+Build one `calculateOrderForm()` adapter, one guarded confirmation handler, and a history/cancellation view. The SDK prepares and submits protocol data; the host owns application state, current market data, wallet transactions, and polling.
 
-See [Integration Lifecycle](/advanced-orders/shared#how-it-works) for the host and SDK responsibilities.
+### Implementation Order
 
-Initialize the client using the shared [Partner Configuration](/advanced-orders/shared#fees-and-configuration) requirements.
+Install `@orbs-network/spot-ui`, create one client for your existing DEX partner (or `Partners.External`) and connected chain, derive the form from current DEX inputs, then prepare, sign, and submit one immutable attempt. Use the same partner and chain for history and cancellation.
+
+The client resolves protocol configuration and prepares the signing payload. Your app sends wrapping/approval transactions, waits for successful receipts, requests the signature, and tracks the accepted order through history. Keep the account, chain, and partner consistent throughout an attempt.
 
 ### Install the TypeScript SDK
 
@@ -32,30 +41,24 @@ npm install @orbs-network/spot-ui@latest
 # or: yarn add @orbs-network/spot-ui@latest
 ```
 
-The package has no React or wallet-library dependency. Import only from the package root; do not use `dist/*` or internal source paths.
+The wallet examples illustrate operations with Viem; adapt those calls to your existing wallet setup. The SDK itself has no React or wallet-library dependency. Import only from the package root; do not use `dist/*` or internal source paths.
 
 ### Initialize the Client
 
 `createClient(partner, chainId)` validates support, fetches and validates the current RePermit configuration, and returns a new frozen client bound to that exact partner and chain.
 
-```typescript
-import { createClient, Partners } from "@orbs-network/spot-ui";
+Import `createClient` and `Partners` from `@orbs-network/spot-ui`, then call `const client = await createClient(Partners.External, chain.id)` inside your async operation. Use the connected wallet's chain and use `Partners.External` (`"external"`) or the partner provided by the Orbs team. The submission, history, and cancellation examples below include this call directly.
 
-export async function getSpotClient(chainId: number) {
-  const partner = Partners.External;
+Each `createClient()` call fetches configuration. You can optionally reuse or cache clients in your app by partner and chain.
 
-  return createClient(partner, chainId);
-}
-```
-
-Every call fetches configuration and there is no SDK-global cache. Reuse an in-flight promise or resolved client in the host data layer, keyed by partner and chain. Remove rejected promises so an explicit retry can initialize again, and invalidate the resource when either key changes.
+**Checkpoint:** `createClient(partner, chainId)` resolves for the selected chain and partner. Surface configuration errors before enabling submission.
 
 The client exposes these read-only configuration values and operations:
 
 | Member | What it represents |
 | --- | --- |
 | `client.partner` | The `Partners` value used for configuration and configured history requests. |
-| `client.chainId` | The EVM chain captured by this client. Create or retrieve another keyed client when the wallet chain changes. |
+| `client.chainId` | The EVM chain captured by this client. Create a new client when the wallet chain changes. |
 | `client.rePermitData` | The validated, trusted RePermit configuration, including the EIP-712 domain/types, base order, and protocol addresses. Treat it as read-only. |
 | `client.spenderAddress` | The RePermit verifying contract. Use it for ERC-20 allowance and approval; it is also the v2 cancellation contract. |
 | `client.exchangeAddress` | The configured exchange adapter used for order execution; it is not a v2 history query parameter. |
@@ -203,7 +206,11 @@ Amount objects contain:
 
 The example lists every `CalculateOrderFormParams` field explicitly. Supply values from the current host form and market data; optional fields may be `undefined` when unavailable or unused by the selected strategy.
 
-### Input Values
+### Validate Form Inputs
+
+Before wiring a wallet action, check the calculation with real token decimals, balance, and a current quote. Show `form.errors.primary` and field errors, and enable confirmation only when `form.canSubmit` is true. `form.isReady` alone is insufficient.
+
+#### Input Values
 
 | Value | What it represents |
 | --- | --- |
@@ -225,7 +232,7 @@ The example lists every `CalculateOrderFormParams` field explicitly. Supply valu
 
 Track the amount and token pair that produced the DEX quote. As soon as any of them changes, omit `quotedOutputAmountRaw` until the replacement quote arrives; never calculate from a previous quote or treat it as a one-token price.
 
-### Returned Values
+#### Returned Values
 
 | Value | What it represents |
 | --- | --- |
@@ -255,8 +262,10 @@ Treat one click as one immutable attempt and reject concurrent submissions. Capt
 
 This is a plain browser TypeScript example. It creates the Viem clients once at module scope from the active chain and injected wallet provider, while the host passes the connected account with the current order inputs. Replace the example Polygon chain with the chain selected in the wallet.
 
+Create the SDK client with the active chain and your partner before preparing the order. Use `Partners.External` (`"external"`) or the partner provided by the Orbs team.
+
 ```typescript
-import { isNativeAddress, type CalculatedOrderForm, type Token } from "@orbs-network/spot-ui";
+import { createClient, Partners, isNativeAddress, type CalculatedOrderForm, type Token } from "@orbs-network/spot-ui";
 import { createPublicClient, createWalletClient, custom, erc20Abi, http, parseAbi, type Address, type Hash } from "viem";
 import { polygon } from "viem/chains";
 
@@ -282,7 +291,8 @@ export async function submitAdvancedOrder({
   outputToken,
   wrappedNativeToken,
 }: SubmitAdvancedOrderParams) {
-  const client = await getSpotClient(chain.id);
+  // Use Partners.External, or the partner provided by the Orbs team.
+  const client = await createClient(Partners.External, chain.id);
   if (!form.canSubmit) throw new Error("Order form is not ready");
 
   const amount = form.inputAmount.raw;
@@ -368,13 +378,23 @@ Return the wallet's original `0x`-prefixed EIP-712 signature. Do not split it in
 
 ## Fetch and Cancel Orders
 
+This step loads order history and cancels a selected order. Use the connected wallet's chain for both operations.
+
+Both examples call the SDK's `createClient()` directly. Use `Partners.External` (`"external"`) or the partner provided by the Orbs team, and use the same partner for submission, history, and cancellation.
+
+The examples use the active `chain` from your wallet setup. Cancellation also uses the connected `walletClient` and `waitForSuccessfulReceipt`, which must wait for the transaction receipt and reject if the transaction reverted.
+
 ### Fetch Orders
 
-Use the initialized client so partner and chain remain aligned with submission. V2 history fetches all orders in one request per configured endpoint, sending only `swapper`, `chainId`, and `partner`. The client supplies partner and chain automatically; do not add `exchange`, `page`, `limit`, or a page-fetching loop. The public `page` and `limit` options apply only to legacy v1 history. `legacyOrders` defaults to `true`.
+Initialize the client with the same partner and chain used for submission. V2 history fetches all orders in one request per configured endpoint, sending only `swapper`, `chainId`, and `partner`. The client supplies partner and chain automatically; do not add `exchange`, `page`, `limit`, or a page-fetching loop. The public `page` and `limit` options apply only to legacy v1 history. `legacyOrders` defaults to `true`.
 
 ```typescript
+import { createClient, Partners } from "@orbs-network/spot-ui";
+import type { Address } from "viem";
+
 export async function fetchOrders(account: Address, signal?: AbortSignal) {
-  const client = await getSpotClient(chain.id);
+  // Use Partners.External, or the partner provided by the Orbs team.
+  const client = await createClient(Partners.External, chain.id);
   return client.getAccountOrders({ account, signal });
 }
 ```
@@ -383,13 +403,15 @@ Use `historyKey` for UI and cache identity because legacy numeric IDs can repeat
 
 ### Cancel Order
 
-Pass the selected order returned by `fetchOrders()` to the same initialized client.
+Pass the selected order returned by `fetchOrders()` to a client initialized with the same partner and chain.
 
 ```typescript
-import type { Order } from "@orbs-network/spot-ui";
+import { createClient, Partners, type Order } from "@orbs-network/spot-ui";
+import type { Address } from "viem";
 
 export async function cancelSelectedOrder(order: Order, account: Address) {
-  const client = await getSpotClient(chain.id);
+  // Use Partners.External, or the partner provided by the Orbs team.
+  const client = await createClient(Partners.External, chain.id);
   const request = client.getCancelOrderRequest(order);
   const txHash = await walletClient.writeContract({
     address: request.contractAddress as Address,
@@ -409,7 +431,7 @@ export async function cancelSelectedOrder(order: Order, account: Address) {
 ## Operational Checklist
 
 - Use the partner enum supplied by Orbs; otherwise use `Partners.External`.
-- Confirm support with `getPartnerChains(partner)` and cache `createClient()` by partner and chain with a retry path.
+- Confirm support with `getPartnerChains(partner)` and initialize with `createClient(partner, chainId)`.
 - Keep the existing DEX controls, state, current quote, wallet, chain metadata, routing, and translations.
 - Derive one `CalculatedOrderForm` from current inputs; never mirror it into editable state.
 - Render field errors and `form.errors.primary`, and disable submission until `form.canSubmit`.
@@ -417,15 +439,15 @@ export async function cancelSelectedOrder(order: Order, account: Address) {
 - Supply the wrapped-native token from host chain configuration and wrap before approval when native is selected.
 - Use `client.spenderAddress`, exact raw amounts, confirmed wallet writes, and bounded post-approval verification.
 - Prepare immediately before signing and submit the same prepared order with the unchanged signature once.
-- Key history by `order.historyKey`; use configured history and cancellation methods from the same client.
+- Key history by `order.historyKey`; use history and cancellation methods with the same partner and chain.
 
 ### End-to-End Acceptance Run
 
-1. Initialize the client as shown in [Quickstart](/advanced-orders/typescript#quickstart). Supply the actual connected chain instead of leaving the example Polygon chain hardcoded in wallet clients.
-2. Assemble [Calculate the Order Form](/advanced-orders/typescript#calculate-the-order-form) and [Prepare and Submit an Order](/advanced-orders/typescript#prepare-and-submit-an-order) in the same module, or export/import `getSpotClient()` explicitly. Provide real token metadata, current prices/quote, and account state; wait for `form.canSubmit`.
+1. Call `createClient(partner, chainId)` and verify it initializes for the intended partner and chain. Supply the actual connected chain instead of leaving the example Polygon chain hardcoded in wallet clients.
+2. Keep the form-calculation adapter and `submitAdvancedOrder()` in the same module, or explicitly export/import their shared bindings. Provide real token metadata, current prices/quote, and account state; wait for `form.canSubmit`.
 3. Connect `submitAdvancedOrder({ account, form, inputToken, outputToken, wrappedNativeToken })` to one guarded confirm handler. Verify approval to `client.spenderAddress`, confirmed wallet writes, late preparation, signing, and submission.
-4. Render “Order submitted” after acceptance, then fetch the account's orders through the same client. Use `historyKey` for UI identity and render actual fill progress separately from submission success.
-5. Wire `getCancelOrderRequest(order)` to your wallet transaction adapter. The `wallet.cancelOrder` and `refreshOrders` names in the cancellation snippet are host adapters: implement sending, successful receipt confirmation, and history refresh before using the snippet.
+4. Render “Order submitted” after acceptance, then fetch the account's orders with the same partner and chain. Use `historyKey` for UI identity and render actual fill progress separately from submission success.
+5. Wire `getCancelOrderRequest(order)` to your wallet transaction adapter. The `cancelSelectedOrder()` example sends the wallet transaction, waits with `waitForSuccessfulReceipt()`, and returns refreshed orders. Update the displayed list from that result.
 6. Test missing/stale quote inputs, rejected approval/signature, and a lost submission response. Ensure invalid forms cannot submit, concurrent clicks produce one attempt, and ambiguous submission triggers reconciliation rather than automatic resubmission.
 
 Run ERC-20, already-approved, and native-input cases using a funded development wallet. The live flow can execute trades and incurs network costs; mocked failure cases do not establish successful settlement.

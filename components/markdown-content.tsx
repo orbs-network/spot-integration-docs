@@ -23,9 +23,10 @@ type MarkdownBlock =
   | { rows: string[][]; type: "table" }
   | { text: string; type: "paragraph" };
 
-const TOKEN_PATTERN = /(\[[^\]]+\]\([^)]+\)|`[^`]+`)/g;
+const TOKEN_PATTERN = /(\[[^\]]+\]\([^)]+\)|`[^`]+`|\*\*[^*]+\*\*)/g;
 const LINK_PATTERN = /^\[([^\]]+)\]\(([^)]+)\)$/;
 const CODE_PATTERN = /^`([^`]+)`$/;
+const STRONG_PATTERN = /^\*\*([\s\S]+)\*\*$/;
 function parseTableRow(row: string): string[] {
   return row
     .trim()
@@ -220,6 +221,7 @@ function renderInline(
     const token = match[0];
     const link = token.match(LINK_PATTERN);
     const code = token.match(CODE_PATTERN);
+    const strong = token.match(STRONG_PATTERN);
 
     if (link) {
       const external = /^https?:\/\//.test(link[2]);
@@ -244,6 +246,12 @@ function renderInline(
         <code key={`${token}-${match.index}`} className="inline-code" translate="no">
           <HighlightedText query={highlightQuery} text={code[1]} />
         </code>,
+      );
+    } else if (strong) {
+      parts.push(
+        <strong key={`${token}-${match.index}`}>
+          {renderInline(strong[1], highlightQuery, partnerRequest)}
+        </strong>,
       );
     }
 

@@ -1,6 +1,12 @@
-# Advanced Orders · Shared Reference
+# Advanced Orders · Overview & Setup
 
-Shared details for API Only, TypeScript SDK, React SDK, and MCP Skill integrations of the Spot protocol.
+Start here if you are new to Advanced Orders. This page explains the product and the app data you need before writing integration code.
+
+1. Read **Product Overview** to confirm this is the behavior you need.
+2. Work through the setup requirements in this guide. Here, **host app** means the application you are adding Orbs to.
+3. Choose one implementation guide: [React SDK](/advanced-orders/react) for React apps, [TypeScript SDK](/advanced-orders/typescript) for other JavaScript/TypeScript apps, or [API Only](/advanced-orders/direct) when you need to construct protocol requests yourself. You do not need to complete every method.
+
+Keep this page available for chain, amount-unit, fee, and lifecycle details as you build.
 
 ## Product Overview
 
@@ -29,17 +35,18 @@ A user selects TWAP, chooses a token pair, and sets the total amount, number of 
 
 Your application provides the strategy controls, token and price data, wallet connection, order review, history, and cancellation interface. The protocol and order service handle the signed order lifecycle; the SDKs help prepare orders and access that lifecycle. A successful submission is the beginning of tracking, not proof that the trade has completed.
 
-Choose Advanced Orders when execution depends on time or price conditions. Choose [Swap](/liquidity-hub/shared#product-overview) when the user wants to exchange tokens from a current quote.
+Choose Advanced Orders when execution depends on time or price conditions. Choose [Swap](/liquidity-hub/shared) when the user wants to exchange tokens from a current quote.
 
 ## Supported Chains
 
-These 19 networks are listed in the [Spot configuration](https://github.com/orbs-network/spot/blob/master/config.json), checked on September 9, 2026. The numeric top-level keys identify chains; the `"*"` entry contains shared defaults and is not a network.
+These 23 networks are listed in the [Spot configuration](https://github.com/orbs-network/spot/blob/master/config.json). The numeric top-level keys identify chains; the `"*"` entry contains shared defaults and is not a network.
 
 | Chain ID | Network |
 | --- | --- |
 | `1` | Ethereum |
 | `10` | Optimism |
 | `14` | Flare |
+| `30` | Rootstock |
 | `56` | BNB Chain |
 | `130` | Unichain |
 | `137` | Polygon |
@@ -50,9 +57,12 @@ These 19 networks are listed in the [Spot configuration](https://github.com/orbs
 | `1329` | Sei |
 | `4326` | MegaETH |
 | `4663` | Robinhood Chain |
+| `5000` | Mantle |
 | `8453` | Base |
+| `9745` | Plasma |
 | `42161` | Arbitrum |
 | `43114` | Avalanche |
+| `57073` | Ink |
 | `59144` | Linea |
 | `80094` | Berachain |
 | `747474` | Katana |
@@ -60,10 +70,6 @@ These 19 networks are listed in the [Spot configuration](https://github.com/orbs
 Protocol coverage and partner availability are separate. Confirm the selected partner supports the connected chain before enabling order creation. SDK integrations use `getPartnerChains(partner)` and the initialized client; API-only integrations validate the partner-and-chain configuration response. Do not substitute another chain when the selected one is unsupported.
 
 This is a documentation snapshot. Check the linked configuration for updates before enabling a new network.
-
-### Development and Test Networks
-
-The networks listed above are mainnets. These guides do not provide a verified testnet deployment. Before testing on another network, ask [Orbs integration support](https://t.me/dTWAPSupportGroup) for its availability and configuration. Use mocked HTTP and wallet responses for local UI and error-path tests; a live acceptance run on a listed network uses real tokens and gas.
 
 ## Integration Options
 
@@ -80,7 +86,7 @@ The networks listed above are mainnets. These guides do not provide a verified t
 | Protocol addresses and fee reference | Trusted partner configuration / SDK | RePermit, reactor, and exchange adapter are resolved rather than guessed. |
 | History UI | Host application | The user can find a submitted order, inspect progress, and request cancellation. |
 
-No private key belongs in frontend configuration. The host wallet supplies signing and transaction access. See [Fees and Configuration](/advanced-orders/shared#fees-and-configuration) for partner and fee setup.
+No private key belongs in frontend configuration. The host wallet supplies signing and transaction access. Use your existing DEX partner ID, or `"external"` / `Partners.External`, and obtain protocol addresses from its configuration. Fee estimates shown in your UI must follow the agreed partner terms; they do not change the signed execution amounts.
 
 ### Amounts and Units
 
@@ -117,7 +123,7 @@ Prefer an SDK when possible: the TypeScript SDK provides framework-neutral contr
 
 #### Try the Product
 
-- [Playground: Spot App](https://spot-app.orbs.com/?tab=twap) — uses the Advanced Orders TypeScript SDK.
+- [Playground: Spot App](https://swap.orbs.com/?tab=twap) — uses the Advanced Orders TypeScript SDK.
 - [Spot App source on GitHub](https://github.com/orbs-network/orbs-spot)
 
 #### API Only
@@ -126,7 +132,7 @@ Prefer an SDK when possible: the TypeScript SDK provides framework-neutral contr
 
 #### TypeScript SDK
 
-- [Spot App example application](https://spot-app.orbs.com/?tab=twap) — [source on GitHub](https://github.com/orbs-network/orbs-spot).
+- [Spot App example application](https://swap.orbs.com/?tab=twap) — [source on GitHub](https://github.com/orbs-network/orbs-spot).
 - [TypeScript SDK package](https://github.com/orbs-network/spot-ui/tree/master/packages/spot-ui)
 - [TypeScript SDK API](https://github.com/orbs-network/spot-ui/blob/master/packages/spot-ui/README.md)
 - [Spot TypeScript integration skill](https://github.com/orbs-network/spot-ui/tree/master/skills/spot-integration)

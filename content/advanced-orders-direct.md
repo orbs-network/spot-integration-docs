@@ -1,14 +1,18 @@
 # Advanced Orders · API Only
 
+Integrate **Orbs Spot** without an Orbs SDK. Your app constructs the order, requests a wallet signature, submits it to **Order Sink** (the HTTP service that accepts and tracks orders), and sends on-chain cancellation transactions. The examples use TypeScript and Viem; the HTTP contracts also apply to other stacks.
+
+This guide includes setup, order construction, submission, history, and cancellation in implementation order. If you do not need to implement protocol fields yourself, choose the [TypeScript SDK](/advanced-orders/typescript) or [React SDK](/advanced-orders/react).
+
 ## Quickstart
 
 ### Before You Start
 
-Complete the shared [setup requirements](/advanced-orders/shared#integration-options). This path requires no Orbs runtime package, but the TypeScript examples use Viem for wallet and contract operations. Initialize the account, chain, and Viem clients at the top of the create-order file. Supply the chain-specific wrapped-token address and a validated `OrderInput` from your host form.
+This path requires no Orbs runtime package. Have a connected wallet, RPC reads/writes on the same chain, real token addresses and decimals, an input balance, gas for wallet transactions, and current market data for strategy validation. Use your existing wallet provider or library. The TypeScript examples illustrate wallet and contract operations with Viem; adapt those calls to your wallet setup. Initialize the account, chain, and wallet/RPC clients at the top of the create-order file. Supply the chain-specific wrapped-token address and a validated `OrderInput` from your host form.
 
-Implement in this order: configuration fetch, strategy derivation, the two [Create Order reference files](/advanced-orders/direct#create-order), history, then cancellation. The host owns strategy math, protocol field validation, HTTP requests, and wallet transactions.
+Implement in this order: configuration fetch, strategy derivation, the `create-order-flow.ts` and `order-types.ts` files, history, then cancellation. The host owns strategy math, protocol field validation, HTTP requests, and wallet transactions.
 
-Start with the shared [Partner Configuration](/advanced-orders/shared#fees-and-configuration) and [Input Tokens](/advanced-orders/shared#how-it-works) requirements, then implement these API operations.
+Use your existing DEX partner ID, or `"external"`. Fetch its configuration for the connected chain; signing and approval use the returned protocol addresses. Orders spend ERC-20 tokens: when native currency is selected, wrap it first and use the chain’s wrapped-native address in the order.
 
 The API-only integration uses these HTTP and on-chain operations:
 
@@ -25,29 +29,14 @@ The two Create Order files are `create-order-flow.ts` and `order-types.ts`. They
 
 | Function | Contract |
 | --- | --- |
-| `fetchDefaultPermitData(partnerId, chainId)` | Fetches the partner-chain configuration; returns `PermitData` containing `domain`, `types`, `primaryType`, and the base `order`. |
-| `buildOrderFromDerivedValues({ orderInput, permitData, inputTokenAddress })` | Uses the supplied permit data, validates the schedule, and returns `{ order, permitData }`. |
+| `fetchDefaultPermitData(partnerId, chainId)` | Fetches and validates the partner-chain configuration; returns `PermitData` containing `domain`, `types`, `primaryType`, and the base `order`. |
+| `buildOrderFromDerivedValues({ orderInput, permitData, inputTokenAddress })` | Validates the supplied configuration, amounts, schedule, freshness, slippage, and triggers, and returns `{ order, permitData }`. |
 | `signOrder({ orderInput, permitData, inputTokenAddress })` | Builds the order, signs its EIP-712 payload, and returns `{ order, signature }`. |
-| `submitOrdersSinkOrder({ orderInput, wTokenAddress })` | Prepares funds, calls `signOrder`, and returns the accepted `OrderResponse`. Its internal `submitOrder(order, signature)` helper posts the unchanged signed message to Order Sink. |
+| `submitOrdersSinkOrder({ orderInput, wTokenAddress })` | Validates configuration and order inputs before preparing funds, calls `signOrder`, and returns the accepted `OrderResponse`. Its internal `submitOrder(order, signature)` helper posts the unchanged signed message to Order Sink. |
 
 Use your DEX partner ID in each `fetchDefaultPermitData` call for creation and cancellation, and the `partner` query parameter for history; use `"external"` if you do not have one. The host supplies the active account and chain to each operation.
 
 The RePermit contract, reactor, executor, exchange adapter, and fee reference addresses come from the fetched partner configuration. Do not hardcode them in the integration.
-
-## Strategy Recipes
-
-All amounts below are integer strings in token base units. Start from the trusted `/config` template, preserve its protocol and exchange fields, and fill only the strategy values. For one-fill strategies use `totalTrades = 1`, `witness.epoch = 0`, and `witness.input.amount = witness.input.maxAmount = permitted.amount`.
-
-| Strategy | Required field rules |
-| --- | --- |
-| TWAP | Choose `totalTrades > 1`; set `permitted.amount = srcAmountPerFill × totalTrades`, `input.amount = srcAmountPerFill`, `input.maxAmount = permitted.amount`, and `epoch = fillDelaySeconds`. Ensure `deadline >= start + epoch × (totalTrades - 1)`. Set both triggers to `"0"`; set `output.limit` to the minimum destination amount per fill, or `"0"` for market execution. |
-| Limit | Use one fill and `epoch = 0`. Set `output.limit` to the required minimum destination amount; both triggers are `"0"`. The order remains eligible until `witness.deadline`. |
-| Stop Loss | Use one fill and `epoch = 0`. Set `triggerLower` to the lower trigger amount per fill and `triggerUpper = "0"`. Set `output.limit` to the post-trigger minimum, or `"0"` for market execution. |
-| Take Profit | Use one fill and `epoch = 0`. Set `triggerUpper` to the upper trigger amount per fill and `triggerLower = "0"`. Set `output.limit` to the post-trigger minimum, or `"0"` for market execution. |
-
-For TWAP, calculate `srcAmountPerFill = totalInputAmount / totalTrades` with integer division, then set the actual signed total to `srcAmountPerFill × totalTrades`. Show that adjusted total before signing; the remainder stays in the wallet. For example, 1,000 USDC (6 decimals) over 3 fills becomes 333.333333 USDC per fill, a total of 999.999999 USDC, and a remainder of 0.000001 USDC. Reject a zero per-fill amount. The builder rejects totals that do not match this multiplication and deadlines that cannot accommodate the schedule.
-
-Build the order close to signing time. The live Spot builder generates one nonce from the current Unix time in milliseconds and uses that same value for both `order.nonce` and `order.witness.nonce`. Preserve the complete built order unchanged through signing, submission, storage, and retry.
 
 ## Fetch Config
 
@@ -55,7 +44,7 @@ Pass the user’s selected chain ID in the `chain` query parameter. `137` (Polyg
 
 Every create-order attempt begins with `GET https://order-sink-v2.orbs.network/config?partner={partner}&chain={chainId}`. This returns the server-controlled `domain`, `types`, `primaryType`, and base `order` template used by the helpers in `create-order-flow.ts`. Encode the partner as a query value and fetch a fresh template for the active chain when preparing the order.
 
-Preserve the returned domain and types unchanged. Reject the response when `domain.verifyingContract` or `order.witness.exchange.adapter` is missing or the zero address, or when either signed chain ID differs from the connected chain. The RePermit contract, reactor, executor, exchange adapter, and fee reference addresses must come from this response rather than local constants.
+Preserve the returned domain and types unchanged. The helper rejects missing, malformed, or zero RePermit, spender, reactor, executor, and adapter addresses, a spender that differs from the reactor, or domain/witness chain IDs that differ from the connected chain. It also checks the EIP-712 domain and type-map structure, referral address, exchange share/data, and exclusivity setting. Zero is allowed for the optional referral address. The RePermit contract, reactor, executor, exchange adapter, and fee reference addresses must come from this response rather than local constants.
 
 
 The Request tab shows the endpoint and header; use **Copy as cURL** to run it. The Response tab is an illustrative template with placeholder addresses. Always fetch the current response for your partner and chain.
@@ -69,30 +58,26 @@ The Request tab shows the endpoint and header; use **Copy as cURL** to run it. T
 
 Keep the response as `permitData`. The create-order flow fetches it once and reuses it for approval, building, and signing.
 
-## Create Order
+## Strategy Recipes
 
-The framework-neutral reference above contains the complete flow. `create-order-flow.ts` exports `submitOrdersSinkOrder()`, prepares funds, and includes the signing, order-building, and permit-data helpers at the bottom; `order-types.ts` defines the shared contracts. Set `account` and `chainId` at the top from the connected wallet, and refresh them when the account or network changes. Initialize `publicClient` and `walletClient` at the top using the connected wallet provider. Pass only `orderInput` and the wrapped-token address to the create flow. No React hooks are required.
+All amounts below are integer strings in token base units. Start from the trusted `/config` template, preserve its protocol and exchange fields, and fill only the strategy values. For one-fill strategies use `totalTrades = 1`, `witness.epoch = 0`, and `witness.input.amount = witness.input.maxAmount = permitted.amount`.
 
-Fetch configuration once per create-order attempt. Use that same `permitData` for the approval spender, pass it to `signOrder()`, and forward it to `buildOrderFromDerivedValues()` to construct the signed order.
+| Strategy | Required field rules |
+| --- | --- |
+| TWAP | Choose `totalTrades > 1`; set `permitted.amount = srcAmountPerFill × totalTrades`, `input.amount = srcAmountPerFill`, `input.maxAmount = permitted.amount`, and `epoch = fillDelaySeconds`. Require `0 < freshness < epoch`. Ensure `deadline >= start + epoch × (totalTrades - 1)`. Set both triggers to `"0"`; set `output.limit` to the minimum destination amount per fill, or `"0"` for market execution. |
+| Limit | Use one fill and `epoch = 0`. Set `output.limit` to the required minimum destination amount; both triggers are `"0"`. The order remains eligible until `witness.deadline`. |
+| Stop Loss | Use one fill and `epoch = 0`. Set `triggerLower` to the lower trigger amount per fill and `triggerUpper = "0"`. Set `output.limit` to the post-trigger minimum, or `"0"` for market execution. |
+| Take Profit | Use one fill and `epoch = 0`. Set `triggerUpper` to the upper trigger amount per fill and `triggerLower = "0"`. Set `output.limit` to the post-trigger minimum, or `"0"` for market execution. |
 
+For TWAP, calculate `srcAmountPerFill = totalInputAmount / totalTrades` with integer division, then set the actual signed total to `srcAmountPerFill × totalTrades`. Show that adjusted total before signing; the remainder stays in the wallet. For example, 1,000 USDC (6 decimals) over 3 fills becomes 333.333333 USDC per fill, a total of 999.999999 USDC, and a remainder of 0.000001 USDC. Reject a zero per-fill amount. The builder rejects totals that do not match this multiplication and deadlines that cannot accommodate the schedule.
 
-1. Fetch the default partner and active-chain permit template.
-2. Ensure the input is an ERC-20 token. If the user selected native currency, wrap it and replace it with the wrapped-native token before building the order. Then check allowance and approve RePermit for `order.permitted.amount` when allowance is insufficient. This API-only reference uses an exact allowance; use a maximum allowance only as an explicit host security decision.
-3. Call `signOrder()` with `orderInput`, fetched `permitData` and resolved `inputTokenAddress` (the wrapped-token address for native input). It uses that template to build `signTypedDataArgs`, and signs the resulting order.
-4. Submit the returned `order` unchanged as `{ signature, order, status: "pending" }` to `POST /orders/new`.
-5. Require HTTP and API success, then keep the returned `signedOrder` for progress, history, fills, and cancellation.
+Build the order close to signing time. The reference builder generates one nonce from the current Unix time in milliseconds and uses that same value for both `order.nonce` and `order.witness.nonce`. Preserve the complete built order unchanged through signing, submission, storage, and retry.
 
-Use the partner identifier provided by Orbs. If none was provided, send the exact value `"external"`. Token amounts must be integer strings in base units, the signer must match `order.witness.swapper`, and the active chain must match both the EIP-712 domain and witness chain IDs.
-
-Do not recreate the EIP-712 domain, types, protocol contracts, or exchange fields locally. Do not rebuild or mutate the order after signing. Store the returned order hash for tracking and `metadata.repermitDigest` for cancellation.
-
-`POST /orders/new` returns a success envelope containing `signedOrder`, or an API error. Preserve the returned order `hash`, service `metadata`, original `order`, `signature`, and timestamp. Transport success alone is insufficient: also require the response body's `success` value before treating creation as complete.
-
-### `OrderInput` Fields
+### Build the Form Input
 
 `OrderInput` is the order data your host form calculates before calling `submitOrdersSinkOrder`. Amounts are **integer strings in token base units**, not human-readable decimals or USD values. Source amounts use the input token's decimals; output limits and triggers use the destination token's decimals. For example, 1 USDC with 6 decimals is `"1000000"`.
 
-**TWAP example:** to spend 30 USDC in three trades of 10 USDC, pass `totalInputAmount: "30000000"`, `srcAmountPerFill: "10000000"`, and `totalTrades: 3`. A `fillDelayMillis` of `60000` spaces fills one minute apart. Each trade must meet the $10 minimum. Set both triggers to `"0"`, and choose a deadline that allows the full schedule.
+**TWAP example:** to spend 30 USDC in three trades of 10 USDC, pass `totalInputAmount: "30000000"`, `srcAmountPerFill: "10000000"`, and `totalTrades: 3`. Use `fillDelayMillis: 60000` and `freshnessSeconds: 30` for one-minute fills with a 30-second price-data window. Freshness must be positive and strictly less than the 60-second epoch. Each trade must meet the $10 minimum. Set both triggers to `"0"`, and choose a deadline that allows the full schedule.
 
 For a single limit, stop-loss, or take-profit order, use `totalTrades: 1`, `fillDelayMillis: 0`, and the same source amount for `totalInputAmount` and `srcAmountPerFill`. Output limits and triggers describe **one fill**.
 
@@ -105,14 +90,37 @@ For a single limit, stop-loss, or take-profit order, use `totalTrades: 1`, `fill
 | `srcAmountPerFill` | Source amount assigned to one fill, in source-token base units. |
 | `dstMinAmountPerFill` | Minimum destination amount accepted for one fill, in destination-token base units. Use `"0"` when the strategy has no limit. |
 | `deadlineMillis` | Absolute order deadline as Unix time in milliseconds. The helper converts it to Unix seconds. |
-| `fillDelayMillis` | Delay between eligible fills in milliseconds. The helper converts it to `witness.epoch` seconds. |
+| `fillDelayMillis` | Delay between eligible fills in milliseconds. Use whole seconds; TWAP requires an interval longer than freshness. Single-fill orders use `0`. |
 | `totalTrades` | Number of expected fills. Use a positive integer. `1` produces `witness.epoch = 0`. |
-| `slippageBps` | Execution slippage in basis points; `100` means 1%. |
-| `freshnessSeconds` | Maximum accepted age of execution price data in seconds. Use `60` unless Orbs explicitly supplied another value. |
+| `slippageBps` | Execution slippage as an integer from `0` to `5000` basis points; `100` means 1%. |
+| `freshnessSeconds` | Positive integer price-data age in seconds. Defaults to `60`; for TWAP it must be strictly less than `fillDelayMillis / 1000`. Explicitly use `30` for a 60-second fill interval. |
 | `triggerLower` | Stop-loss trigger output amount for one fill, in destination-token base units, not a USD price. Use `"0"` when unused. |
 | `triggerUpper` | Take-profit trigger output amount for one fill, in destination-token base units, not a USD price. Use `"0"` when unused. |
 
-### `signTypedDataArgs` Fields
+## Create Order
+
+The framework-neutral reference above contains the complete flow. `create-order-flow.ts` exports `submitOrdersSinkOrder()`, prepares funds, and includes the signing, order-building, and permit-data helpers at the bottom; `order-types.ts` defines the shared contracts. Set `account` and `chainId` at the top from the connected wallet, and refresh them when the account or network changes. Initialize `publicClient` and `walletClient` at the top using the connected wallet provider. Pass only `orderInput` and the wrapped-token address to the create flow. No React hooks are required.
+
+Fetch configuration once per create-order attempt. Use that same `permitData` for the approval spender, pass it to `signOrder()`, and forward it to `buildOrderFromDerivedValues()` to construct the signed order.
+
+
+1. Fetch and validate the partner and active-chain permit template. Validate token addresses, positive integer amounts, exact `totalInputAmount = srcAmountPerFill × totalTrades`, schedule, freshness, slippage, and triggers before any wrapping, approval, or signing. The builder rechecks these inputs immediately before signing.
+2. Ensure the input is an ERC-20 token. If the user selected native currency, wrap it and replace it with the wrapped-native token before building the order. Then check allowance and approve RePermit for `order.permitted.amount` when allowance is insufficient. This API-only reference uses an exact allowance; use a maximum allowance only as an explicit host security decision.
+3. Call `signOrder()` with `orderInput`, fetched `permitData` and resolved `inputTokenAddress` (the wrapped-token address for native input). It uses that template to build `signTypedDataArgs`, and signs the resulting order.
+4. Submit the returned `order` unchanged as `{ signature, order, status: "pending" }` to `POST /orders/new`.
+5. Require HTTP and API success, then keep the returned `signedOrder` for progress, history, fills, and cancellation.
+
+Use the partner identifier provided by Orbs. If none was provided, send the exact value `"external"`. Token amounts must be integer strings in base units, the signer must match `order.witness.swapper`, and the active chain must match both the EIP-712 domain and witness chain IDs.
+
+Do not recreate the EIP-712 domain, types, protocol contracts, or exchange fields locally. Do not rebuild or mutate the order after signing. Store the returned order hash for tracking and `metadata.repermitDigest` for cancellation.
+
+`POST /orders/new` returns a success envelope containing `signedOrder`, or an API error. Preserve the returned order `hash`, service `metadata`, original `order`, `signature`, and timestamp. Transport success alone is insufficient: also require the response body's `success` value before treating creation as complete.
+
+### Check Signing and Submission Results
+
+Use these tables to inspect the signing request and accepted response produced by `submitOrdersSinkOrder()`. A wallet signature authorizes the order. A successful Order Sink response creates a trackable order; fills and cancellation happen later.
+
+#### `signTypedDataArgs` Fields
 
 | Field | Meaning |
 | --- | --- |
@@ -122,7 +130,7 @@ For a single limit, stop-loss, or take-profit order, use `totalTrades: 1`, `fill
 | `primaryType` | Root EIP-712 type returned by default permit data. Pass it to the wallet unchanged. |
 | `message` | Fully populated RePermit order. Sign this object and submit the exact same object as `order`. |
 
-### Created Order Fields
+#### Created Order Fields
 
 | Field | Meaning |
 | --- | --- |
@@ -138,8 +146,6 @@ For a single limit, stop-loss, or take-profit order, use `totalTrades: 1`, `fill
 Call `fetchOrders({ account, chainId, partner })` with the connected wallet context and the same partner ID used for submission. Use your existing DEX partner ID, or `"external"` if you do not have one.
 
 The v2 history query contains only `swapper`, `chainId`, and `partner`. `swapper` is the order owner address, matching `order.witness.swapper`. Do not send `exchange`, `page`, or `limit`: v2 returns all matching orders in one request, so no page-fetching loop is needed. Fetching history does not require a configuration request to resolve an adapter.
-
-For example, [fetch Thena orders on BNB Chain](https://order-sink.orbs.network/orders?swapper=0x50015A452E644F5511fbeeac6B2aD2bf154E40E4&chainId=56&partner=thena).
 
 Use the Request and Response tabs in the `Fetch Order History` reference. The Request tab shows the HTTP method, endpoint, and complete query parameters. The Response tab contains the successful `orders` JSON returned by Order Sink.
 
@@ -190,18 +196,18 @@ The transaction sender should be the same address that signed the original order
 | Funding | Read allowance for signer → `domain.verifyingContract`; wrap native input and approve the complete amount when required. | Both receipts succeed and allowance covers `permitted.amount`. | Keep the order unsubmitted; show the reverted preparation step. |
 | Signature | Set `witness.swapper` to the signer and sign the final message once. | The exact signed message is retained unchanged. | Discard the signature and rebuild from current state. |
 | Submission | POST `{ signature, order, status: "pending" }` and require HTTP success plus `result.success`. | A `signedOrder` with hash and metadata is stored. | Show the API error without silently marking creation successful. |
-| History | Fetch orders using the stored chain and adapter. | The UI receives the matching orders and keeps raw metadata. | Offer retry and preserve the last known list. |
+| History | Fetch orders using the original account (`swapper`), `chainId`, and `partner`. | The UI receives the matching orders and keeps raw metadata. | Offer retry and preserve the last known list. |
 | Cancellation | Resolve RePermit for the active wallet chain, call `cancel([metadata.repermitDigest])`, confirm the receipt, then refetch. | Order Sink eventually reports the terminal cancelled state. | Show the on-chain failure and leave the order open. |
 
 Ready to launch when every row passes on each supported chain.
 
 ### End-to-End Acceptance Run
 
-1. Resolve partner/chain configuration and select a strategy from [Strategy Recipes](/advanced-orders/direct#strategy-recipes). Fill `OrderInput` with real token metadata and validated raw amounts; example addresses and response objects are not executable fixtures.
-2. Copy both [Create Order files](/advanced-orders/direct#create-order) together: `create-order-flow.ts` and `order-types.ts`. Set the host account and chain ID at the top of the file. Initialize the Viem clients there using the connected wallet provider, and pass the correct wrapped-native address to `submitOrdersSinkOrder`.
+1. Resolve partner/chain configuration and validate the selected strategy’s amounts, schedule, limits, and triggers. Fill `OrderInput` with real token metadata and validated raw amounts; example addresses and response objects are not executable fixtures.
+2. Include both implementation files: `create-order-flow.ts` and `order-types.ts`. Set the host account and chain ID at the top of the file. Initialize the Viem clients there using the connected wallet provider, and pass the correct wrapped-native address to `submitOrdersSinkOrder`.
 3. Call `submitOrdersSinkOrder({ orderInput, wTokenAddress })` from one guarded confirmation handler. Start with insufficient allowance; verify RePermit approval confirms before the EIP-712 prompt. Repeat with native input to verify wrapping occurs first.
-4. Require HTTP and API success, retain the returned `signedOrder`, and show “Order submitted”. Fetch history using the same account, chain, and configured adapter; match the returned order hash. Acceptance alone is not a fill.
-5. Select an open order from history and exercise [Cancel Order Sink Orders](/advanced-orders/direct#cancel-order-sink-orders). Use its `metadata.repermitDigest`, confirm the transaction, then refresh until history reflects the result.
-6. Reject signing and simulate a lost create response. Verify the first case never submits, while the second reconciles history before another attempt. Test wrong-chain configuration and invalid strategy fields before enabling review.
+4. Require HTTP and API success, retain the returned `signedOrder`, and show “Order submitted”. Fetch history using the same `swapper`, `chainId`, and `partner`; match the returned order hash. Acceptance alone is not a fill.
+5. Select an open order from history and call `cancelOrdersSinkOrder(order)`. Use its `metadata.repermitDigest`, confirm the transaction, then refresh until history reflects the result.
+6. Reject signing and simulate a lost create response. Verify the first case never submits, while the second reconciles history before another attempt. Test wrong-chain/zero-address configuration, a mismatched chunk total, and freshness equal to or greater than the TWAP epoch. These cases must fail before wallet transactions or signing.
 
 Use an explicitly funded development wallet for the live run. Choose an amount meeting partner requirements and a strategy you understand: execution can spend funds before you cancel. A successful cancellation does not reverse prior fills.

@@ -1,6 +1,12 @@
-# Swap · Shared Reference
+# Swap · Overview & Setup
 
-Shared details for the TypeScript SDK and Direct API integrations. Use this reference for concepts, lifecycle, input requirements, chains, fees, partner configuration, and integration resources.
+Start here if you are new to Swap. This page explains the product and the app data you need before writing integration code.
+
+1. Read **Product Overview** to confirm this is the behavior you need.
+2. Work through the setup requirements in this guide. Here, **host app** means the application you are adding Orbs to.
+3. Choose one implementation guide: [TypeScript SDK](/liquidity-hub) for JavaScript/TypeScript apps (including React), or [Direct API](/liquidity-hub/direct) when you need to implement the HTTP flow yourself. You do not need to complete every method.
+
+Keep this page available for chain, amount-unit, fee, and lifecycle details as you build.
 
 ## Product Overview
 
@@ -18,7 +24,7 @@ A user wants to exchange 100 USDC for WETH. Your app requests a Liquidity Hub qu
 
 Your application provides the token and amount inputs, wallet connection, quote display, route selection, and transaction status. Liquidity Hub provides the quote and signed-swap submission service. The TypeScript SDK and Direct API are two ways to integrate this same product; neither requires replacing your application's interface.
 
-Choose Swap for a trade the user wants to execute from a current quote. Choose [Advanced Orders](/advanced-orders/shared#product-overview) when the user wants to split a trade over time or wait for a price condition.
+Choose Swap for a trade the user wants to execute from a current quote. Choose [Advanced Orders](/advanced-orders/shared) when the user wants to split a trade over time or wait for a price condition.
 
 ## Supported Chains
 
@@ -40,10 +46,6 @@ Network reference: [Liquidity Hub chain routing](https://github.com/orbs-network
 
 Before enabling a network, provide its wrapped-native-token address and wallet/RPC support for sending and confirming transactions. Both integration methods use the active chain ID; a listed network does not guarantee a quote for every token pair or amount.
 
-### Development and Test Networks
-
-The networks listed above are mainnets. These guides do not provide a verified testnet deployment. Before testing on another network, ask [Orbs integration support](https://t.me/dTWAPSupportGroup) for its availability and configuration. Use mocked HTTP and wallet responses for local UI and error-path tests; a live acceptance run on a listed network uses real tokens and gas.
-
 ## Integration Options
 
 ### Before You Start
@@ -58,7 +60,7 @@ Collect these values before wiring either integration. Contract and token addres
 | Account and wallet | Host wallet connection | The account can send transactions and sign EIP-712 typed data. Never put a private key in frontend configuration. |
 | Spendable balance and gas | Connected wallet | The account can fund the input amount and any wrap/approval transactions. |
 | Current quote inputs | Host swap form and quote layer | Account, chain, pair, amount, and slippage describe the same form snapshot. |
-| Fee presentation | Partner terms agreed with Orbs | Review uses the [fee guidance](/liquidity-hub/shared#fees-and-configuration), without inventing a fixed rate. |
+| Fee presentation | Partner terms agreed with Orbs | Display agreed partner fees and preparation gas costs; do not invent a fixed rate or change the quote’s signed amounts. |
 
 ### Amounts and Units
 
@@ -77,8 +79,8 @@ Swap uses Liquidity Hub to improve an existing DEX quote with on-chain and off-c
 
 ### Integration Resources
 
-- [Playground](https://spot-app.orbs.com/)
-- [Interactive Example](https://spot-app.orbs.com/?devMode=true)
+- [Playground](https://swap.orbs.com/)
+- [Interactive Example](https://swap.orbs.com/?devMode=true)
 - [Liquidity Hub Integration Skill](https://github.com/orbs-network/spot-ui/tree/master/skills/liquidity-hub-integration) — implementation workflow and package guardrails for coding agents.
 - [Liquidity Hub SDK and examples](https://github.com/orbs-network/spot-ui/tree/master/packages/liquidity-hub-ui)
 - [React example application](https://github.com/orbs-network/spot-ui/blob/master/apps/web/components/best-trade-form.tsx)

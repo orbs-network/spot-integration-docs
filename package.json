@@ -8,7 +8,8 @@
     "build": "yarn generate:integrations && next build",
     "start": "next start",
     "check:examples": "node --no-warnings --experimental-strip-types scripts/check-framework-neutral.mjs",
-    "lint": "eslint && yarn check:examples && yarn check:integrations",
+    "lint": "eslint && yarn check:guides && yarn check:examples && yarn check:integrations",
+    "check:guides": "node --no-warnings --experimental-strip-types scripts/check-guide-navigation.mjs",
     "typecheck": "tsc --noEmit",
     "generate:integrations": "node --no-warnings --experimental-strip-types scripts/generate-integration-downloads.mjs",
     "check:integrations": "node --no-warnings --experimental-strip-types scripts/generate-integration-downloads.mjs --check && node scripts/check-integration-downloads.mjs && node --no-warnings --experimental-strip-types scripts/check-integration-behavior.mjs"

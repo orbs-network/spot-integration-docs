@@ -6,6 +6,7 @@ import { type MouseEvent, type ReactNode, useEffect, useRef } from "react";
 export function CategoryAccordion({
   children,
   className,
+  defaultOpen = true,
   description,
   headingLevel = 2,
   selected = false,
@@ -13,6 +14,7 @@ export function CategoryAccordion({
 }: {
   children: ReactNode;
   className: string;
+  defaultOpen?: boolean;
   description?: string;
   headingLevel?: 2 | 3;
   selected?: boolean;
@@ -20,7 +22,7 @@ export function CategoryAccordion({
 }) {
   const Heading = headingLevel === 3 ? "h3" : "h2";
   const animationRef = useRef<Animation | null>(null);
-  const targetOpenRef = useRef(true);
+  const targetOpenRef = useRef(defaultOpen);
 
   useEffect(() => () => animationRef.current?.cancel(), []);
 
@@ -70,7 +72,7 @@ export function CategoryAccordion({
   }
 
   return (
-    <details className={`category-accordion ${className}${selected ? " category-selected" : ""}`} open>
+    <details className={`category-accordion ${className}${selected ? " category-selected" : ""}`} open={defaultOpen}>
       <summary className="category-summary" onClick={toggleCategory}>
         <Heading className="category-summary-copy">
           {title}

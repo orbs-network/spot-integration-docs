@@ -12,7 +12,7 @@ import { SITE_REPOSITORY } from "@/lib/site";
 
 export function AppHeader({ search, partnerRequest }: { search?: ReactNode; partnerRequest?: PartnerDocumentationRequest }) {
   const homeHref = createPartnerDocumentationHref("/", partnerRequest);
-  const playgroundUrl = "https://spot-app.orbs.com/?tab=twap";
+  const playgroundUrl = "https://swap.orbs.com/?tab=twap";
   return (
     <header className={`app-header${search ? " app-header-with-search" : ""}`}>
       <Link
