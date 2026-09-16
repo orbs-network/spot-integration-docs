@@ -6,7 +6,6 @@
 
 - [React SDK example in spot-ui](https://github.com/orbs-network/spot-ui/tree/master/apps/web/components/spot) — form, order submission, history, and cancellation components.
 - [SpotProvider setup example](https://github.com/orbs-network/spot-ui/blob/master/apps/web/components/spot/spot-form.tsx).
-- [Orbs Spot example application](https://github.com/orbs-network/orbs-spot).
 
 ### Before You Start
 

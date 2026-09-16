@@ -3,7 +3,6 @@
 import type { ReactNode } from "react";
 import Image from "next/image";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
 import { createPartnerDocumentationHref } from "@/features/partner-documentation/query-state";
 import type { PartnerDocumentationRequest } from "@/features/partner-documentation/partner-documentation";
 import { ExternalLink, Github } from "lucide-react";
@@ -12,12 +11,8 @@ import { ThemeToggle } from "@/components/theme-toggle";
 import { SITE_REPOSITORY } from "@/lib/site";
 
 export function AppHeader({ search, partnerRequest }: { search?: ReactNode; partnerRequest?: PartnerDocumentationRequest }) {
-  const pathname = usePathname();
   const homeHref = createPartnerDocumentationHref("/", partnerRequest);
-  const advancedOrders = pathname.startsWith("/advanced-orders");
-  const playgroundUrl = advancedOrders
-    ? "https://spot-app.orbs.com/?devMode=true&tab=twap"
-    : "https://spot-app.orbs.com/";
+  const playgroundUrl = "https://spot-app.orbs.com/?tab=twap";
   return (
     <header className={`app-header${search ? " app-header-with-search" : ""}`}>
       <Link
@@ -40,7 +35,7 @@ export function AppHeader({ search, partnerRequest }: { search?: ReactNode; part
           href={playgroundUrl}
           target="_blank"
           rel="noopener noreferrer"
-          aria-label={`Open ${advancedOrders ? "Advanced Orders" : "Swap"} playground in a new tab`}
+          aria-label="Open Advanced Orders playground in a new tab"
         >
           Playground
           <ExternalLink aria-hidden="true" size={14} />

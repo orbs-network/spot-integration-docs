@@ -77,8 +77,8 @@ const RESOURCES: Record<
     sourceHref: "https://github.com/orbs-network/spot-ui/tree/master/packages/liquidity-hub-ui",
   },
   "advanced-orders-shared": {
-    primaryHref: "https://orbs-spot.vercel.app/?devMode=true&tab=twap",
-    primaryLabel: "Open Interactive Example",
+    primaryHref: "https://spot-app.orbs.com/?tab=twap",
+    primaryLabel: "Open TypeScript SDK Example",
     sourceHref: "https://github.com/orbs-network/spot/blob/master/config.json",
   },
   "liquidity-hub": {
@@ -100,14 +100,14 @@ const RESOURCES: Record<
       "https://github.com/orbs-network/spot-ui/tree/master/packages/spot-ui",
   },
   "advanced-orders-sdk": {
-    primaryHref: "https://orbs-spot.vercel.app/?devMode=true&tab=twap",
-    primaryLabel: "Open Interactive Example",
+    primaryHref: "https://spot-app.orbs.com/?tab=twap",
+    primaryLabel: "Open TypeScript SDK Example",
     sourceHref:
       "https://github.com/orbs-network/spot-ui/tree/master/packages/spot-ui",
   },
   "advanced-orders-react": {
-    primaryHref: "https://orbs-spot.vercel.app/?devMode=true&tab=twap",
-    primaryLabel: "Open Interactive Example",
+    primaryHref: "https://github.com/orbs-network/spot-ui",
+    primaryLabel: "View React SDK Example",
     sourceHref:
       "https://github.com/orbs-network/spot-ui/tree/master/packages/spot-react",
   },
@@ -120,6 +120,7 @@ function createInteractiveExampleHref(
   if (!request) return href;
 
   const url = new URL(href);
+  if (url.hostname === "github.com") return href;
   url.searchParams.set("partner", request.partner);
   if (request.chainId !== undefined) {
     url.searchParams.set("chainId", String(request.chainId));

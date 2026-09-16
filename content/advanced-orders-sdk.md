@@ -2,6 +2,10 @@
 
 ## Quickstart
 
+### TypeScript SDK Example
+
+[Spot App](https://spot-app.orbs.com/?tab=twap) uses the Advanced Orders TypeScript SDK. View the [Spot App source on GitHub](https://github.com/orbs-network/orbs-spot) for an application example.
+
 ### Before You Start
 
 Pass `minTradeSizeUsd` to `calculateOrderForm()` with any value of **10 or higher**, such as `10`, `25`, or `50`. This is the minimum amount in USD for each individual trade. For example, `minTradeSizeUsd: 25` means every trade must be worth at least $25. For TWAP orders, each smaller trade must meet this minimum; it is not the total order amount.

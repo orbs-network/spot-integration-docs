@@ -117,8 +117,8 @@ Prefer an SDK when possible: the TypeScript SDK provides framework-neutral contr
 
 #### Try the Product
 
-- [Playground](https://spot-app.orbs.com/?tab=twap)
-- [Interactive Example](https://spot-app.orbs.com/?tab=twap&devMode=true)
+- [Playground: Spot App](https://spot-app.orbs.com/?tab=twap) — uses the Advanced Orders TypeScript SDK.
+- [Spot App source on GitHub](https://github.com/orbs-network/orbs-spot)
 
 #### API Only
 
@@ -126,6 +126,7 @@ Prefer an SDK when possible: the TypeScript SDK provides framework-neutral contr
 
 #### TypeScript SDK
 
+- [Spot App example application](https://spot-app.orbs.com/?tab=twap) — [source on GitHub](https://github.com/orbs-network/orbs-spot).
 - [TypeScript SDK package](https://github.com/orbs-network/spot-ui/tree/master/packages/spot-ui)
 - [TypeScript SDK API](https://github.com/orbs-network/spot-ui/blob/master/packages/spot-ui/README.md)
 - [Spot TypeScript integration skill](https://github.com/orbs-network/spot-ui/tree/master/skills/spot-integration)
@@ -135,7 +136,7 @@ Prefer an SDK when possible: the TypeScript SDK provides framework-neutral contr
 - [React SDK package](https://github.com/orbs-network/spot-ui/tree/master/packages/spot-react)
 - [Spot React integration skill](https://github.com/orbs-network/spot-ui/tree/master/skills/spot-react-integration)
 - [React SDK example: SpotProvider setup](https://github.com/orbs-network/spot-ui/blob/master/apps/web/components/spot/spot-form.tsx)
-- [Orbs Spot example application](https://github.com/orbs-network/orbs-spot) — additional application example.
+- [Spot UI React SDK example application](https://github.com/orbs-network/spot-ui)
 - [Swap UI execution helper](https://www.npmjs.com/package/@orbs-network/swap-ui)
 
 #### Agents and Protocol Configuration
