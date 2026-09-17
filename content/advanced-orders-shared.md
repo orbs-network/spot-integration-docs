@@ -182,7 +182,7 @@ The TypeScript and React SDKs share the same form calculation and configured cli
 1. Resolve trusted configuration for the selected partner and connected chain.
 2. Prepare the ERC-20 input funds, including wrapping native input and approving RePermit when required.
 3. Build one order attempt, sign its EIP-712 payload, and submit the same signed order to Order Sink.
-4. Fetch order history for the swapper, chain, and partner.
+4. Fetch order history for the swapper and chain, always sending the partner ID as `exchange`, not `partner`, in the HTTP query.
 5. To cancel, submit the on-chain cancellation transaction, confirm its receipt, and refresh history.
 
 The host owns wallet access and transaction confirmation. API-only integrations construct protocol fields directly; the SDKs provide preparation, submission, history, and cancellation requests. React adds provider-scoped state and execution handling.

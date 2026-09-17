@@ -386,7 +386,7 @@ The examples use the active `chain` from your wallet setup. Cancellation also us
 
 ### Fetch Orders
 
-Initialize the client with the same partner and chain used for submission. V2 history fetches all orders in one request per configured endpoint, sending only `swapper`, `chainId`, and `partner`. The client supplies partner and chain automatically; do not add `exchange`, `page`, `limit`, or a page-fetching loop. The public `page` and `limit` options apply only to legacy v1 history. `legacyOrders` defaults to `true`.
+Initialize the client with the same partner and chain used for submission. V2 history fetches all orders in one request per configured endpoint, always sending `swapper`, `chainId`, and `exchange`. The client supplies its partner ID as `exchange` (for example, `exchange=ginco`) and its chain automatically. Do not send a `partner` query parameter or an adapter address, and do not add `page`, `limit`, or a page-fetching loop. The public `page` and `limit` options apply only to legacy v1 history. `legacyOrders` defaults to `true`.
 
 ```typescript
 import { createClient, Partners } from "@orbs-network/spot-ui";

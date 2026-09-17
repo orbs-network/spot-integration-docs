@@ -368,6 +368,8 @@ export function personalizeReferenceExample(
     const partner =
       file.kind === "response" ? config.partner : config.requestedPartner;
     const fileReplacements = new Map(commonReplacements);
+    fileReplacements.set("exchange=external", `exchange=${encodeURIComponent(partner)}`);
+    fileReplacements.set('exchange: "external"', `exchange: ${JSON.stringify(partner)}`);
     fileReplacements.set("partner=external", `partner=${encodeURIComponent(partner)}`);
     fileReplacements.set(
       'fetchDefaultPermitData("external",',

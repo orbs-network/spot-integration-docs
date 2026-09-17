@@ -20,7 +20,7 @@ The API-only integration uses these HTTP and on-chain operations:
 | --- | --- |
 | Fetch configuration | `GET https://order-sink-v2.orbs.network/config?partner={partner}&chain={chainId}` with `Accept: application/json`. |
 | Create order | `POST https://order-sink-v2.orbs.network/orders/new` with JSON `{ signature, order, status: "pending" }`. `order` must be the exact EIP-712 message that produced `signature`. |
-| Fetch history | `GET https://order-sink-v2.orbs.network/orders?swapper={account}&chainId={chainId}&partner={partner}`. Returns all matching v2 orders in one request. |
+| Fetch history | `GET https://order-sink-v2.orbs.network/orders?swapper={account}&chainId={chainId}&exchange={partner}`. Returns all matching v2 orders in one request. |
 | Cancel | Send the on-chain transaction `cancel([metadata.repermitDigest])` to `domain.verifyingContract`; cancellation is not an Order Sink HTTP request. |
 
 ### Function Contracts
@@ -34,7 +34,7 @@ The two Create Order files are `create-order-flow.ts` and `order-types.ts`. They
 | `signOrder({ orderInput, permitData, inputTokenAddress })` | Builds the order, signs its EIP-712 payload, and returns `{ order, signature }`. |
 | `submitOrdersSinkOrder({ orderInput, wTokenAddress })` | Validates configuration and order inputs before preparing funds, calls `signOrder`, and returns the accepted `OrderResponse`. Its internal `submitOrder(order, signature)` helper posts the unchanged signed message to Order Sink. |
 
-Use your DEX partner ID in each `fetchDefaultPermitData` call for creation and cancellation, and the `partner` query parameter for history; use `"external"` if you do not have one. The host supplies the active account and chain to each operation.
+Use your DEX partner ID in each `fetchDefaultPermitData` call for creation and cancellation, and always send that same ID as the `exchange` query parameter for history; use `"external"` if you do not have one. The host supplies the active account and chain to each operation.
 
 The RePermit contract, reactor, executor, exchange adapter, and fee reference addresses come from the fetched partner configuration. Do not hardcode them in the integration.
 
@@ -143,9 +143,9 @@ Use these tables to inspect the signing request and accepted response produced b
 
 ## Fetch Order Sink Orders
 
-Call `fetchOrders({ account, chainId, partner })` with the connected wallet context and the same partner ID used for submission. Use your existing DEX partner ID, or `"external"` if you do not have one.
+Call `fetchOrders({ account, chainId, exchange: partner })` with the connected wallet context and the same partner ID used for submission. Use your existing DEX partner ID, or `"external"` if you do not have one.
 
-The v2 history query contains only `swapper`, `chainId`, and `partner`. `swapper` is the order owner address, matching `order.witness.swapper`. Do not send `exchange`, `page`, or `limit`: v2 returns all matching orders in one request, so no page-fetching loop is needed. Fetching history does not require a configuration request to resolve an adapter.
+The v2 history query always includes `swapper`, `chainId`, and `exchange`. `swapper` is the order owner address, matching `order.witness.swapper`. `exchange` is the partner ID, such as `ginco` or `external`, not an adapter address. Do not send `partner`, `page`, or `limit`: v2 returns all matching orders in one request, so no page-fetching loop is needed. Fetching history does not require a configuration request to resolve an adapter.
 
 Use the Request and Response tabs in the `Fetch Order History` reference. The Request tab shows the HTTP method, endpoint, and complete query parameters. The Response tab contains the successful `orders` JSON returned by Order Sink.
 
@@ -196,7 +196,7 @@ The transaction sender should be the same address that signed the original order
 | Funding | Read allowance for signer → `domain.verifyingContract`; wrap native input and approve the complete amount when required. | Both receipts succeed and allowance covers `permitted.amount`. | Keep the order unsubmitted; show the reverted preparation step. |
 | Signature | Set `witness.swapper` to the signer and sign the final message once. | The exact signed message is retained unchanged. | Discard the signature and rebuild from current state. |
 | Submission | POST `{ signature, order, status: "pending" }` and require HTTP success plus `result.success`. | A `signedOrder` with hash and metadata is stored. | Show the API error without silently marking creation successful. |
-| History | Fetch orders using the original account (`swapper`), `chainId`, and `partner`. | The UI receives the matching orders and keeps raw metadata. | Offer retry and preserve the last known list. |
+| History | Fetch orders using the original account (`swapper`), `chainId`, and `exchange` containing the partner ID. | The UI receives the matching orders and keeps raw metadata. | Offer retry and preserve the last known list. |
 | Cancellation | Resolve RePermit for the active wallet chain, call `cancel([metadata.repermitDigest])`, confirm the receipt, then refetch. | Order Sink eventually reports the terminal cancelled state. | Show the on-chain failure and leave the order open. |
 
 Ready to launch when every row passes on each supported chain.
@@ -206,7 +206,7 @@ Ready to launch when every row passes on each supported chain.
 1. Resolve partner/chain configuration and validate the selected strategy’s amounts, schedule, limits, and triggers. Fill `OrderInput` with real token metadata and validated raw amounts; example addresses and response objects are not executable fixtures.
 2. Include both implementation files: `create-order-flow.ts` and `order-types.ts`. Set the host account and chain ID at the top of the file. Initialize the Viem clients there using the connected wallet provider, and pass the correct wrapped-native address to `submitOrdersSinkOrder`.
 3. Call `submitOrdersSinkOrder({ orderInput, wTokenAddress })` from one guarded confirmation handler. Start with insufficient allowance; verify RePermit approval confirms before the EIP-712 prompt. Repeat with native input to verify wrapping occurs first.
-4. Require HTTP and API success, retain the returned `signedOrder`, and show “Order submitted”. Fetch history using the same `swapper`, `chainId`, and `partner`; match the returned order hash. Acceptance alone is not a fill.
+4. Require HTTP and API success, retain the returned `signedOrder`, and show “Order submitted”. Fetch history using the same `swapper`, `chainId`, and `exchange` (partner ID); match the returned order hash. Acceptance alone is not a fill.
 5. Select an open order from history and call `cancelOrdersSinkOrder(order)`. Use its `metadata.repermitDigest`, confirm the transaction, then refresh until history reflects the result.
 6. Reject signing and simulate a lost create response. Verify the first case never submits, while the second reconciles history before another attempt. Test wrong-chain/zero-address configuration, a mismatched chunk total, and freshness equal to or greater than the TWAP epoch. These cases must fail before wallet transactions or signing.
 

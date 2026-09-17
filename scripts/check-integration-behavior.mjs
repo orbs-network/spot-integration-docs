@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import vm from 'node:vm';
 import ts from 'typescript';
 import { REFERENCE_EXAMPLES } from '../lib/reference-examples.ts';
+import { personalizeReferenceExample } from '../features/partner-documentation/partner-documentation.ts';
 import sources from '../lib/generated-integration-sources.json' with { type: 'json' };
 
 function load(code, context = {}) {
@@ -184,12 +185,39 @@ const historyApi = load(sources['advanced-orders-direct'], {
     return { ok: true, json: async () => history };
   },
 });
-assert.equal(await historyApi.fetchOrders({ account, chainId: 56, partner: 'thena' }), history);
+assert.equal(await historyApi.fetchOrders({ account, chainId: 56, exchange: 'thena' }), history);
 assert.equal(historyUrls.length, 1);
 assert.equal(historyUrls[0].pathname, '/orders');
 assert.deepEqual(Object.fromEntries(historyUrls[0].searchParams), {
   swapper: account,
   chainId: '56',
-  partner: 'thena',
+  exchange: 'thena',
 });
-console.log('Swap receipt, polling cleanup, configuration rejection, chunk totals, TWAP freshness/schedule, and partner-scoped history checks passed.');
+for (const exchange of [undefined, '', '   ']) {
+  await assert.rejects(historyApi.fetchOrders({ account, chainId: 56, exchange }), /Exchange partner ID is required/);
+}
+assert.equal(historyUrls.length, 1, 'Missing exchange must fail before a history request');
+// The interactive Request tab and its cURL must use the same wire contract,
+// including after the documentation applies the selected partner.
+const historyExample = REFERENCE_EXAMPLES['advanced-orders-direct:fetch-order-sink-orders'];
+for (const partner of ['external', 'ginco']) {
+  const personalized = personalizeReferenceExample('advanced-orders-direct', historyExample, {
+    partner, requestedPartner: partner,
+  });
+  const request = personalized.files.find(file => file.kind === 'request');
+  const urls = [];
+  const requestApi = load(request.code, {
+    fetch: async url => {
+      urls.push(new URL(url));
+      return { ok: true, json: async () => history };
+    },
+  });
+  assert.equal(await requestApi.fetchOrderHistory(), history);
+  assert.equal(urls.length, 1);
+  assert.deepEqual(Object.fromEntries(urls[0].searchParams), {
+    swapper: '0x5555555555555555555555555555555555555555', chainId: '137', exchange: partner,
+  });
+  assert(request.curl.includes(`'exchange=${partner}'`));
+  assert(!request.curl.includes('partner='));
+}
+console.log('Swap receipt, polling cleanup, configuration rejection, chunk totals, TWAP freshness/schedule, and exchange-scoped history checks passed.');
