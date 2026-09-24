@@ -118,6 +118,8 @@ Do not recreate the EIP-712 domain, types, protocol contracts, or exchange field
 
 ### Check Signing and Submission Results
 
+Before calling the wallet signer inside `signOrder()`, test the generated payload in the [EIP-712 Order Preview](https://swap.orbs.com/developers/eip712). Copy `domain`, `types`, `primaryType`, and `message` from `signTypedDataArgs` as JSON, paste it into the tool, and select **Preview order**. Compare the displayed amounts and execution conditions with your inputs before signing. The preview does not sign or submit the order.
+
 Use these tables to inspect the signing request and accepted response produced by `submitOrdersSinkOrder()`. A wallet signature authorizes the order. A successful Order Sink response creates a trackable order; fills and cancellation happen later.
 
 #### `signTypedDataArgs` Fields

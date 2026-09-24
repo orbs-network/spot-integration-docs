@@ -324,6 +324,8 @@ export function useWalletInteractions(): WalletInteractions {
 
 `useWalletInteractions()` adapts Wagmi's connected wallet and public clients into all five operations required by `SpotProvider`. Transaction callbacks wait for successful receipts before returning their hashes. The SDK supplies the spender, cancellation contract/ABI/arguments, signing account, and EIP-712 payload; forward those exact values instead of reconstructing them. Return the complete `0x` signature unchanged.
 
+To test the EIP-712 payload during integration, copy the `typedData` received by `walletInteractions.signOrder()` before calling `walletClient.signTypedData()`. Paste it as JSON, including `domain`, `types`, `primaryType`, and `message`, into the [EIP-712 Order Preview](https://swap.orbs.com/developers/eip712) and select **Preview order**. Check the displayed amounts and execution conditions before signing. The preview does not sign or submit the order.
+
 ## Build with Focused Hooks
 
 Let each component call the focused hooks for its controls. These files adapt the reference app's trade, schedule, trigger/limit-price, and feedback panels to the current SDK. `useTranslations()` is the DEX's translation hook; it resolves the SDK's error keys and interpolation arguments using the host's messages.

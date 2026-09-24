@@ -5,10 +5,10 @@ import Image from "next/image";
 import Link from "next/link";
 import { createPartnerDocumentationHref } from "@/features/partner-documentation/query-state";
 import type { PartnerDocumentationRequest } from "@/features/partner-documentation/partner-documentation";
-import { ExternalLink, Github } from "lucide-react";
+import { ExternalLink, Github, MessageCircle } from "lucide-react";
 
 import { ThemeToggle } from "@/components/theme-toggle";
-import { SITE_REPOSITORY } from "@/lib/site";
+import { ORBS_SUPPORT_URL, SITE_REPOSITORY } from "@/lib/site";
 
 export function AppHeader({ search, partnerRequest }: { search?: ReactNode; partnerRequest?: PartnerDocumentationRequest }) {
   const homeHref = createPartnerDocumentationHref("/", partnerRequest);
@@ -37,7 +37,7 @@ export function AppHeader({ search, partnerRequest }: { search?: ReactNode; part
           rel="noopener noreferrer"
           aria-label="Open Advanced Orders playground in a new tab"
         >
-          Playground
+          <span>Playground</span>
           <ExternalLink aria-hidden="true" size={14} />
         </a>
         <a
@@ -49,6 +49,16 @@ export function AppHeader({ search, partnerRequest }: { search?: ReactNode; part
           title="View on GitHub"
         >
           <Github aria-hidden="true" size={18} />
+        </a>
+        <a
+          aria-label="Open support chat on Telegram in a new tab"
+          className="support-nav-link"
+          href={ORBS_SUPPORT_URL}
+          rel="noopener noreferrer"
+          target="_blank"
+          title="Support chat · @dTWAPSupportGroup"
+        >
+          <MessageCircle aria-hidden="true" size={18} />
         </a>
         <ThemeToggle />
       </div>

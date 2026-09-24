@@ -226,6 +226,21 @@ a[href] {
   gap: 8px;
 }
 
+@media (max-width: 480px) {
+  .app-header .app-logo-link img {
+    width: 28px;
+  }
+
+  .app-header .playground-link {
+    width: 40px;
+    padding: 0;
+  }
+
+  .playground-link > span {
+    display: none;
+  }
+}
+
 .playground-link {
   display: inline-flex;
   align-items: center;
@@ -254,6 +269,7 @@ a[href] {
 }
 
 .theme-toggle,
+.support-nav-link,
 .github-nav-link {
   position: relative;
   display: inline-grid;
@@ -272,6 +288,7 @@ a[href] {
 }
 
 .theme-toggle:hover,
+.support-nav-link:hover,
 .github-nav-link:hover {
   border-color: var(--border-strong);
   background: var(--panel-raised);
@@ -279,6 +296,7 @@ a[href] {
 }
 
 .theme-toggle:focus-visible,
+.support-nav-link:focus-visible,
 .github-nav-link:focus-visible {
   outline: 2px solid var(--primary);
   outline-offset: 2px;
