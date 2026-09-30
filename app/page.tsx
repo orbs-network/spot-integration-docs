@@ -92,21 +92,6 @@ export default async function HomePage({
                 </a>
               </div>
             </div>
-            <svg aria-hidden="true" className="docs-home-orbit" viewBox="0 0 440 360" fill="none">
-              <defs>
-                <linearGradient id="spot-orbit" x1="50" y1="80" x2="370" y2="280" gradientUnits="userSpaceOnUse">
-                  <stop stopColor="#2cedfc" /><stop offset="0.5" stopColor="#7a89e9" /><stop offset="1" stopColor="#dc8ae0" />
-                </linearGradient>
-              </defs>
-              <path className="orbit-axis" d="M0 180H440M220 0V360" stroke="currentColor" strokeDasharray="2 7" />
-              <g stroke="url(#spot-orbit)" strokeWidth="0.7">
-                {Array.from({ length: 16 }, (_, i) => (
-                  <ellipse cx="220" cy="180" key={i} rx={177 - i * 2} ry={53 + i * 4.6} transform={`rotate(${-28 + i * 3.2} 220 180)`} />
-                ))}
-              </g>
-              <path d="M220 158C223 172 228 177 242 180C228 183 223 188 220 202C217 188 212 183 198 180C212 177 217 172 220 158Z" fill="currentColor" />
-              <g fill="currentColor"><circle cx="58" cy="124" r="2" /><circle cx="374" cy="252" r="2" /><circle cx="350" cy="62" r="2" /></g>
-            </svg>
           </header>
 
           <nav aria-label="Product categories" className="home-category-badges">
