@@ -5,7 +5,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { createPartnerDocumentationHref } from "@/features/partner-documentation/query-state";
 import type { PartnerDocumentationRequest } from "@/features/partner-documentation/partner-documentation";
-import { ExternalLink, Github, MessageCircle } from "lucide-react";
+import { ExternalLink, Github, Globe, MessageCircle } from "lucide-react";
 
 import { ThemeToggle } from "@/components/theme-toggle";
 import { ORBS_SUPPORT_URL, SITE_REPOSITORY } from "@/lib/site";
@@ -16,17 +16,18 @@ export function AppHeader({ search, partnerRequest }: { search?: ReactNode; part
   return (
     <header className={`app-header${search ? " app-header-with-search" : ""}`}>
       <Link
-        aria-label="Orbs Spot"
+        aria-label="Orbs Spot documentation home"
         className="app-logo-link"
         href={homeHref}
       >
         <Image
-          alt="Orbs Swap"
-          height="40"
+          alt=""
+          height="28"
           priority
           src="/orbs-logo.svg"
-          width="160"
+          width="28"
         />
+        <span className="app-wordmark">Orbs</span>
       </Link>
       {search}
       <div className="app-header-actions">
@@ -49,6 +50,16 @@ export function AppHeader({ search, partnerRequest }: { search?: ReactNode; part
           title="View on GitHub"
         >
           <Github aria-hidden="true" size={18} />
+        </a>
+        <a
+          aria-label="Open Orbs website in a new tab"
+          className="website-nav-link"
+          href="https://www.orbs.com/"
+          rel="noopener noreferrer"
+          target="_blank"
+          title="Orbs website"
+        >
+          <Globe aria-hidden="true" size={18} />
         </a>
         <a
           aria-label="Open support chat on Telegram in a new tab"
