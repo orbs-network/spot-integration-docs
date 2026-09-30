@@ -374,6 +374,8 @@ async function waitForSuccessfulReceipt(hash: Hash): Promise<void> {
 
 Run `prepareOrder()` after wrapping and approval, immediately before signing. It rejects `form.canSubmit === false`, stamps fresh `currentTimeMillis`, `deadlineMillis`, and a monotonic client nonce, and returns `order`, `signingRequest`, `approvalRequest`, `form`, and `values`. It does not recalculate the form or perform a wallet call.
 
+To test the EIP-712 payload before signing, paste `preparedOrder.signingRequest.typedData` as JSON into the [EIP-712 Order Preview](https://swap.orbs.com/developers/eip712) and select **Preview order**. Include `domain`, `types`, `primaryType`, and `message`; compare the displayed amounts and execution conditions with the intended order before calling `walletClient.signTypedData()`. The preview does not sign or submit the order.
+
 Return the wallet's original `0x`-prefixed EIP-712 signature. Do not split it into `{ v, r, s }`, alter the recovery byte, or automatically retry an ambiguous submission. Reconcile recent history before preparing another order if the first request may have reached the service.
 
 ## Fetch and Cancel Orders

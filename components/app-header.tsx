@@ -5,10 +5,10 @@ import Image from "next/image";
 import Link from "next/link";
 import { createPartnerDocumentationHref } from "@/features/partner-documentation/query-state";
 import type { PartnerDocumentationRequest } from "@/features/partner-documentation/partner-documentation";
-import { ExternalLink, Github } from "lucide-react";
+import { ExternalLink, Github, Globe, MessageCircle } from "lucide-react";
 
 import { ThemeToggle } from "@/components/theme-toggle";
-import { SITE_REPOSITORY } from "@/lib/site";
+import { ORBS_SUPPORT_URL, SITE_REPOSITORY } from "@/lib/site";
 
 export function AppHeader({ search, partnerRequest }: { search?: ReactNode; partnerRequest?: PartnerDocumentationRequest }) {
   const homeHref = createPartnerDocumentationHref("/", partnerRequest);
@@ -16,17 +16,18 @@ export function AppHeader({ search, partnerRequest }: { search?: ReactNode; part
   return (
     <header className={`app-header${search ? " app-header-with-search" : ""}`}>
       <Link
-        aria-label="Orbs Spot"
+        aria-label="Orbs Spot documentation home"
         className="app-logo-link"
         href={homeHref}
       >
         <Image
-          alt="Orbs Swap"
-          height="40"
+          alt=""
+          height="28"
           priority
           src="/orbs-logo.svg"
-          width="160"
+          width="28"
         />
+        <span className="app-wordmark">Orbs</span>
       </Link>
       {search}
       <div className="app-header-actions">
@@ -37,7 +38,7 @@ export function AppHeader({ search, partnerRequest }: { search?: ReactNode; part
           rel="noopener noreferrer"
           aria-label="Open Advanced Orders playground in a new tab"
         >
-          Playground
+          <span>Playground</span>
           <ExternalLink aria-hidden="true" size={14} />
         </a>
         <a
@@ -49,6 +50,26 @@ export function AppHeader({ search, partnerRequest }: { search?: ReactNode; part
           title="View on GitHub"
         >
           <Github aria-hidden="true" size={18} />
+        </a>
+        <a
+          aria-label="Open Orbs website in a new tab"
+          className="website-nav-link"
+          href="https://www.orbs.com/"
+          rel="noopener noreferrer"
+          target="_blank"
+          title="Orbs website"
+        >
+          <Globe aria-hidden="true" size={18} />
+        </a>
+        <a
+          aria-label="Open support chat on Telegram in a new tab"
+          className="support-nav-link"
+          href={ORBS_SUPPORT_URL}
+          rel="noopener noreferrer"
+          target="_blank"
+          title="Support chat · @dTWAPSupportGroup"
+        >
+          <MessageCircle aria-hidden="true" size={18} />
         </a>
         <ThemeToggle />
       </div>

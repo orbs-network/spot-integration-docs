@@ -1,4 +1,4 @@
-import { ArrowRight, ExternalLink } from "lucide-react";
+import { ArrowDown, ArrowRight, ExternalLink } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
 
@@ -10,7 +10,7 @@ import {
 } from "@/features/partner-documentation/partner-documentation";
 import { createPartnerDocumentationHref } from "@/features/partner-documentation/query-state";
 import { GUIDE_SOURCES, type GuideProductId } from "@/lib/guides";
-import { ADVANCED_ORDERS_SKILL_URL, SITE_DESCRIPTION } from "@/lib/site";
+import { ADVANCED_ORDERS_SKILL_URL, ORBS_SUPPORT_URL, SITE_DESCRIPTION } from "@/lib/site";
 
 export const metadata: Metadata = {
   alternates: { canonical: "/" },
@@ -75,13 +75,38 @@ export default async function HomePage({
       <main className="docs-home" id="guide-content" tabIndex={-1}>
         <div className="docs-home-shell">
           <header className="docs-home-hero">
-            <p className="eyebrow">Orbs Spot Docs{partnerRequest ? ` for ${partnerRequest.partner.charAt(0).toUpperCase() + partnerRequest.partner.slice(1)}` : ""}</p>
-            <h1>Choose Your Integration Guide</h1>
-            <p>
-              Choose what your users need below, then pick one SDK or API guide.
-              Follow it from setup to a working trade, with the requirements
-              explained along the way.
-            </p>
+            <div className="docs-home-hero-copy">
+              <p className="eyebrow">Orbs Spot · Developer Docs{partnerRequest ? ` for ${partnerRequest.partner.charAt(0).toUpperCase() + partnerRequest.partner.slice(1)}` : ""}</p>
+              <h1>Build with<br />Orbs Spot.</h1>
+              <p className="docs-home-description">
+                Bring swaps and advanced orders to your app.
+                Choose an SDK or API and go from setup to a working trade
+                with step-by-step integration guides.
+              </p>
+              <div className="docs-home-hero-actions">
+                <a className="brand-cta" href="#spot-guides">
+                  Explore the guides <ArrowDown aria-hidden="true" size={16} />
+                </a>
+                <a className="brand-text-link" href="https://orbs-spot.vercel.app/?devMode=true" rel="noreferrer" target="_blank">
+                  Try the interactive example <ExternalLink aria-hidden="true" size={14} />
+                </a>
+              </div>
+            </div>
+            <svg aria-hidden="true" className="docs-home-orbit" viewBox="0 0 440 360" fill="none">
+              <defs>
+                <linearGradient id="spot-orbit" x1="50" y1="80" x2="370" y2="280" gradientUnits="userSpaceOnUse">
+                  <stop stopColor="#2cedfc" /><stop offset="0.5" stopColor="#7a89e9" /><stop offset="1" stopColor="#dc8ae0" />
+                </linearGradient>
+              </defs>
+              <path className="orbit-axis" d="M0 180H440M220 0V360" stroke="currentColor" strokeDasharray="2 7" />
+              <g stroke="url(#spot-orbit)" strokeWidth="0.7">
+                {Array.from({ length: 16 }, (_, i) => (
+                  <ellipse cx="220" cy="180" key={i} rx={177 - i * 2} ry={53 + i * 4.6} transform={`rotate(${-28 + i * 3.2} 220 180)`} />
+                ))}
+              </g>
+              <path d="M220 158C223 172 228 177 242 180C228 183 223 188 220 202C217 188 212 183 198 180C212 177 217 172 220 158Z" fill="currentColor" />
+              <g fill="currentColor"><circle cx="58" cy="124" r="2" /><circle cx="374" cy="252" r="2" /><circle cx="350" cy="62" r="2" /></g>
+            </svg>
           </header>
 
           <nav aria-label="Product categories" className="home-category-badges">
@@ -162,16 +187,15 @@ export default async function HomePage({
           </section>
 
           <footer className="docs-home-footer">
-            <span>
-              Want to see the integrations running before choosing a guide?
-            </span>
+            <span>Building something with Orbs? We’re here to help.</span>
             <a
-              href="https://orbs-spot.vercel.app/?devMode=true"
+              className="brand-cta"
+              href={ORBS_SUPPORT_URL}
               rel="noreferrer"
               target="_blank"
             >
-              Open Interactive Example
-              <ExternalLink aria-hidden="true" size={15} />
+              Talk to the team
+              <ArrowRight aria-hidden="true" size={15} />
             </a>
           </footer>
         </div>

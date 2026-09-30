@@ -189,6 +189,14 @@ The host owns wallet access and transaction confirmation. API-only integrations 
 
 Across SDK integrations, the host owns controls, market data, quote freshness, wallet transactions, translations, and modal presentation. The SDK owns form defaults and validation, trusted partner configuration, order construction, submission, normalized history, and version-aware cancellation requests. The TypeScript host manages client caching and polling; React manages the provider-scoped client and mounted history queries.
 
+### Test the EIP-712 Payload Before Signing
+
+During integration, use the [EIP-712 Order Preview](https://swap.orbs.com/developers/eip712) to inspect an order before requesting a wallet signature. Paste the unsigned typed-data JSON, including `domain`, `types`, `primaryType`, and `message`, then select **Preview order**. Check what the order sells, what it receives, and when it can execute against the intended form values. You can also select **Load example** to try the preview first.
+
+Open **Technical details** to inspect the underlying fields and checks for typed-data structure, slippage range, agreement between the permit and order, order timing, and input amounts. Pasting JSON alone does not compare the payload against your app's order form or SDK configuration; the preview indicates when that comparison context is missing.
+
+The preview reads order values in your browser; it does not sign, place, or change an order. Use it to check the payload your integration builds before continuing with the normal signing and submission flow.
+
 ### Wallet Actions and Completion
 
 | Stage | User action / transport | Completion signal |

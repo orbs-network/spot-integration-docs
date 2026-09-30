@@ -25,7 +25,7 @@ const THEME_INITIALIZER = `
     document.documentElement.dataset.theme = theme;
     document.documentElement.style.colorScheme = theme;
     document.querySelectorAll('meta[name="theme-color"]').forEach(function (meta) {
-      meta.content = theme === "light" ? "#f7f7f8" : "#09090b";
+      meta.content = theme === "light" ? "#f6f6f6" : "#121214";
     });
   } catch (_) {}
 })();`;
@@ -65,7 +65,7 @@ export const metadata: Metadata = {
 export const viewport: Viewport = {
   colorScheme: "light dark",
   initialScale: 1,
-  themeColor: "#09090b",
+  themeColor: "#121214",
   width: "device-width",
 };
 
