@@ -123,7 +123,7 @@ Prefer an SDK when possible: the TypeScript SDK provides framework-neutral contr
 
 #### Try the Product
 
-- [Playground: Spot App](https://swap.orbs.com/?tab=twap) — uses the Advanced Orders TypeScript SDK.
+- [Playground: Spot App](https://playground.orbs.network/?tab=twap) — uses the Advanced Orders TypeScript SDK.
 - [Spot App source on GitHub](https://github.com/orbs-network/orbs-spot)
 
 #### API Only
@@ -132,7 +132,7 @@ Prefer an SDK when possible: the TypeScript SDK provides framework-neutral contr
 
 #### TypeScript SDK
 
-- [Spot App example application](https://swap.orbs.com/?tab=twap) — [source on GitHub](https://github.com/orbs-network/orbs-spot).
+- [Spot App example application](https://playground.orbs.network/?tab=twap) — [source on GitHub](https://github.com/orbs-network/orbs-spot).
 - [TypeScript SDK package](https://github.com/orbs-network/spot-ui/tree/master/packages/spot-ui)
 - [TypeScript SDK API](https://github.com/orbs-network/spot-ui/blob/master/packages/spot-ui/README.md)
 - [Spot TypeScript integration skill](https://github.com/orbs-network/spot-ui/tree/master/skills/spot-integration)
@@ -191,7 +191,7 @@ Across SDK integrations, the host owns controls, market data, quote freshness, w
 
 ### Test the EIP-712 Payload Before Signing
 
-During integration, use the [EIP-712 Order Preview](https://swap.orbs.com/developers/eip712) to inspect an order before requesting a wallet signature. Paste the unsigned typed-data JSON, including `domain`, `types`, `primaryType`, and `message`, then select **Preview order**. Check what the order sells, what it receives, and when it can execute against the intended form values. You can also select **Load example** to try the preview first.
+During integration, use the [EIP-712 Order Preview](https://playground.orbs.network/developers/eip712) to inspect an order before requesting a wallet signature. Paste the unsigned typed-data JSON, including `domain`, `types`, `primaryType`, and `message`, then select **Preview order**. Check what the order sells, what it receives, and when it can execute against the intended form values. You can also select **Load example** to try the preview first.
 
 Open **Technical details** to inspect the underlying fields and checks for typed-data structure, slippage range, agreement between the permit and order, order timing, and input amounts. Pasting JSON alone does not compare the payload against your app's order form or SDK configuration; the preview indicates when that comparison context is missing.
 

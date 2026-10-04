@@ -12,7 +12,7 @@ import { ORBS_SUPPORT_URL, SITE_REPOSITORY } from "@/lib/site";
 
 export function AppHeader({ search, partnerRequest }: { search?: ReactNode; partnerRequest?: PartnerDocumentationRequest }) {
   const homeHref = createPartnerDocumentationHref("/", partnerRequest);
-  const playgroundUrl = "https://swap.orbs.com/?tab=twap";
+  const playgroundUrl = "https://playground.orbs.network/?tab=twap";
   return (
     <header className={`app-header${search ? " app-header-with-search" : ""}`}>
       <Link
