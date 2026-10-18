@@ -123,7 +123,7 @@ Prefer an SDK when possible: the TypeScript SDK provides framework-neutral contr
 
 #### Try the Product
 
-- [Playground: Spot App](https://playground.orbs.network/?tab=twap) — uses the Advanced Orders TypeScript SDK.
+- [Developer link](https://swap.orbs.network/dev?tab=twap) — uses the Advanced Orders TypeScript SDK.
 - [Spot App source on GitHub](https://github.com/orbs-network/orbs-spot)
 
 #### API Only
@@ -132,7 +132,7 @@ Prefer an SDK when possible: the TypeScript SDK provides framework-neutral contr
 
 #### TypeScript SDK
 
-- [Spot App example application](https://playground.orbs.network/?tab=twap) — [source on GitHub](https://github.com/orbs-network/orbs-spot).
+- [Spot App example application](https://swap.orbs.network/dev?tab=twap) — [source on GitHub](https://github.com/orbs-network/orbs-spot).
 - [TypeScript SDK package](https://github.com/orbs-network/spot-ui/tree/master/packages/spot-ui)
 - [TypeScript SDK API](https://github.com/orbs-network/spot-ui/blob/master/packages/spot-ui/README.md)
 - [Spot TypeScript integration skill](https://github.com/orbs-network/spot-ui/tree/master/skills/spot-integration)

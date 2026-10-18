@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "next dev --port 3004",
     "build": "yarn generate:integrations && next build",
+    "deploy": "bash scripts/deploy-vercel.sh",
     "start": "next start",
     "check:examples": "node --no-warnings --experimental-strip-types scripts/check-framework-neutral.mjs",
     "lint": "eslint && yarn check:guides && yarn check:examples && yarn check:integrations",

@@ -8,7 +8,7 @@ Follow this guide from setup to create one order, find it in history, track its 
 
 ### TypeScript SDK Example
 
-[Spot App](https://playground.orbs.network/?tab=twap) uses the Advanced Orders TypeScript SDK. View the [Spot App source on GitHub](https://github.com/orbs-network/orbs-spot) for an application example.
+[Spot App](https://swap.orbs.network/dev?tab=twap) uses the Advanced Orders TypeScript SDK. View the [Spot App source on GitHub](https://github.com/orbs-network/orbs-spot) for an application example.
 
 ### Before You Start
 

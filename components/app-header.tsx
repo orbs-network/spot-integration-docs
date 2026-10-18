@@ -12,7 +12,7 @@ import { ORBS_SUPPORT_URL, SITE_REPOSITORY } from "@/lib/site";
 
 export function AppHeader({ search, partnerRequest }: { search?: ReactNode; partnerRequest?: PartnerDocumentationRequest }) {
   const homeHref = createPartnerDocumentationHref("/", partnerRequest);
-  const playgroundUrl = "https://playground.orbs.network/?tab=twap";
+  const developerUrl = "https://swap.orbs.network/dev?tab=twap";
   return (
     <header className={`app-header${search ? " app-header-with-search" : ""}`}>
       <Link
@@ -33,12 +33,12 @@ export function AppHeader({ search, partnerRequest }: { search?: ReactNode; part
       <div className="app-header-actions">
         <a
           className="playground-link"
-          href={playgroundUrl}
+          href={developerUrl}
           target="_blank"
           rel="noopener noreferrer"
-          aria-label="Open Advanced Orders playground in a new tab"
+          aria-label="Open developer link in a new tab"
         >
-          <span>Playground</span>
+          <span>Developer link</span>
           <ExternalLink aria-hidden="true" size={14} />
         </a>
         <a

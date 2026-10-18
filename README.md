@@ -26,6 +26,17 @@ yarn dev
 
 Open [http://localhost:3004](http://localhost:3004). The root route shows the product and integration-method chooser. Start with Overview & Setup, then follow one SDK or API guide.
 
+## Production deployment
+
+With the Vercel CLI installed, sign in and deploy:
+
+```bash
+vercel login
+yarn deploy
+```
+
+`yarn deploy` deploys the current working tree directly to production for Vercel project `prj_uMBZSztD2z9Oaoi0n4gMmznXj2cl`. It waits for the deployment to finish and logs out of Vercel afterward, including when deployment fails.
+
 ## Validation
 
 ```bash

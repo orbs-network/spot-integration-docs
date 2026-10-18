@@ -79,7 +79,7 @@ const RESOURCES: Record<
     sourceHref: "https://github.com/orbs-network/spot-ui/tree/master/packages/liquidity-hub-ui",
   },
   "advanced-orders-shared": {
-    primaryHref: "https://playground.orbs.network/?tab=twap",
+    primaryHref: "https://swap.orbs.network/dev?tab=twap",
     primaryLabel: "Open TypeScript SDK Example",
     sourceHref: "https://github.com/orbs-network/spot/blob/master/config.json",
   },
@@ -102,7 +102,7 @@ const RESOURCES: Record<
       "https://github.com/orbs-network/spot-ui/tree/master/packages/spot-ui",
   },
   "advanced-orders-sdk": {
-    primaryHref: "https://playground.orbs.network/?tab=twap",
+    primaryHref: "https://swap.orbs.network/dev?tab=twap",
     primaryLabel: "Open TypeScript SDK Example",
     sourceHref:
       "https://github.com/orbs-network/spot-ui/tree/master/packages/spot-ui",
