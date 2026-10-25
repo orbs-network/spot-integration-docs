@@ -1,4 +1,4 @@
-# Spot Integration Docs
+# Orbs Integration Docs
 
 Standalone documentation for integrating Orbs products into an existing DEX or swap application.
 
@@ -6,8 +6,9 @@ Standalone documentation for integrating Orbs products into an existing DEX or s
 
 - **Swap (Orbs Liquidity Hub)** exchanges tokens on the same chain using a current quote. It sources liquidity from on-chain and off-chain providers and can be compared with an existing DEX route to select the higher protected minimum output. See the [Swap product overview](content/liquidity-hub-shared.md#product-overview).
 - **Advanced Orders (Orbs Spot)** lets users schedule trades over time with TWAP or set price conditions with limit, stop-loss, and take-profit orders. Users submit a signed order, track its fills, and can cancel future execution. See the [Advanced Orders product overview](content/advanced-orders-shared.md#product-overview).
+- **Perps (Perpetual Hub)** provides a partner API for server-side account signing, collateral, perpetual orders, account history, and live updates. See the [Perps API integration guide](content/perps-api.md).
 
-The SDK and API guides below are different integration methods for these two products.
+The SDK and API guides below cover integration methods for these products.
 
 ## Guides
 
@@ -16,6 +17,7 @@ The SDK and API guides below are different integration methods for these two pro
 - Advanced Orders API Only: Order Sink HTTP contracts, EIP-712 order construction, history, and cancellation without an Orbs package.
 - Advanced Orders TypeScript SDK: framework-neutral form calculation, client initialization, order submission, history, and cancellation with `@orbs-network/spot-ui`.
 - Advanced Orders React SDK: `SpotProvider`, focused hooks, execution lifecycle, and order history with `@orbs-network/spot-react`.
+- Perps Direct API: connection, EIP-712 signing and sessions, deposits and withdrawals, trading, account history, streaming, and reliability at `/perps/api`.
 
 ## Local Development
 
@@ -24,7 +26,7 @@ yarn install
 yarn dev
 ```
 
-Open [http://localhost:3004](http://localhost:3004). The root route shows the product and integration-method chooser. Start with Overview & Setup, then follow one SDK or API guide.
+Open [http://localhost:3001](http://localhost:3001). The root route shows the product and integration-method chooser. Start with Overview & Setup, then follow one SDK or API guide.
 
 ## Production deployment
 
@@ -48,6 +50,8 @@ yarn build
 `yarn generate:integrations` regenerates the `.ts`/`.tsx` downloads after editing guide examples. The build runs it automatically; lint rejects stale generated sources and runs download binding and execution-behavior checks. Downloads merge the canonical code into one module; host adapters and package dependencies still come from the integrating application.
 
 Guide content lives in `content/`. Each level-2 Markdown heading becomes a navigable step with a stable hash link.
+
+`content/perps-api.md` imports the partner handoff from `orbs-network/perpetual-hub` under `docs/partner-integration/` (copied on 25 October 2026). The default examples use Global's production Arbitrum configuration (`global:42161`) from the shared partner registry, replacing the source handoff's Orbs staging values. The Global config, market, and risk endpoints were checked read-only on 25 October; this does not establish funded-flow acceptance. Source headings are nested under eight guide steps and local cross-links point to those steps. Perps uses its own lane configuration; Spot partner-query personalization does not apply. Use `/perps/api.md` for the complete Markdown reference; there is no generated TypeScript integration download for this API-only handoff.
 
 ## Documentation endpoints
 

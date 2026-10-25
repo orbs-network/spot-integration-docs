@@ -39,7 +39,7 @@ export async function generateMetadata({ params }: GuidePageProps): Promise<Meta
       description: source.description,
       images: [
         {
-          alt: "Orbs Spot Integration Guides",
+          alt: "Orbs Integration Guides",
           height: 630,
           url: "/opengraph-image",
           width: 1200,

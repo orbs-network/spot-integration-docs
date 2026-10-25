@@ -4,7 +4,7 @@ import { ImageResponse } from "next/og";
 
 import { SITE_DESCRIPTION, SITE_NAME } from "@/lib/site";
 
-export const alt = "Orbs Spot Integration Guides";
+export const alt = "Orbs Integration Guides";
 export const contentType = "image/png";
 export const size = {
   height: 630,
@@ -65,7 +65,7 @@ export default async function OpenGraphImage(): Promise<ImageResponse> {
             }}
           />
         </span>
-        Orbs Spot Docs
+        Orbs Docs
       </div>
 
       <div style={{ display: "flex", flexDirection: "column", maxWidth: 960 }}>
@@ -106,6 +106,7 @@ export default async function OpenGraphImage(): Promise<ImageResponse> {
       >
         <span style={{ color: "#2cedfc" }}>Swap</span>
         <span style={{ color: "#7a89e9" }}>Advanced Orders</span>
+        <span style={{ color: "#dc8ae0" }}>Perps</span>
         <span>API · TypeScript SDK · React</span>
       </div>
     </div>,

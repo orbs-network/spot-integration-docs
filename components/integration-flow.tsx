@@ -13,6 +13,17 @@ const FLOWS: Record<GuideProductId, {
   note: string;
   steps: readonly FlowStep[];
 }> = {
+  perps: {
+    title: "How a Perps integration works",
+    note: "Confirm the assigned lane is ready before funding. Order admission, execution, and withdrawal payout are separate states to reconcile.",
+    steps: [
+      { owner: "Your backend", title: "Connect the lane", detail: "Verify the partner-chain key, contracts, and market rules." },
+      { owner: "Account wallet", title: "Register a session", detail: "Sign the login; use the session for trading and private updates." },
+      { owner: "Wallet · Contract", title: "Deposit collateral", detail: "Approve and deposit, then wait for usable account credit." },
+      { owner: "Your backend · API", title: "Sign & trade", detail: "Submit signed orders and track positions, fills, and fees." },
+      { owner: "Your backend · RPC", title: "Reconcile & withdraw", detail: "Resolve pending actions and confirm the final wallet payout." },
+    ],
+  },
   "liquidity-hub": {
     title: "How a swap completes",
     note: "Wrap and approve only when needed. Show success after the swap receipt confirms—not after signing or receiving a transaction hash.",

@@ -3037,7 +3037,8 @@ summary.category-summary:focus-visible {
 }
 
 .product-background[data-active-product="liquidity-hub"] > [data-product="liquidity-hub"],
-.product-background[data-active-product="advanced-orders"] > [data-product="advanced-orders"] {
+.product-background[data-active-product="advanced-orders"] > [data-product="advanced-orders"],
+.product-background[data-active-product="perps"] > [data-product="perps"] {
   opacity: 1;
 }
 
@@ -3115,6 +3116,27 @@ summary.category-summary:focus-visible {
   border: 0;
   background: transparent;
   scroll-margin-top: 88px;
+}
+
+#perps-guides {
+  margin-top: 32px;
+}
+
+.docs-home-perps {
+  grid-column: 1 / -1;
+}
+
+.docs-home-perps > header > span {
+  min-height: 0;
+}
+
+.home-category-badge[data-product="perps"]:hover {
+  background: var(--primary-soft);
+}
+
+.home-category-badge[data-product="perps"]:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 3px;
 }
 
 @media (max-width: 600px) {

@@ -73,6 +73,11 @@ const RESOURCES: Record<
   GuideId,
   { primaryHref: string; primaryLabel: string; sourceHref: string }
 > = {
+  "perps-api": {
+    primaryHref: "/perps/api.md",
+    primaryLabel: "Open Markdown Reference",
+    sourceHref: "https://github.com/orbs-network/spot-integration-docs/blob/main/content/perps-api.md",
+  },
   "liquidity-hub-shared": {
     primaryHref: "https://orbs-spot.vercel.app/?devMode=true",
     primaryLabel: "Open Interactive Example",
@@ -178,6 +183,43 @@ function getSearchExcerpt(
   return `${start > 0 ? "…" : ""}${text.slice(start, end)}${end < text.length ? "…" : ""}`;
 }
 
+function GuideVariant({
+  activeGuideId,
+  children,
+  guide,
+  partnerRequest,
+}: {
+  activeGuideId: GuideId;
+  children: ReactNode;
+  guide: GuideSummary;
+  partnerRequest?: PartnerDocumentationRequest;
+}) {
+  if (guide.id === activeGuideId) {
+    return (
+      <details className="guide-variant" open>
+        <summary aria-current="page" className="variant-link variant-link-active">
+          <span aria-hidden="true" className="variant-link-marker" />
+          <span>{guide.variantLabel}</span>
+          <ChevronDown aria-hidden="true" className="variant-chevron" size={14} />
+        </summary>
+        <div className="guide-variant-steps">{children}</div>
+      </details>
+    );
+  }
+
+  return (
+    <div className="guide-variant">
+      <Link
+        className={`variant-link${guide.id.endsWith("-shared") ? " variant-link-reference" : ""}`}
+        href={createPartnerDocumentationHref(guide.route, guide.product === "perps" ? undefined : partnerRequest)}
+      >
+        <span aria-hidden="true" className="variant-link-marker" />
+        <span>{guide.variantLabel}</span>
+      </Link>
+    </div>
+  );
+}
+
 function GuideNavigation({
   activeGuide,
   children,
@@ -206,7 +248,7 @@ function GuideNavigation({
     <nav aria-label="Integration guides" className="guide-tree">
       <CategoryAccordion
         className="guide-category"
-        selected
+        selected={activeGuide.product !== "perps"}
         title="Spot"
       >
         <div className="guide-category-products">
@@ -230,35 +272,11 @@ function GuideNavigation({
                   <ChevronDown aria-hidden="true" className="guide-product-chevron" size={15} />
                 </summary>
                 <div className="variant-list">
-                  {variants.map((guide) => {
-                    const active = guide.id === activeGuide.id;
-                    if (active) {
-                      return (
-                        <details className="guide-variant" key={guide.id} open>
-                          <summary aria-current="page" className="variant-link variant-link-active">
-                            <span aria-hidden="true" className="variant-link-marker" />
-                            <span>{guide.variantLabel}</span>
-                            <ChevronDown aria-hidden="true" className="variant-chevron" size={14} />
-                          </summary>
-                          <div className="guide-variant-steps">{children}</div>
-                        </details>
-                      );
-                    }
-                    return (
-                      <div className="guide-variant" key={guide.id}>
-                        <Link
-                          className={`variant-link${guide.id.endsWith("-shared") ? " variant-link-reference" : ""}`}
-                          href={createPartnerDocumentationHref(
-                            guide.route,
-                            partnerRequest,
-                          )}
-                        >
-                          <span aria-hidden="true" className="variant-link-marker" />
-                          <span>{guide.variantLabel}</span>
-                        </Link>
-                      </div>
-                    );
-                  })}
+                  {variants.map((guide) => (
+                    <GuideVariant activeGuideId={activeGuide.id} guide={guide} key={guide.id} partnerRequest={partnerRequest}>
+                      {children}
+                    </GuideVariant>
+                  ))}
                   {product.id === "advanced-orders" ? (
                     <a
                       className="variant-link"
@@ -288,12 +306,17 @@ function GuideNavigation({
           </CategoryAccordion>
         </div>
       </CategoryAccordion>
-      <section data-product="perps" aria-label="Perps" className="category-accordion guide-category category-upcoming">
-        <div className="category-summary">
-          <h2>Perps</h2>
-          <span className="coming-soon-badge">Coming soon</span>
-        </div>
-      </section>
+      <div data-product="perps">
+        <CategoryAccordion className="guide-category" selected={activeGuide.product === "perps"} title="Perps">
+          <div className="variant-list">
+            {guides.filter((guide) => guide.product === "perps").map((guide) => (
+              <GuideVariant activeGuideId={activeGuide.id} guide={guide} key={guide.id}>
+                {children}
+              </GuideVariant>
+            ))}
+          </div>
+        </CategoryAccordion>
+      </div>
     </nav>
   );
 }
@@ -410,6 +433,10 @@ function PartnerAwareDocsShell(props: DocsShellProps) {
 }
 
 export function DocsShell(props: DocsShellProps) {
+  if (props.activeGuide.product === "perps") {
+    return <DocsShellContent {...props} partnerDocumentation={EMPTY_PARTNER_DOCUMENTATION} />;
+  }
+
   return (
     <Suspense
       fallback={
@@ -700,7 +727,7 @@ function DocsShellContent({
                     )}
                   </div>
                 ) : null}
-                {!deferredSearch ? <p className="search-empty">Search across Swap and Advanced Orders guides, code, and shared references.</p> : null}
+                {!deferredSearch ? <p className="search-empty">Search across Swap, Advanced Orders, and Perps guides, code, and shared references.</p> : null}
               </form>
       </dialog>
       <main className="docs-shell" data-product={activeGuide.product}>
@@ -713,7 +740,7 @@ function DocsShellContent({
                 <small>
                   {activeGuide.product === "liquidity-hub"
                     ? "Swap"
-                    : "Advanced Orders"}
+                    : activeGuide.product === "perps" ? "Perps" : "Advanced Orders"}
                 </small>
                 <strong>{activeStepIndex + 1}. {activeStep.title}</strong>
               </span>
@@ -742,7 +769,7 @@ function DocsShellContent({
             <div className="brand-lockup">
               <span aria-hidden="true" className="brand-mark"><BookOpen size={17} /></span>
               <span>
-                <small>Orbs Spot Docs{partnerName ? ` for ${partnerName.charAt(0).toUpperCase() + partnerName.slice(1)}` : ""}</small>
+                <small>Orbs Docs{partnerName ? ` for ${partnerName.charAt(0).toUpperCase() + partnerName.slice(1)}` : ""}</small>
                 <strong>
                   {partnerName ? (
                     <>
@@ -814,7 +841,7 @@ function DocsShellContent({
           </div>
 
           <article className="guide-article" id={activeStep.id}>
-            {activeGuide.id.endsWith("-shared") && activeStep.id === "product-overview" ? (
+            {(activeGuide.id.endsWith("-shared") && activeStep.id === "product-overview") || (activeGuide.product === "perps" && activeStepIndex === 0) ? (
               <IntegrationFlow product={activeGuide.product} />
             ) : null}
             {hasInteractiveReference ? (
@@ -842,7 +869,9 @@ function DocsShellContent({
           <aside className="implementation-callout">
             <span>
               <strong>Ready to Implement?</strong>
-              <small>Use your DEX partner ID if you have one; otherwise, use external.</small>
+              <small>{activeGuide.product === "perps"
+                ? "Use Global by default, or obtain your assigned partner-chain configuration from the Orbs team."
+                : "Use your DEX partner ID if you have one; otherwise, use external."}</small>
             </span>
             <span className="resource-links">
               <a href={resources.sourceHref} rel="noreferrer" target="_blank">

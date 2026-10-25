@@ -76,10 +76,10 @@ export default async function HomePage({
         <div className="docs-home-shell">
           <header className="docs-home-hero">
             <div className="docs-home-hero-copy">
-              <p className="eyebrow">Orbs Spot · Developer Docs{partnerRequest ? ` for ${partnerRequest.partner.charAt(0).toUpperCase() + partnerRequest.partner.slice(1)}` : ""}</p>
-              <h1>Build with<br />Orbs Spot.</h1>
+              <p className="eyebrow">Orbs · Developer Docs{partnerRequest ? ` for ${partnerRequest.partner.charAt(0).toUpperCase() + partnerRequest.partner.slice(1)}` : ""}</p>
+              <h1>Build with<br />Orbs.</h1>
               <p className="docs-home-description">
-                Bring swaps and advanced orders to your app.
+                Bring swaps, advanced orders, and perpetual trading to your app.
                 Choose an SDK or API and go from setup to a working trade
                 with step-by-step integration guides.
               </p>
@@ -99,10 +99,10 @@ export default async function HomePage({
               <span aria-hidden="true" className="home-category-dot" />
               Spot
             </a>
-            <span className="home-category-badge home-category-badge-upcoming" data-product="perps">
+            <a className="home-category-badge" data-product="perps" href="#perps-guides">
+              <span aria-hidden="true" className="home-category-dot" />
               Perps
-              <span className="coming-soon-badge">Coming soon</span>
-            </span>
+            </a>
           </nav>
           <section aria-labelledby="spot-heading" className="docs-home-category home-category-panel" id="spot-guides">
             <h2 className="sr-only" id="spot-heading">Spot</h2>
@@ -169,6 +169,30 @@ export default async function HomePage({
                 Private and Sealed Orders.
               </p>
             </CategoryAccordion>
+          </section>
+
+          <section aria-labelledby="perps-heading" className="docs-home-category home-category-panel" id="perps-guides">
+            <h2 className="sr-only" id="perps-heading">Perps</h2>
+            <div className="docs-home-products">
+              <article className="docs-home-product docs-home-perps" data-product="perps">
+                <header>
+                  <p>Perpetual Trading</p>
+                  <h3>Perps</h3>
+                  <span>Connect your backend to Perpetual Hub for collateral, signed orders, positions, and live market updates.</span>
+                </header>
+                <nav aria-label="Perps integration guides" className="docs-home-guide-list">
+                  {GUIDE_SOURCES.filter((guide) => guide.product === "perps").map((guide) => (
+                    <Link className="docs-home-guide-link" href={guide.route} key={guide.id}>
+                      <span>
+                        <strong>{guide.variantLabel}</strong>
+                        <small>{guide.description}</small>
+                      </span>
+                      <ArrowRight aria-hidden="true" size={17} />
+                    </Link>
+                  ))}
+                </nav>
+              </article>
+            </div>
           </section>
 
           <footer className="docs-home-footer">

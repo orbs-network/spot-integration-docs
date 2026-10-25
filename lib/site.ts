@@ -1,7 +1,7 @@
 export const ORBS_SUPPORT_URL = "https://t.me/dTWAPSupportGroup";
-export const SITE_NAME = "Spot Integration Docs";
+export const SITE_NAME = "Orbs Integration Docs";
 export const SITE_DESCRIPTION =
-  "Integration guides for Orbs Swap and Advanced Orders.";
+  "Integration guides for Orbs Swap, Advanced Orders, and the Perps API.";
 export const SITE_REPOSITORY = "https://github.com/orbs-network/spot-integration-docs";
 export const ADVANCED_ORDERS_SKILL_URL =
   "https://github.com/orbs-network/spot/tree/master/skill";

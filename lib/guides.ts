@@ -8,9 +8,10 @@ export type GuideId =
   | "liquidity-hub-direct"
   | "advanced-orders-direct"
   | "advanced-orders-sdk"
-  | "advanced-orders-react";
+  | "advanced-orders-react"
+  | "perps-api";
 
-export type GuideProductId = "liquidity-hub" | "advanced-orders";
+export type GuideProductId = "liquidity-hub" | "advanced-orders" | "perps";
 
 export interface GuideStep {
   content: string;
@@ -300,6 +301,20 @@ export const GUIDE_SOURCES = [
     variantLabel: "API Only",
   },
 
+  {
+    description: "Integrate account signing, collateral, trading, and live updates through the Perps API",
+    fileName: "perps-api.md",
+    hashAliases: {},
+    id: "perps-api",
+    introSections: [],
+    label: "Perps · Direct API",
+    product: "perps",
+    route: "/perps/api",
+    segments: ["perps", "api"],
+    stepOrder: [],
+    updatedAt: "2026-10-25",
+    variantLabel: "Direct API",
+  },
 ] as const satisfies readonly GuideSource[];
 
 function slugify(value: string): string {

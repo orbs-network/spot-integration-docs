@@ -126,7 +126,7 @@ function bundle(files, isReact) {
   return [(isReact ? '"use client";\n' : ''), ...imports, '', ...body].join('\n');
 }
 const output = {};
-for (const guide of loadGuides().filter(g => !g.id.endsWith('-shared'))) {
+for (const guide of loadGuides().filter(g => !g.id.endsWith('-shared') && g.product !== 'perps')) {
   output[guide.id] = bundle(filesFor(guide), guide.id === 'advanced-orders-react');
 }
 const filename = path.join(import.meta.dirname, '../lib/generated-integration-sources.json');

@@ -8,12 +8,15 @@ export function ProductBackground() {
     ? "liquidity-hub"
     : pathname.startsWith("/advanced-orders")
       ? "advanced-orders"
-      : "overview";
+      : pathname.startsWith("/perps")
+        ? "perps"
+        : "overview";
 
   return (
     <div aria-hidden="true" className="product-background" data-active-product={product}>
       <div className="product-background-layer" data-product="liquidity-hub" />
       <div className="product-background-layer" data-product="advanced-orders" />
+      <div className="product-background-layer" data-product="perps" />
     </div>
   );
 }

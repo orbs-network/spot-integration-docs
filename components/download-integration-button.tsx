@@ -7,7 +7,7 @@ import type { PartnerDocumentationContext } from "@/features/partner-documentati
 
 export function DownloadIntegrationButton({guide, partnerConfig}: {guide: Guide; partnerConfig?: PartnerDocumentationContext}) {
   const [status, setStatus] = useState<"idle" | "loading" | "failed">("idle");
-  if (guide.id.endsWith("-shared")) return null;
+  if (guide.id.endsWith("-shared") || guide.product === "perps") return null;
   const download = async () => {
     setStatus("loading");
     try {

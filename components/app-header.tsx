@@ -16,7 +16,7 @@ export function AppHeader({ search, partnerRequest }: { search?: ReactNode; part
   return (
     <header className={`app-header${search ? " app-header-with-search" : ""}`}>
       <Link
-        aria-label="Orbs Spot documentation home"
+        aria-label="Orbs documentation home"
         className="app-logo-link"
         href={homeHref}
       >
