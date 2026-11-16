@@ -14,36 +14,95 @@ function load(code, context = {}) {
 const hash = `0x${'1'.repeat(64)}`;
 const account = `0x${'2'.repeat(40)}`;
 const signature = `0x${'3'.repeat(130)}`;
-const quote = { inAmount: '100', inToken: account, timestamp: Date.now(), sessionId: 'test', eip712: { domain: {}, types: {}, primaryType: 'Order', message: {} } };
-for (const mode of ['submission', 'polling', 'reverted', 'submission-error']) {
-  const timers = new Set();
-  let receiptWaits = 0;
-  let pollRequests = 0;
-  const publicClient = {
-    readContract: async () => 100n,
-    getTransactionReceipt: () => { throw new Error('Immediate receipt lookup must not be used'); },
-    waitForTransactionReceipt: async () => { receiptWaits++; return { status: mode === 'reverted' ? 'reverted' : 'success' }; },
-  };
-  const exports = load(REFERENCE_EXAMPLES['liquidity-hub-direct:submit-swap'].files[0].code, {
-    window: { ethereum: {} },
-    require: id => id === 'viem/chains' ? { polygon: { id: 137 } } : {
-      createPublicClient: () => publicClient, createWalletClient: () => ({ signTypedData: async () => signature }),
-      custom: () => ({}), http: () => ({}), erc20Abi: [],
-    },
-    setTimeout: callback => { const timer = setTimeout(() => { timers.delete(timer); callback(); }, 1); timers.add(timer); return timer; },
-    clearTimeout: timer => { timers.delete(timer); clearTimeout(timer); },
-    fetch: async url => {
-      if (url.includes('/status/')) { pollRequests++; return { ok: true, json: async () => ({ txHash: hash }) }; }
-      return { ok: mode !== 'submission-error', json: async () => mode === 'submission-error' ? { error: 'Submission rejected' } : mode === 'polling' ? {} : { txHash: hash } };
-    },
-  });
-  const result = exports.submitLiquidityHubSwap(quote, account, async () => quote);
-  if (mode === 'reverted') await assert.rejects(result, /reverted/);
-  else if (mode === 'submission-error') await assert.rejects(result, /Submission rejected/);
-  else assert.equal((await result).status, 'success');
-  assert.equal(receiptWaits, mode === 'submission-error' ? 0 : 1);
-  assert.equal(pollRequests, mode === 'polling' ? 1 : 0);
-  assert.equal(timers.size, 0, 'Polling timer must be cleared');
+// Exercise displayed and downloaded swap code against the current client API.
+// Receipt waiting is a host contract; insufficient confirmed allowance must stop
+// preparation, while uncertain submission must retain the original signed intent.
+for (const code of [REFERENCE_EXAMPLES['swap:submit-swap'].files[0].code, sources.swap]) {
+  const example = load(code);
+  function scenario({ nativeInput = true, insufficient = false, uncertain = false, rejectSign = false } = {}) {
+    const calls = [];
+    const accepted = { id: 'v2-order', chainId: 137, deadline: Date.now() + 180000, status: 'OPEN' };
+    const quote = { request: { inToken: account, inAmount: '1000000' }, minimumAmountOut: '900' };
+    const prepared = { order: {}, quote: { ...quote, minimumAmountOut: '950' }, signingRequest: {
+      signerAddress: account, typedData: { domain: {}, types: {}, primaryType: 'Order', message: {} },
+    } };
+    const failure = new Error('Unknown acceptance');
+    const attempt = {};
+    let reads = 0;
+    let current = true;
+    let reviewed;
+    const params = {
+      quote, account, nativeInput, attempt,
+      assertCurrent: () => { if (!current) throw new Error('Obsolete review'); },
+      onPrepared: snapshot => { calls.push('review'); reviewed = snapshot; },
+      wallet: {
+        getAllowance: async (token, spender) => {
+          calls.push('allowance'); reads++;
+          assert.equal(token, account); assert.equal(spender, account);
+          return reads === 1 || insufficient ? '0' : '1000000';
+        },
+        wrapNativeToken: async amount => { calls.push('wrap'); assert.equal(amount, '1000000'); return hash; },
+        approveToken: async (token, spender, amount) => {
+          calls.push('approve'); assert.equal(token, account); assert.equal(spender, account);
+          assert.equal(amount, '1000000'); return hash;
+        },
+        signTypedData: async payload => {
+          calls.push('sign'); assert.equal(reviewed, prepared, 'Publish the final prepared quote before signing');
+          assert.equal(payload.message, prepared.signingRequest.typedData.message);
+          assert.equal(payload.account, account);
+          if (rejectSign) throw new Error('Wallet rejected');
+          return signature;
+        },
+      },
+      client: {
+        spenderAddress: account,
+        prepareSwap: async options => {
+          calls.push('prepare');
+          assert.equal(options.quote.request.inAmount, '1000000');
+          assert.equal(options.quote.minimumAmountOut, '900');
+          assert.equal(options.account, account);
+          return prepared;
+        },
+        submitSwap: async (order, originalSignature) => {
+          calls.push('submit');
+          assert.equal(order, prepared.order, 'Submit the exact prepared order');
+          assert.equal(originalSignature, signature, 'Preserve the original signature');
+          assert.equal(attempt.signature, signature, 'Retain the signature before posting');
+          if (uncertain) throw failure;
+          return accepted;
+        },
+      },
+    };
+    return { params, calls, accepted, prepared, failure, attempt, invalidate: () => { current = false; } };
+  }
+  const flow = scenario();
+  assert.equal(await example.executeSpotSwap(flow.params), flow.accepted);
+  assert.equal(flow.attempt.order, flow.accepted, 'Retain acceptance before the host starts polling');
+  assert.equal(flow.attempt.order.status, 'OPEN', 'Acceptance is not settlement');
+  assert.equal(flow.attempt.wrapTxHash, hash);
+  assert.equal(flow.attempt.approvalTxHash, hash);
+  assert.deepEqual(flow.calls, ['allowance', 'wrap', 'approve', 'allowance', 'prepare', 'review', 'sign', 'submit']);
+
+  const capped = scenario({ insufficient: true });
+  await assert.rejects(example.executeSpotSwap(capped.params), /Confirmed approval is still insufficient/);
+  assert.deepEqual(capped.calls, ['allowance', 'wrap', 'approve', 'allowance']);
+
+  const uncertain = scenario({ nativeInput: false, uncertain: true });
+  await assert.rejects(example.executeSpotSwap(uncertain.params), error => error === uncertain.failure);
+  assert.equal(uncertain.attempt.prepared, uncertain.prepared);
+  assert.equal(uncertain.attempt.signature, signature);
+  assert.equal(uncertain.attempt.order, undefined);
+  assert.equal(uncertain.calls.filter(call => call === 'submit').length, 1, 'Never auto-resubmit an uncertain intent');
+
+  const rejected = scenario({ rejectSign: true });
+  await assert.rejects(example.executeSpotSwap(rejected.params), /Wallet rejected/);
+  assert(!rejected.calls.includes('submit'));
+
+  const stale = scenario();
+  stale.params.wallet.wrapNativeToken = async () => { stale.calls.push('wrap'); stale.invalidate(); return hash; };
+  await assert.rejects(example.executeSpotSwap(stale.params), /Obsolete review/);
+  assert.deepEqual(stale.calls, ['allowance', 'wrap'], 'Stop obsolete scope before another wallet prompt');
+  assert.equal(stale.attempt.wrapTxHash, hash, 'Confirmed transactions survive scope changes');
 }
 const config = JSON.parse(REFERENCE_EXAMPLES['advanced-orders-direct:fetch-config'].files[1].code);
 const apiClientContext = { window: { ethereum: {} }, require: () => ({ parseAbi: () => [], custom: provider => provider, createPublicClient: () => ({}), createWalletClient: () => ({}) }) };
@@ -220,4 +279,4 @@ for (const partner of ['external', 'ginco']) {
   assert(request.curl.includes(`'exchange=${partner}'`));
   assert(!request.curl.includes('partner='));
 }
-console.log('Swap receipt, polling cleanup, configuration rejection, chunk totals, TWAP freshness/schedule, and exchange-scoped history checks passed.');
+console.log('Spot swap wallet/preparation/acceptance recovery, configuration rejection, chunk totals, TWAP freshness/schedule, and exchange-scoped history checks passed.');

@@ -35,41 +35,13 @@ A user selects TWAP, chooses a token pair, and sets the total amount, number of 
 
 Your application provides the strategy controls, token and price data, wallet connection, order review, history, and cancellation interface. The protocol and order service handle the signed order lifecycle; the SDKs help prepare orders and access that lifecycle. A successful submission is the beginning of tracking, not proof that the trade has completed.
 
-Choose Advanced Orders when execution depends on time or price conditions. Choose [Swap](/liquidity-hub/shared) when the user wants to exchange tokens from a current quote.
+Choose Advanced Orders when execution depends on time or price conditions. Choose [Swap](/swap/shared) when the user wants to exchange tokens from a current quote. Both use Orbs Spot: the same TypeScript client provides quote access, swap preparation, advanced-order submission, history, and cancellation. React advanced orders use `AdvancedOrdersProvider`; swaps use the client directly in the host's existing wallet flow.
 
 ## Supported Chains
 
-These 23 networks are listed in the [Spot configuration](https://github.com/orbs-network/spot/blob/master/config.json). The numeric top-level keys identify chains; the `"*"` entry contains shared defaults and is not a network.
+Availability is specific to the selected partner and connected chain. Initialize `createClient(partner, chainId)` and require its configuration to resolve before enabling submission. In React, `AdvancedOrdersProvider` performs this initialization and exposes failures through `useClient()` and `errorFallback`. API-only integrations validate the partner-and-chain configuration response described in [Fetch Config](/advanced-orders/direct#fetch-config).
 
-| Chain ID | Network |
-| --- | --- |
-| `1` | Ethereum |
-| `10` | Optimism |
-| `14` | Flare |
-| `30` | Rootstock |
-| `56` | BNB Chain |
-| `130` | Unichain |
-| `137` | Polygon |
-| `143` | Monad |
-| `146` | Sonic |
-| `196` | X Layer |
-| `999` | HyperEVM |
-| `1329` | Sei |
-| `4326` | MegaETH |
-| `4663` | Robinhood Chain |
-| `5000` | Mantle |
-| `8453` | Base |
-| `9745` | Plasma |
-| `42161` | Arbitrum |
-| `43114` | Avalanche |
-| `57073` | Ink |
-| `59144` | Linea |
-| `80094` | Berachain |
-| `747474` | Katana |
-
-Protocol coverage and partner availability are separate. Confirm the selected partner supports the connected chain before enabling order creation. SDK integrations use `getPartnerChains(partner)` and the initialized client; API-only integrations validate the partner-and-chain configuration response. Do not substitute another chain when the selected one is unsupported.
-
-This is a documentation snapshot. Check the linked configuration for updates before enabling a new network.
+The SDK has no network registry. The host supplies chain labels, RPC endpoints, explorers, token metadata, and the wrapped-native token. Keep the selected chain when configuration is unavailable and show the configuration error; do not substitute a different chain or partner.
 
 ## Integration Options
 
@@ -88,6 +60,10 @@ This is a documentation snapshot. Check the linked configuration for updates bef
 
 No private key belongs in frontend configuration. The host wallet supplies signing and transaction access. Use your existing DEX partner ID, or `"external"` / `Partners.External`, and obtain protocol addresses from its configuration. Fee estimates shown in your UI must follow the agreed partner terms; they do not change the signed execution amounts.
 
+If the application has no trading services, build the missing host layer for the requested order types: wallet connection, a verified chain/token registry, raw balances, current quotes and one-token USD prices, and review/progress controls. An existing router is unnecessary; `client.getQuote` can supply the market quote, with its current `netAmountOut` mapped to the advanced form's `quotedOutputAmountRaw`. Keep loading/failed balances unavailable rather than displaying a fabricated zero. Preserve native gas and normalize native input to the chain's verified wrapped token. Reuse the existing app's framework, wallet, state, and numeric libraries.
+
+Verify the actual host RPC/proxy chain, native and ERC-20 catalog entries, balance reads, price coverage, and quote invalidation independently. Successful protocol initialization or a loaded token list alone does not establish host chain support. If configuration remains unavailable, finish independent host work, keep submission unavailable, and provide [Orbs support](https://t.me/dTWAPSupportGroup) with a sanitized draft containing the partner, chain, package version, and read-only error code/status. Never substitute another partner or hard-code protocol addresses.
+
 ### Amounts and Units
 
 | Value | Representation |
@@ -99,13 +75,13 @@ No private key belongs in frontend configuration. The host wallet supplies signi
 | API-only `slippageBps` | Basis points: `50` means 0.5%. This differs from Swap's percentage-valued `slippage`. |
 | USD price inputs | Price of one whole token, not the price of one base unit. |
 
-`priceProtectionPercent` uses percentage units in both SDKs: `0.5` means 0.5%. The SDK converts it to `slippageBps = priceProtectionPercent × 100`, which becomes signed `witness.slippage`; `0.5` therefore becomes `50`. Do not multiply an already-converted basis-point value again.
+`priceProtectionPercent` must be finite and between 0 and 50 inclusive in both SDKs. It uses percentage units: `0.5` means 0.5%. The SDK converts it to `slippageBps = priceProtectionPercent × 100`, which becomes signed `witness.slippage`; `0.5` therefore becomes `50`. Do not multiply an already-converted basis-point value again.
 
 Use token-aware decimal parsing and integer arithmetic for protocol amounts. Do not assume input and output tokens share decimals. Example amounts illustrate units only; verify their USD value before submission.
 
 ### Minimum Trade Size
 
-Set `minTradeSizeUsd` to any value of **10 or higher** in `calculateOrderForm()` or `SpotProvider`. The value is the minimum amount in USD for each individual trade: `10` sets a $10 minimum, while `25` sets a $25 minimum. There is no implicit default. For TWAP, this applies to each smaller trade, not the total order. For example, 10 trades with `minTradeSizeUsd` set to `25` require at least $250 of total input at the price used for validation.
+Set a finite positive `minTradeSizeUsd` in `calculateOrder()` or `AdvancedOrdersProvider` according to your host application's minimum-trade policy. The value is the minimum amount in USD for each individual trade: `10` sets a $10 minimum, while `25` sets a $25 minimum. There is no implicit default. For TWAP, this applies to each smaller trade, not the total order. For example, 10 trades with `minTradeSizeUsd` set to `25` require at least $250 of total input at the price used for validation.
 
 ### Choose an Integration
 
@@ -114,9 +90,18 @@ Set `minTradeSizeUsd` to any value of **10 or higher** in `calculateOrderForm()`
 | [API Only](/advanced-orders/direct) | An Orbs package cannot run in the target environment, or the host needs full ownership of HTTP and EIP-712 construction. The host calculates and validates strategy, amount, schedule, trigger, limit, nonce, and deadline fields. |
 | [TypeScript SDK](/advanced-orders/typescript) | The host needs framework-neutral calculation and protocol operations while retaining its state and UI. Works with Vue, Angular, Svelte, vanilla TypeScript, and server-side TypeScript. |
 | [React SDK](/advanced-orders/react) | A React application wants provider-scoped forms, execution, history, and cancellation hooks. Uses the TypeScript SDK internally. |
-| [MCP Skill](https://github.com/orbs-network/spot/tree/master/skill) | An agent needs the published Spot skill and MCP integration resources. |
 
 Prefer an SDK when possible: the TypeScript SDK provides framework-neutral control, while the React SDK also manages provider-scoped application state.
+
+For coding agents, choose the skill matching the requested surface:
+
+| Surface | Version-matched installed skill |
+| --- | --- |
+| [Swaps](/swap), including React without a provider | `node_modules/@orbs-network/spot-ui/dist/integration-skills/spot-swap-integration/SKILL.md` |
+| Advanced Orders TypeScript | `node_modules/@orbs-network/spot-ui/dist/integration-skills/spot-advanced-orders-integration/SKILL.md` |
+| Advanced Orders React provider/hooks | `node_modules/@orbs-network/spot-react/dist/integration-skills/spot-advanced-orders-react-integration/SKILL.md` |
+
+Check each skill's adjacent `manifest.json.sdkVersion` against the installed package and read only the references needed for the request. If an older release has no bundle, use a matching release or checkout of the repository skill. Documentation under `dist` may be read; SDK code imports use the public package root. Preserve compatible installed versions and add only requested order types and history surfaces.
 
 ### Integration Resources
 
@@ -135,19 +120,18 @@ Prefer an SDK when possible: the TypeScript SDK provides framework-neutral contr
 - [Spot App example application](https://swap.orbs.network/dev?tab=twap) — [source on GitHub](https://github.com/orbs-network/orbs-spot).
 - [TypeScript SDK package](https://github.com/orbs-network/spot-ui/tree/master/packages/spot-ui)
 - [TypeScript SDK API](https://github.com/orbs-network/spot-ui/blob/master/packages/spot-ui/README.md)
-- [Spot TypeScript integration skill](https://github.com/orbs-network/spot-ui/tree/master/skills/spot-integration)
+- [Spot Advanced Orders TypeScript integration skill](https://github.com/orbs-network/spot-ui/tree/master/skills/spot-advanced-orders-integration)
 
 #### React SDK
 
 - [React SDK package](https://github.com/orbs-network/spot-ui/tree/master/packages/spot-react)
-- [Spot React integration skill](https://github.com/orbs-network/spot-ui/tree/master/skills/spot-react-integration)
-- [React SDK example: SpotProvider setup](https://github.com/orbs-network/spot-ui/blob/master/apps/web/components/spot/spot-form.tsx)
+- [Spot Advanced Orders React integration skill](https://github.com/orbs-network/spot-ui/tree/master/skills/spot-advanced-orders-react-integration)
+- [React SDK example: AdvancedOrdersProvider setup](https://github.com/orbs-network/spot-ui/blob/master/apps/web/components/spot/spot-form.tsx)
 - [Spot UI React SDK example application](https://github.com/orbs-network/spot-ui)
 - [Swap UI execution helper](https://www.npmjs.com/package/@orbs-network/swap-ui)
 
-#### Agents and Protocol Configuration
+#### Protocol Configuration
 
-- [MCP Skill](https://github.com/orbs-network/spot/tree/master/skill)
 - [Protocol configuration](https://github.com/orbs-network/spot/blob/master/config.json)
 
 ## How It Works
@@ -172,8 +156,9 @@ The TypeScript and React SDKs share the same form calculation and configured cli
 
 | Term | Meaning |
 | --- | --- |
-| Calculated form | The synchronous result of `calculateOrderForm()`. It is the single source for display values, protocol values, validation, and submission readiness. |
-| Spot client | A partner- and chain-scoped client returned by `createClient()`. It owns configuration-dependent preparation, signing, submission, history, and cancellation requests. |
+| Order type / variant | `OrderType` selects `TWAP`, `LIMIT`, `STOP_LOSS`, or `TAKE_PROFIT`. `OrderVariant` identifies the detailed protocol mode in `form.values.orderVariant` and history `order.type`. |
+| Calculated form | The synchronous result of `calculateOrder()` for those four advanced types. It is the single source for display values, protocol values, validation, and submission readiness. `calculateOrderForm()` remains a compatibility alias. |
+| Spot client | A partner- and chain-scoped client returned by `createClient()`. It provides `getQuote()`, configuration-dependent preparation, signing requests, submission, history, and cancellation requests. |
 | Prepared order | The order, EIP-712 signing request, approval request, calculated form snapshot, and fresh execution timestamps returned by `client.prepareOrder()`. |
 | Host adapter | Application code that maps the existing market, state, wallet, and transaction layers to SDK inputs. |
 
@@ -187,7 +172,7 @@ The TypeScript and React SDKs share the same form calculation and configured cli
 
 The host owns wallet access and transaction confirmation. API-only integrations construct protocol fields directly; the SDKs provide preparation, submission, history, and cancellation requests. React adds provider-scoped state and execution handling.
 
-Across SDK integrations, the host owns controls, market data, quote freshness, wallet transactions, translations, and modal presentation. The SDK owns form defaults and validation, trusted partner configuration, order construction, submission, normalized history, and version-aware cancellation requests. The TypeScript host manages client caching and polling; React manages the provider-scoped client and mounted history queries.
+Across SDK integrations, the host owns controls, market data, quote freshness, wallet transactions, translations, and modal presentation. The SDK owns form defaults and validation, trusted partner configuration, order construction, submission, normalized history, and version-aware cancellation requests. The TypeScript host manages client caching and polling; React manages the provider-scoped client and mounted history queries. Configured history uses `client.getOrders({ account })` and returns `{ orders, legacyLoaded }`; omitting `account` includes all wallets for that partner and chain.
 
 ### Test the EIP-712 Payload Before Signing
 
@@ -261,7 +246,6 @@ For API requests, use your existing DEX partner ID, or `"external"` if you do no
 | --- | --- |
 | API Only | Fetch `GET https://order-sink-v2.orbs.network/config?partner={partner}&chain={chainId}`. Preserve the returned domain, types, protocol addresses, adapter, and fee reference. |
 | TypeScript SDK | Initialize `createClient(partner, chainId)` and reuse the client for that partner and chain. |
-| React SDK | Configure `SpotProvider` with the partner and current chain; partner or chain changes re-key the configured client. |
-| MCP Skill | Follow the [published skill](https://github.com/orbs-network/spot/tree/master/skill) for its configuration workflow. |
+| React SDK | Configure `AdvancedOrdersProvider` with the partner and current chain; partner or chain changes re-key the configured client. |
 
 Continue with [API Only](/advanced-orders/direct), [TypeScript SDK](/advanced-orders/typescript), or [React SDK](/advanced-orders/react) for method-specific implementation details.

@@ -379,10 +379,6 @@ export function personalizeReferenceExample(
       "const partner = \"external\";",
       `const partner = ${JSON.stringify(partner)};`,
     );
-    fileReplacements.set(
-      'LIQUIDITY_HUB_PARTNER = "external"',
-      `LIQUIDITY_HUB_PARTNER = ${JSON.stringify(partner)}`,
-    );
     if (partnerEnum) {
       fileReplacements.set(
         "const partner = Partners.External;",

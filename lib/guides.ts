@@ -2,16 +2,15 @@ import fs from "node:fs";
 import path from "node:path";
 
 export type GuideId =
-  | "liquidity-hub-shared"
+  | "swap-shared"
   | "advanced-orders-shared"
-  | "liquidity-hub"
-  | "liquidity-hub-direct"
+  | "swap"
   | "advanced-orders-direct"
   | "advanced-orders-sdk"
   | "advanced-orders-react"
   | "perps-api";
 
-export type GuideProductId = "liquidity-hub" | "advanced-orders" | "perps";
+export type GuideProductId = "swap" | "advanced-orders" | "perps";
 
 export interface GuideStep {
   content: string;
@@ -73,7 +72,7 @@ interface GuideSource {
 export const GUIDE_SOURCES = [
   {
     description: "Start here: product basics, prerequisites, and method selection",
-    fileName: "liquidity-hub-shared.md",
+    fileName: "swap-shared.md",
     hashAliases: {
       "choose-an-integration": "integration-options",
       "integration-resources": "integration-options",
@@ -83,14 +82,14 @@ export const GUIDE_SOURCES = [
       "fees": "fees-and-configuration",
       "partner-configuration": "fees-and-configuration",
     },
-    id: "liquidity-hub-shared",
+    id: "swap-shared",
     introSections: [],
     label: "Swap · Overview & Setup",
-    product: "liquidity-hub",
-    route: "/liquidity-hub/shared",
-    segments: ["liquidity-hub", "shared"],
+    product: "swap",
+    route: "/swap/shared",
+    segments: ["swap", "shared"],
     stepOrder: [],
-    updatedAt: "2026-09-16",
+    updatedAt: "2026-11-16",
     variantLabel: "Overview & Setup",
   },
   {
@@ -112,14 +111,23 @@ export const GUIDE_SOURCES = [
     route: "/advanced-orders/shared",
     segments: ["advanced-orders", "shared"],
     stepOrder: [],
-    updatedAt: "2026-09-16",
+    updatedAt: "2026-11-16",
     variantLabel: "Overview & Setup",
   },
 
   {
     description: "Quotes and swap execution in any JavaScript or TypeScript app",
-    fileName: "liquidity-hub.md",
+    fileName: "swap.md",
     hashAliases: {
+      quickstart: "install-and-initialize",
+      endpoint: "install-and-initialize",
+      "api-endpoint": "install-and-initialize",
+      quote: "fetch-quote",
+      compare: "fetch-quote",
+      sign: "submit-swap",
+      submit: "submit-swap",
+      status: "submit-swap",
+      confirmation: "submit-swap",
       "end-to-end-flow": "submit-swap",
       "execute-swap": "submit-swap",
       "execute-and-confirm": "submit-swap",
@@ -135,53 +143,15 @@ export const GUIDE_SOURCES = [
       "confirm-the-receipt": "submit-swap",
       "end-to-end-acceptance-run": "operational-checklist",
     },
-    id: "liquidity-hub",
+    id: "swap",
     introSections: [],
     label: "Swap · TypeScript SDK",
-    product: "liquidity-hub",
-    route: "/liquidity-hub",
-    segments: ["liquidity-hub"],
+    product: "swap",
+    route: "/swap",
+    segments: ["swap"],
     stepOrder: [],
-    updatedAt: "2026-09-16",
+    updatedAt: "2026-11-16",
     variantLabel: "TypeScript SDK",
-  },
-  {
-    description: "Implement quote, signing, submission, and polling yourself",
-    fileName: "liquidity-hub-direct.md",
-    hashAliases: {
-      endpoint: "quickstart",
-      "api-endpoint": "quickstart",
-      "choose-the-api-endpoint": "quickstart",
-      "fetch-a-liquidity-hub-quote": "fetch-quote",
-      quote: "fetch-quote",
-      compare: "fetch-quote",
-      "compare-with-a-dex-router": "fetch-quote",
-      "optional-compare-with-a-dex-router": "fetch-quote",
-      sign: "submit-swap",
-      submit: "submit-swap",
-      status: "submit-swap",
-      confirmation: "submit-swap",
-      "submit-and-poll-the-swap": "submit-swap",
-      "submit-poll-and-confirm-the-swap": "submit-swap",
-      "prepare-funds-and-sign": "submit-swap",
-      "confirm-the-transaction": "submit-swap",
-      overview: "quickstart",
-      "compare-routes": "fetch-quote",
-      "wrap-and-approve": "submit-swap",
-      "refresh-and-sign": "submit-swap",
-      "submit-and-poll": "submit-swap",
-      "confirm-the-receipt": "submit-swap",
-      "end-to-end-acceptance-run": "operational-checklist",
-    },
-    id: "liquidity-hub-direct",
-    introSections: [],
-    label: "Swap · Direct API",
-    product: "liquidity-hub",
-    route: "/liquidity-hub/direct",
-    segments: ["liquidity-hub", "direct"],
-    stepOrder: [],
-    updatedAt: "2026-09-16",
-    variantLabel: "Direct API",
   },
   {
     description: "Connect your app to a provider and focused React hooks",
@@ -192,25 +162,26 @@ export const GUIDE_SOURCES = [
       install: "quickstart",
       "install-the-react-package": "quickstart",
       "install-the-react-packages": "quickstart",
-      "integration-model": "configure-spotprovider",
+      "integration-model": "configure-advancedordersprovider",
       "lifecycle-and-reset": "show-execution-progress",
       "order-history": "order-history-and-cancellation",
       "order-history-details-fills-and-cancellation": "order-history-and-cancellation",
       overview: "quickstart",
       prerequisites: "quickstart",
       "package-guardrails-and-escape-hatches": "order-history-and-cancellation",
-      "advanced-orders-provider": "configure-spotprovider",
-      "connect-spotprovider": "configure-spotprovider",
-      "connect-your-app-data": "configure-spotprovider",
+      "advanced-orders-provider": "configure-advancedordersprovider",
+      "configure-spotprovider": "configure-advancedordersprovider",
+      "connect-spotprovider": "configure-advancedordersprovider",
+      "connect-your-app-data": "configure-advancedordersprovider",
       "adapt-wallet-interactions": "implement-wallet-interactions",
-      provider: "configure-spotprovider",
+      provider: "configure-advancedordersprovider",
       submit: "submit-and-track-execution",
       "submit-and-show-progress": "submit-and-track-execution",
       "submit-modal-and-lifecycle": "submit-and-track-execution",
       "build-the-form-with-usespot": "build-with-focused-hooks",
       wallet: "implement-wallet-interactions",
       "install-the-react-sdk": "quickstart",
-      "check-provider-inputs": "configure-spotprovider",
+      "check-provider-inputs": "configure-advancedordersprovider",
       "add-schedule-and-trigger-controls": "build-with-focused-hooks",
       "assemble-the-order-form": "build-with-focused-hooks",
       "build-the-review-screen": "submit-and-track-execution",
@@ -225,7 +196,7 @@ export const GUIDE_SOURCES = [
     route: "/advanced-orders/react",
     segments: ["advanced-orders", "react"],
     stepOrder: [],
-    updatedAt: "2026-09-16",
+    updatedAt: "2026-11-16",
     variantLabel: "React SDK",
   },
   {
@@ -256,7 +227,7 @@ export const GUIDE_SOURCES = [
     route: "/advanced-orders/typescript",
     segments: ["advanced-orders", "typescript"],
     stepOrder: [],
-    updatedAt: "2026-09-16",
+    updatedAt: "2026-11-16",
     variantLabel: "TypeScript SDK",
   },
   {
@@ -297,7 +268,7 @@ export const GUIDE_SOURCES = [
       "cancel-order-sink-orders",
       "operational-checklist",
     ],
-    updatedAt: "2026-09-16",
+    updatedAt: "2026-11-16",
     variantLabel: "API Only",
   },
 
@@ -312,7 +283,7 @@ export const GUIDE_SOURCES = [
     route: "/perps/api",
     segments: ["perps", "api"],
     stepOrder: [],
-    updatedAt: "2026-10-25",
+    updatedAt: "2026-11-16",
     variantLabel: "Direct API",
   },
 ] as const satisfies readonly GuideSource[];

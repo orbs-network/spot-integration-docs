@@ -105,7 +105,7 @@ Fetch configuration once per create-order attempt. Use that same `permitData` fo
 
 
 1. Fetch and validate the partner and active-chain permit template. Validate token addresses, positive integer amounts, exact `totalInputAmount = srcAmountPerFill × totalTrades`, schedule, freshness, slippage, and triggers before any wrapping, approval, or signing. The builder rechecks these inputs immediately before signing.
-2. Ensure the input is an ERC-20 token. If the user selected native currency, wrap it and replace it with the wrapped-native token before building the order. Then check allowance and approve RePermit for `order.permitted.amount` when allowance is insufficient. This API-only reference uses an exact allowance; use a maximum allowance only as an explicit host security decision.
+2. Resolve the ERC-20 input address and read allowance for RePermit before opening a wallet prompt. If the user selected native currency, wrap it and confirm the receipt. Approve RePermit for `order.permitted.amount` when allowance is insufficient, wait for a successful receipt, and reread allowance before signing. This API-only reference uses an exact allowance; use a maximum allowance only as an explicit host security decision. A confirmed hash alone does not establish sufficient allowance.
 3. Call `signOrder()` with `orderInput`, fetched `permitData` and resolved `inputTokenAddress` (the wrapped-token address for native input). It uses that template to build `signTypedDataArgs`, and signs the resulting order.
 4. Submit the returned `order` unchanged as `{ signature, order, status: "pending" }` to `POST /orders/new`.
 5. Require HTTP and API success, then keep the returned `signedOrder` for progress, history, fills, and cancellation.

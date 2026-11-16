@@ -27,15 +27,8 @@ function stripComments(code) {
 const REACT_GUIDE = "advanced-orders-react";
 const REACT_CONTENT_FILE = "advanced-orders-react.md";
 
-// Deliberate exceptions, keyed by "<example key>::<file name>" and justified by
-// the surrounding prose. The canonical Liquidity Hub flow stays framework-
-// neutral; its optional second tab demonstrates the production React adapter.
-const ALLOWED = new Map([
-  [
-    "liquidity-hub:submit-swap::react-example.tsx",
-    "Optional React presentation adapter beside the canonical TypeScript flow.",
-  ],
-]);
+// Any future exception must be keyed by "<example key>::<file name>" and justified.
+const ALLOWED = new Map();
 
 const failures = [];
 

@@ -2,6 +2,8 @@
 
 Add scheduled or price-based trades to an existing **React app**. `@orbs-network/spot-react` supplies state and hooks; you build the controls and connect your wallet and market data. It uses the Orbs Spot protocol.
 
+Use `AdvancedOrdersProvider` for TWAP, limit, stop-loss, and take-profit forms. Swaps use the [Spot swap SDK flow](/swap) through this package's SDK re-exports: the host wraps and approves, calls `client.prepareSwap()`, signs inline, submits with `client.submitSwap()`, and polls status. Swaps have no provider or calculated order form.
+
 Follow this guide in order; setup requirements and implementation details are included as you need them. The goal is to create one order, track its fills in history, and cancel an open order. Order creation does not mean the trade has filled.
 
 ## Quickstart
@@ -13,11 +15,11 @@ Install the packages, implement the provider and wallet adapter, then add the fo
 ### React SDK Examples
 
 - [React SDK example in spot-ui](https://github.com/orbs-network/spot-ui/tree/master/apps/web/components/spot) — form, order submission, history, and cancellation components.
-- [SpotProvider setup example](https://github.com/orbs-network/spot-ui/blob/master/apps/web/components/spot/spot-form.tsx).
+- [AdvancedOrdersProvider setup example](https://github.com/orbs-network/spot-ui/blob/master/apps/web/components/spot/spot-form.tsx).
 
 ### Before You Start
 
-Set `minTradeSizeUsd` on `SpotProvider` to any value of **10 or higher**, such as `10`, `25`, or `50`. This is the minimum amount in USD for each individual trade. For example, `minTradeSizeUsd: 25` means every trade must be worth at least $25. For TWAP orders, each smaller trade must meet this minimum; it is not the total order amount.
+Set a finite positive `minTradeSizeUsd` on `AdvancedOrdersProvider` according to the host's minimum-trade policy, for example `10`, `25`, or `50`. This is the minimum amount in USD for each individual trade. For example, `minTradeSizeUsd: 25` means every trade must be worth at least $25. For TWAP orders, each smaller trade must meet this minimum; it is not the total order amount.
 
 Have these app values available before connecting the SDK:
 
@@ -28,22 +30,22 @@ Have these app values available before connecting the SDK:
 
 The installation commands below list the packages to add. Your existing wallet, token registry, quote, balance, and price sources supply these values.
 
-Mount one `SpotProvider` around the form, submission dialog, and history consumers. The wallet adapter needs five operations: read allowance, wrap native input, approve tokens, sign an order, and cancel an order. The following steps implement these operations before connecting the form and submission dialog. The SDK supplies provider state and execution orchestration; your app supplies wallet access, data, controls, and presentation.
+Mount one `AdvancedOrdersProvider` around the form, submission dialog, and history consumers. The wallet adapter needs six methods: decide whether wrapping is needed, check whether approval is needed, wrap native input, approve tokens, sign an order, and cancel an order. The following steps implement these operations before connecting the form and submission dialog. The SDK supplies provider state and execution orchestration; your app supplies wallet access, data, controls, and presentation.
 
 ### Install the React SDK
 
 Use your app’s package manager. The SDK is headless: it supplies state and behavior. The full dialog example also imports `@orbs-network/swap-ui` and `@radix-ui/react-dialog`; install those if copying it. Use your existing wallet provider or library to implement `walletInteractions`. The wallet adapter example illustrates this with Viem and Wagmi v3; adapt its calls to your wallet setup.
 
 ```bash
-npm install @orbs-network/spot-react@latest
+npm install @orbs-network/spot-react
 # Optional UI helper:
-npm install @orbs-network/swap-ui@latest @radix-ui/react-dialog
+npm install @orbs-network/swap-ui @radix-ui/react-dialog
 
-# or: pnpm add @orbs-network/spot-react@latest
-# optional: pnpm add @orbs-network/swap-ui@latest @radix-ui/react-dialog
+# or: pnpm add @orbs-network/spot-react
+# optional: pnpm add @orbs-network/swap-ui @radix-ui/react-dialog
 
-# or: yarn add @orbs-network/spot-react@latest
-# optional: yarn add @orbs-network/swap-ui@latest @radix-ui/react-dialog
+# or: yarn add @orbs-network/spot-react
+# optional: yarn add @orbs-network/swap-ui @radix-ui/react-dialog
 ```
 
 The copied UI also imports `lucide-react` for icons. Install it if your app does not already use it.
@@ -52,7 +54,13 @@ The wallet adapter examples target **Wagmi v3**, including `useConnection`. Wagm
 
 The host must provide React `^18 || ^19`. Zustand is internal; Viem, Wagmi, and Ethers are not package dependencies. The package publishes a `"use client"` entry for Next.js App Router.
 
-## Configure SpotProvider
+Inspect installed exports, React peers, and lockfile versions before adding or changing dependencies. Read `node_modules/@orbs-network/spot-react/dist/integration-skills/spot-advanced-orders-react-integration/SKILL.md` and compare its adjacent `manifest.json.sdkVersion` with the installed package. For an older release without a bundle, use the [Advanced Orders React integration skill](https://github.com/orbs-network/spot-ui/tree/master/skills/spot-advanced-orders-react-integration) from a matching release or checkout. Read only the references needed for the requested form, execution, or history surface. SDK code imports remain public-package-root-only; reading bundled documentation under `dist` is allowed.
+
+Provider-free swaps follow `spot-swap-integration`, bundled in the resolved `@orbs-network/spot-ui` dependency at `dist/integration-skills/spot-swap-integration/SKILL.md`. A separate core install is unnecessary. Framework-neutral advanced forms use `spot-advanced-orders-integration`. If the host lacks trading services, build the missing wallet, verified chain/token registry, balances, quote/price resources, and UI described in [Overview & Setup](/advanced-orders/shared#integration-options), keeping an existing application's stack and the requested scope.
+
+## Configure AdvancedOrdersProvider
+
+`OrderType` selects the advanced form: `TWAP`, `LIMIT`, `STOP_LOSS`, or `TAKE_PROFIT`. `OrderVariant` identifies a detailed protocol/history variant; it appears as `form.values.orderVariant` and `order.type`, and includes historical swaps.
 
 Create `advanced-order-form.tsx` to connect host values to one provider. The component imports `use-wallet-interactions.ts` and `spot-form-content.tsx`, which you will add in the following steps. Keep the provider, form, submission dialog, and history under the same React tree. Memoize adapted tokens, wallet interactions, and callbacks by their real dependencies.
 
@@ -60,7 +68,7 @@ Create `advanced-order-form.tsx` to connect host values to one provider. The com
 "use client";
 
 import { useMemo } from "react";
-import { type Callbacks, type ClientErrorFallbackProps, type MarketQuote, Module, Partners, SpotProvider, type Token } from "@orbs-network/spot-react";
+import { type Callbacks, type SpotErrorFallbackProps, type MarketQuote, OrderType, Partners, AdvancedOrdersProvider, type Token } from "@orbs-network/spot-react";
 import { useDexDerivedData } from "./use-dex-derived-data";
 import { useWalletInteractions } from "./use-wallet-interactions";
 import { SpotFormContent } from "./spot-form-content";
@@ -89,29 +97,32 @@ function useSpotToken(currency?: DexCurrency): Token | undefined {
 
 function useMarketQuote(): MarketQuote {
   const dex = useDexDerivedData();
-  return {
-    quotedOutputAmountRaw: dex.quotedOutputAmountRaw,
-    isLoading: dex.isQuoteLoading,
-    noLiquidity: dex.noLiquidity,
-  };
+  return useMemo(
+    () => ({
+      quotedOutputAmountRaw: dex.isQuoteLoading ? undefined : dex.quotedOutputAmountRaw,
+      isLoading: dex.isQuoteLoading,
+      noLiquidity: dex.noLiquidity,
+    }),
+    [dex.quotedOutputAmountRaw, dex.isQuoteLoading, dex.noLiquidity],
+  );
 }
 
-function ClientErrorFallback({
+function ErrorFallback({
   error,
   retry,
   isRetrying,
-}: ClientErrorFallbackProps) {
+}: SpotErrorFallbackProps) {
   return (
     <div role="alert">
       <p>{error.message}</p>
       <button disabled={isRetrying} onClick={retry} type="button">
-        {isRetrying ? "Retrying…" : "Retry configuration"}
+        {isRetrying ? "Retrying…" : "Retry"}
       </button>
     </div>
   );
 }
 
-export function AdvancedOrderForm({ module }: { module: Module }) {
+export function AdvancedOrderForm({ orderType }: { orderType: OrderType }) {
   const dex = useDexDerivedData();
   const inputToken = useSpotToken(dex.inputCurrency);
   const outputToken = useSpotToken(dex.outputCurrency);
@@ -133,11 +144,12 @@ export function AdvancedOrderForm({ module }: { module: Module }) {
   const partner = Partners.External;
 
   return (
-    <SpotProvider
+    <AdvancedOrdersProvider
       account={dex.account}
       callbacks={callbacks}
       chainId={dex.chainId}
-      clientErrorFallback={ClientErrorFallback}
+      errorFallback={ErrorFallback}
+      // Optional display estimate; fee collection is configured separately.
       displayFeePercent={0.25}
       inputAmountUi={dex.inputAmountUi}
       inputBalanceRaw={dex.inputBalanceRaw}
@@ -145,7 +157,7 @@ export function AdvancedOrderForm({ module }: { module: Module }) {
       inputTokenUsdPrice={dex.inputTokenUsdPrice}
       marketQuote={marketQuote}
       minTradeSizeUsd={10}
-      module={module}
+      orderType={orderType}
       outputToken={outputToken}
       outputTokenUsdPrice={dex.outputTokenUsdPrice}
       partner={partner}
@@ -154,7 +166,7 @@ export function AdvancedOrderForm({ module }: { module: Module }) {
       wrappedNativeToken={wrappedNativeToken}
     >
       <SpotFormContent />
-    </SpotProvider>
+    </AdvancedOrdersProvider>
   );
 }
 ```
@@ -163,22 +175,24 @@ export function AdvancedOrderForm({ module }: { module: Module }) {
 
 **Checkpoint:** once the wallet adapter and form components are in place, render the provider with the connected account, active chain, real tokens, balance, and quote. Loading or missing data must keep submission disabled; a configuration failure must show a retry action.
 
-`marketQuote.quotedOutputAmountRaw` is the current DEX quote's raw output for the complete `inputAmountUi`, not a standalone per-token price. `useDexDerivedData()` should omit stale output, keep `isQuoteLoading: true` until the current quote arrives, and expose `noLiquidity` only for the active amount and token pair.
+`marketQuote.quotedOutputAmountRaw` is the current DEX quote's raw output for the complete `inputAmountUi`, not a standalone per-token price. `useDexDerivedData()` must withhold stale output, keep `isQuoteLoading: true` until the current amount and pair's quote arrives, and expose `noLiquidity` only for that request. If the host obtains Spot quotes, map the current `quote.netAmountOut` to `quotedOutputAmountRaw`.
+
+`MarketQuote` contains only `quotedOutputAmountRaw`, `isLoading`, and `noLiquidity`. Pass token USD prices through the separate provider props. The provider derives amounts and prices from this bridge; the original `SwapQuote` remains in the host's provider-free swap flow.
 
 For a native/wrapped-native pair, the provider derives the 1:1 relationship using the host-supplied `wrappedNativeToken`. `spot-react` has no network registry: the DEX also owns chain labels and explorer URLs.
 
 | Prop | Contract |
 | --- | --- |
 | `partner` | Required `Partners` value. Use `Partners.External` unless Orbs provides another member. |
-| `module` | `TWAP`, `LIMIT`, `STOP_LOSS`, or `TAKE_PROFIT`. |
+| `orderType` | Required `OrderType`: `TWAP`, `LIMIT`, `STOP_LOSS`, or `TAKE_PROFIT`. |
 | `inputAmountUi` | Required user-facing input decimal string. |
-| `priceProtectionPercent` | Required percentage; `3` means 3%, not 3 basis points or swap slippage. |
-| `minTradeSizeUsd` | Required minimum amount in USD for each individual trade. Accepts any value of `10` or higher; there is no SDK default. For TWAP, the configured minimum applies to each smaller trade. |
-| `marketQuote` | Required `{ quotedOutputAmountRaw?, isLoading?, noLiquidity? }` for the current DEX quote. |
-| `walletInteractions` | Required five-method wallet adapter. |
+| `priceProtectionPercent` | Required finite percentage from 0 through 50; `3` means 3% signed oracle protection. |
+| `minTradeSizeUsd` | Required finite positive minimum amount in USD for each individual trade, set by the host; there is no SDK default. For TWAP, it applies to each smaller trade. |
+| `marketQuote` | Required current quote state with optional `quotedOutputAmountRaw`, `isLoading`, and `noLiquidity`. |
+| `walletInteractions` | Required six-method wallet adapter. |
 | `wrappedNativeToken` | Required host-provided `Token`; pass `undefined` only before a chain is known. |
 | `inputBalanceRaw` | Required raw balance; pass `undefined` while disconnected or loading. |
-| `inputTokenUsdPrice` | Required one-token USD value; pass `undefined` while loading. |
+| `inputTokenUsdPrice` | Required prop containing a one-token USD value or `undefined`. Provide the unit price for USD readiness; `MarketQuote` has no USD-total fields. |
 | `chainId`, `account` | Current connected wallet chain and address. |
 | `inputToken`, `outputToken` | Adapted selected token metadata. |
 | `outputTokenUsdPrice` | Optional one-token output USD value used for display. |
@@ -186,16 +200,16 @@ For a native/wrapped-native pair, the provider derives the 1:1 relationship usin
 | `callbacks` | Optional lifecycle and controlled-field observers. |
 | `overrides` | Optional initial editable state under `overrides.state`. |
 | `supportLegacyOrders` | Include supported v1 history alongside current v2 orders. Defaults to `false`. |
-| `clientErrorFallback` | Host-styled, retryable client-initialization error UI. |
-| `errorFallback` | Host-styled fallback for unexpected calculation/render failures. |
+| `errorFallback` | A `ComponentType<SpotErrorFallbackProps>` for retryable initialization and calculation/render failures. |
+| `disableAnalytics` | Optional client analytics opt-out; defaults to `false`. |
 
-Changing module or token pair reapplies form defaults without rebuilding unrelated provider state. Partner or chain changes re-key the configured client. Active execution keeps a frozen form, token, chain, and prepared order snapshot.
+Changing order type or token pair reapplies form defaults without rebuilding unrelated provider state. During active or unconfirmed execution, the reset waits until the attempt finishes or the user explicitly calls `startNewOrder()`. Changing `overrides.state` updates future reset defaults without wiping current fields. Partner or chain changes re-key the configured client. Active execution keeps a frozen form, token, chain, and prepared order snapshot. Initialization retries twice before rendering `errorFallback` alongside the mounted children; the fallback receives `error`, async `retry`, and `isRetrying`.
 
-When native input is selected, the SDK uses the required `wrappedNativeToken`, calls `wrapNativeToken()` for the complete amount, checks and approves its ERC-20 address, and prepares the signed order with that same address. After approval it rechecks allowance with a bounded retry to cover RPC propagation delay.
+When native input is selected, the SDK uses the required `wrappedNativeToken`, calls `shouldWrap()` before `wrapNativeToken()` for the complete amount, checks and approves its ERC-20 address, and prepares the signed order with that same address. After each approval receipt it calls `shouldApprove()` again and can request a second approval if needed. Keep RPC allowance reads current; a transaction hash alone does not prove enough allowance was granted.
 
 ## Implement Wallet Interactions
 
-Create `use-wallet-interactions.ts`, imported by the provider in the previous step. Implement all five methods: read allowance, wrap native input, approve tokens, sign an order, and cancel an order. Reads and signatures are different from transactions: wrap, approve, and cancel must wait for successful receipts.
+Create `use-wallet-interactions.ts`, imported by the provider in the previous step. Implement all six methods: `shouldWrap`, `shouldApprove`, `wrapNativeToken`, `approveToken`, `signOrder`, and `cancelOrder`. Reads and signatures are different from transactions: wrap, approve, and cancel must wait for successful receipts.
 
 ```ts title="use-wallet-interactions.ts"
 "use client";
@@ -209,7 +223,8 @@ import { useDexDerivedData } from "./use-dex-derived-data";
 const wrappedNativeAbi = parseAbi(["function deposit() payable"]);
 
 export function useWalletInteractions(): WalletInteractions {
-  const { wrappedNativeCurrency } = useDexDerivedData();
+  // The host identifies native input using its existing currency model.
+  const { inputIsNative, wrappedNativeCurrency } = useDexDerivedData();
   const wrappedNativeAddress = wrappedNativeCurrency?.address;
   const { address: account } = useConnection();
   const { data: walletClient } = useWalletClient();
@@ -294,8 +309,13 @@ export function useWalletInteractions(): WalletInteractions {
     [walletClient],
   );
 
-  const getAllowance = useCallback<WalletInteractions["getAllowance"]>(
-    async ({ tokenAddress, spenderAddress }) => {
+  const shouldWrap = useCallback<WalletInteractions["shouldWrap"]>(
+    () => inputIsNative,
+    [inputIsNative],
+  );
+
+  const shouldApprove = useCallback<WalletInteractions["shouldApprove"]>(
+    async ({ tokenAddress, spenderAddress, amount }) => {
       if (!publicClient || !account) throw new Error("Connect a wallet first");
 
       const allowance = await publicClient.readContract({
@@ -304,7 +324,7 @@ export function useWalletInteractions(): WalletInteractions {
         functionName: "allowance",
         args: [account, spenderAddress],
       });
-      return allowance.toString();
+      return allowance < BigInt(amount);
     },
     [account, publicClient],
   );
@@ -313,16 +333,19 @@ export function useWalletInteractions(): WalletInteractions {
     () => ({
       approveToken,
       cancelOrder,
-      getAllowance,
+      shouldWrap,
+      shouldApprove,
       signOrder,
       wrapNativeToken,
     }),
-    [approveToken, cancelOrder, getAllowance, signOrder, wrapNativeToken],
+    [approveToken, cancelOrder, shouldWrap, shouldApprove, signOrder, wrapNativeToken],
   );
 }
 ```
 
-`useWalletInteractions()` adapts Wagmi's connected wallet and public clients into all five operations required by `SpotProvider`. Transaction callbacks wait for successful receipts before returning their hashes. The SDK supplies the spender, cancellation contract/ABI/arguments, signing account, and EIP-712 payload; forward those exact values instead of reconstructing them. Return the complete `0x` signature unchanged.
+`useWalletInteractions()` adapts Wagmi's connected wallet and public clients into all six methods required by `AdvancedOrdersProvider`. Transaction callbacks wait for successful receipts before returning their hashes. The SDK supplies the spender, cancellation contract/ABI/arguments, signing account, and EIP-712 payload; forward those exact values instead of reconstructing them. Return the complete `0x` signature unchanged. `shouldApprove()` compares live allowance with the exact required `request.amount`, including after approval receipts. `request.approvalAmount` is a suggested cap, defaulting to maximum uint256; this example deliberately approves the exact `amount` instead. Do not mutate the SDK request. `inputIsNative` comes from the host currency model and must describe the captured input selection.
+
+Import `WalletInteractions`, `AllowanceRequest`, `GetAllowanceProps`, `WalletInteractionError`, and `WalletInteractionErrorCode` from `@orbs-network/spot-react` when needed. React preserves `WRAP_FAILED`, `APPROVAL_FAILED`, and `INSUFFICIENT_ALLOWANCE` classifications; these belong to the React host layer rather than the core `SpotErrorCode` union. Core `Eip712TypedData`, `OrderSigningRequest`, and `ApprovalRequest` remain protocol-preparation types re-exported by React. False `shouldWrap`/`shouldApprove` results skip writes; invoked transaction callbacks must return confirmed hashes and throw on failure.
 
 To test the EIP-712 payload during integration, copy the `typedData` received by `walletInteractions.signOrder()` before calling `walletClient.signTypedData()`. Paste it as JSON, including `domain`, `types`, `primaryType`, and `message`, into the [EIP-712 Order Preview](https://playground.orbs.network/developers/eip712) and select **Preview order**. Check the displayed amounts and execution conditions before signing. The preview does not sign or submit the order.
 
@@ -331,7 +354,7 @@ To test the EIP-712 payload during integration, copy the `typedData` received by
 Let each component call the focused hooks for its controls. These files adapt the reference app's trade, schedule, trigger/limit-price, and feedback panels to the current SDK. `useTranslations()` is the DEX's translation hook; it resolves the SDK's error keys and interpolation arguments using the host's messages.
 
 ```tsx title="order-settings.tsx"
-import { Module, useLimitPrice, useOrderForm, useOutputAmount, usePriceDisplay, useTrades } from "@orbs-network/spot-react";
+import { OrderType, useLimitPrice, useOrderForm, useOutputAmount, usePriceDisplay, useTrades } from "@orbs-network/spot-react";
 import { useTranslations } from "./use-translations";
 
 export function AdvancedOrderSettings() {
@@ -351,7 +374,7 @@ export function AdvancedOrderSettings() {
         Estimated output: {isOutputLoading ? "Loading…" : outputAmount.ui}
       </p>
 
-      {form.module === Module.TWAP && <label>
+      {form.orderType === OrderType.TWAP && <label>
         Number of trades
         <input
           max={trades.maxTrades}
@@ -365,7 +388,7 @@ export function AdvancedOrderSettings() {
         <p role="alert">{t(trades.error.type, trades.error.args)}</p>
       ) : null}
 
-      {form.module !== Module.LIMIT && (
+      {form.orderType !== OrderType.LIMIT && (
         <label>
           <input type="checkbox" checked={limitPrice.isEnabled} onChange={limitPrice.toggle} />
           Use a limit price
@@ -396,20 +419,20 @@ export function AdvancedOrderSettings() {
 
 ### Add Schedule and Trigger Controls
 
-Create `schedule-and-trigger.tsx` for the selected order type. TWAP uses a delay between trades; the other types use an order duration. Stop-loss and take-profit also need a trigger price. Keep these components inside `SpotProvider` so validation and price direction stay consistent.
+Create `schedule-and-trigger.tsx` for the selected order type. TWAP uses a delay between trades; the other types use an order duration. Stop-loss and take-profit also need a trigger price. Keep these components inside `AdvancedOrdersProvider` so validation and price direction stay consistent.
 
 ```tsx title="schedule-and-trigger.tsx"
 "use client";
 
-import { Module, TimeUnit, useDuration, useFillDelay, useOrderForm, useTriggerPrice } from "@orbs-network/spot-react";
+import { OrderType, TimeUnit, useDuration, useFillDelay, useOrderForm, useTriggerPrice } from "@orbs-network/spot-react";
 import { useTranslations } from "./use-translations";
 
 export function ScheduleSettings() {
-  const { module } = useOrderForm();
+  const { orderType } = useOrderForm();
   const duration = useDuration();
   const interval = useFillDelay();
   const t = useTranslations();
-  const isTwap = module === Module.TWAP;
+  const isTwap = orderType === OrderType.TWAP;
   const value = isTwap ? interval.fillDelay : duration.duration;
   const onInputChange = isTwap ? interval.onInputChange : duration.onInputChange;
   const onUnitSelect = isTwap ? interval.onUnitSelect : duration.onUnitSelect;
@@ -447,15 +470,15 @@ export function ScheduleSettings() {
 }
 
 export function TriggerPriceSettings() {
-  const { module } = useOrderForm();
+  const { orderType } = useOrderForm();
   const trigger = useTriggerPrice();
   const t = useTranslations();
 
-  if (module !== Module.STOP_LOSS && module !== Module.TAKE_PROFIT) return null;
+  if (orderType !== OrderType.STOP_LOSS && orderType !== OrderType.TAKE_PROFIT) return null;
 
   return (
     <fieldset>
-      <legend>{module === Module.STOP_LOSS ? "Stop-loss trigger" : "Take-profit trigger"}</legend>
+      <legend>{orderType === OrderType.STOP_LOSS ? "Stop-loss trigger" : "Take-profit trigger"}</legend>
       <p>1 {trigger.displayInputToken?.symbol} in {trigger.displayOutputToken?.symbol}</p>
       <label>
         Trigger price
@@ -480,7 +503,7 @@ Create `spot-form-content.tsx` to compose the controls. Its dialog and history i
 "use client";
 
 import { useState } from "react";
-import { ORBS_TWAP_FAQ_URL, useDisclaimer } from "@orbs-network/spot-react";
+import { ORBS_TWAP_FAQ_URL, useDisclaimer, useExecution } from "@orbs-network/spot-react";
 import { AdvancedOrderSettings } from "./order-settings";
 import { ScheduleSettings, TriggerPriceSettings } from "./schedule-and-trigger";
 import { SubmitOrderDialog } from "./submit-order-dialog";
@@ -490,6 +513,7 @@ import { useTranslations } from "./use-translations";
 export function SpotFormContent() {
   const [showOrders, setShowOrders] = useState(false);
   const disclaimer = useDisclaimer();
+  const execution = useExecution();
   const t = useTranslations();
 
   return (
@@ -498,6 +522,15 @@ export function SpotFormContent() {
       <ScheduleSettings />
       <TriggerPriceSettings />
       <SubmitOrderDialog />
+      {execution.hasUnconfirmedExecutions && (
+        <button
+          disabled={execution.isCheckingOrderStatus}
+          onClick={() => execution.checkOrderStatus()}
+          type="button"
+        >
+          {execution.isCheckingOrderStatus ? "Checking previous orders…" : "Check unresolved orders"}
+        </button>
+      )}
       {disclaimer && (
         <p>
           {t(disclaimer)}{" "}
@@ -524,7 +557,7 @@ The provider renders `SpotFormContent` alongside the host’s existing token/amo
 | `useLimitPrice()`, `useTriggerPrice()` | Return display and canonical prices, percentage controls, token direction, loading state, validation, and update actions. |
 | `usePriceDisplay()` | Returns the current price direction, display tokens, market-order state, and the action that safely inverts entered prices. |
 | `useDisclaimer()`, `useInputErrors()` | Return translation keys and interpolation arguments for product disclaimers and the current primary validation error. |
-| `useSubmitButton()` | Returns the submit button's derived `disabled` and `loading` states. |
+| `useSubmitButton()` | Returns derived `disabled`, `loading`, and actionable `disabledReason` states. |
 | `useExecution()` | Starts submission and exposes the exact phase, progress steps, errors, reset actions, tokens, chain, and wrap/approval hashes. |
 | `useOrders()` | Enables provider-scoped history polling while mounted and returns categorized orders, loading state, errors, and `refetch()`. |
 | `useHistoryOrder()`, `useCancelOrder()` | Return display-ready data for one order and the state/action for cancelling it. |
@@ -536,23 +569,25 @@ An explicit TWAP trade count persists after amount changes. If it exceeds the ne
 
 ## Submit and Track Execution
 
-Mount `SubmitOrderDialog` inside `SpotProvider`. The review button opens the modal; only its confirm button calls `submitOrder()`. These three files adapt the review, progress, and custom result panels from [the spot-ui submission example](https://github.com/orbs-network/spot-ui/blob/master/apps/web/components/spot/submit-order-dialog.tsx) to the current React SDK.
+Mount `SubmitOrderDialog` inside `AdvancedOrdersProvider`. The review button opens the modal; only its confirm button calls `submitOrder()`. These three files adapt the review, progress, and custom result panels from [the spot-ui submission example](https://github.com/orbs-network/spot-ui/blob/master/apps/web/components/spot/submit-order-dialog.tsx) to the current React SDK.
 
-The linked app currently uses the older `useSpot()` API. These snippets preserve its modal behavior using the current SDK's focused hooks.
+These snippets use the current SDK's focused hooks and keep the host in control of modal presentation.
 
 ### Submission API
 
-Checked against `spot-react` 2.1.5 at [commit a5dd841](https://github.com/orbs-network/spot-ui/blob/a5dd841afd5216ac09efc7bc5e6d2b5bac4df4bd/packages/spot-react/src/hooks/use-execution.ts).
+The public [execution hook](https://github.com/orbs-network/spot-ui/blob/master/packages/spot-react/src/hooks/use-execution.ts) exposes advanced-order submission and recovery. Advanced orders finish creation at acceptance; later fills appear in history.
 
 | API | Arguments and result |
 | --- | --- |
 | `useExecution().submitOrder()` | Takes no arguments and returns `void`. Starts the provider's current order attempt. |
+| `useExecution().checkOrderStatus()` | Takes no arguments and returns `void`. Checks visible and retained background attempts without signing or submitting. |
+| `useExecution().startNewOrder()` | Returns `boolean`. Opens a fresh form while retaining active or unconfirmed attempts for independent recovery. |
 | Host `walletInteractions.signOrder(request)` | Receives the SDK's signing request and returns the wallet signature. Preserve its typed data and signer. |
-| Internal `client.submitOrder(preparedOrder.order, signature)` | Receives only the signed protocol order and signature; returns a normalized `Order`. React runs this operation for you. |
+| `client.submitOrder(preparedOrder.order, signature)` | Receives only the signed protocol order and signature; returns a normalized `Order`. React runs this operation for you. |
 
-Pass tokens, account, chain, market data, wallet interactions, and `callbacks` through `SpotProvider`; do not pass them to `execution.submitOrder()`. The click handler below explicitly invokes `execution.submitOrder()` without forwarding the React click event.
+Pass tokens, account, chain, market data, wallet interactions, and `callbacks` through `AdvancedOrdersProvider`; do not pass them to `execution.submitOrder()`. The click handler below explicitly invokes `execution.submitOrder()` without forwarding the React click event.
 
-Do not await `execution.submitOrder()` to detect completion or attach `.then()` / `.catch()` to it. Read `isExecuting`, `isSuccess`, `isFailed`, `isRejected`, and `error` from `useExecution()`. For host side effects, use provider `callbacks.onOrderCreated(order)`, `onSubmitOrderFailed(error)`, and `onSubmitOrderRejected()`. `onOrderCreated` means service acceptance, not that the trade has filled. The internal async execution handles failures and exposes them through that state and those callbacks.
+Do not await `execution.submitOrder()` to detect completion or attach `.then()` / `.catch()` to it. Read `isExecuting`, `isSuccess`, `isFailed`, `isRejected`, `isUnconfirmed`, and `error` from `useExecution()`. For host side effects, use provider `callbacks.onOrderCreated(order)`, `onOrderFilled(order)`, `onSubmitOrderFailed(error)`, and `onSubmitOrderRejected()`. `onOrderCreated` means service acceptance. Advanced orders report success at acceptance. An unconfirmed attempt retains its captured payload and blocks another submission for that visible attempt. The explicit `startNewOrder()` action detaches it into background recovery and opens an independent form; the original order may still complete.
 
 
 The modal example uses Radix Dialog, as the reference app does. Reuse the DEX’s existing accessible dialog and icons, or install `@radix-ui/react-dialog` and `lucide-react` to use these files directly. The utility classes assume the host’s Tailwind styles and theme tokens. `useDexDerivedData().setInputAmount()` is the existing DEX input setter; every order-specific component and helper is shown below.
@@ -581,8 +616,7 @@ export function SubmitOrderDialog() {
   // animation. Keep the result visible until then; no guessed timeout is needed.
   const resetAfterClose = () => {
     if (execution.isSuccess) {
-      execution.startNewOrder();
-      setInputAmount("");
+      if (execution.startNewOrder()) setInputAmount("");
     } else if (execution.isFailed || execution.isRejected) {
       execution.returnToOrderForm();
     }
@@ -591,8 +625,8 @@ export function SubmitOrderDialog() {
   return (
     <Dialog.Root open={open} onOpenChange={changeOpen}>
       <Dialog.Trigger asChild>
-        <button disabled={disabled} type="button">
-          {loading ? "Preparing quote…" : "Review order"}
+        <button disabled={disabled && !execution.isUnconfirmed} type="button">
+          {execution.isUnconfirmed ? "Check order status" : loading ? "Preparing quote…" : "Review order"}
         </button>
       </Dialog.Trigger>
       <Dialog.Portal>
@@ -600,10 +634,10 @@ export function SubmitOrderDialog() {
         <Dialog.Content
           className="fixed left-1/2 top-1/2 z-50 max-h-[90dvh] w-[calc(100vw-2rem)] max-w-md -translate-x-1/2 -translate-y-1/2 overflow-y-auto rounded-2xl bg-background p-6 text-foreground shadow-xl"
           onCloseAutoFocus={resetAfterClose}
-          onEscapeKeyDown={(event) => {
+          onEscapeKeyDown={(event: KeyboardEvent) => {
             if (!execution.canDismiss) event.preventDefault();
           }}
-          onInteractOutside={(event) => {
+          onInteractOutside={(event: { preventDefault(): void }) => {
             if (!execution.canDismiss) event.preventDefault();
           }}
         >
@@ -614,6 +648,19 @@ export function SubmitOrderDialog() {
 
           <OrderFlow />
 
+          {(execution.isExecuting || execution.isUnconfirmed) && (
+            <button
+              onClick={() => {
+                if (execution.startNewOrder()) {
+                  setInputAmount("");
+                  setOpen(false);
+                }
+              }}
+              type="button"
+            >
+              Create another order
+            </button>
+          )}
           <Dialog.Close asChild>
             <button disabled={!execution.canDismiss} type="button">
               {execution.isSuccess ? "Done" : "Close"}
@@ -635,7 +682,7 @@ Create `order-review.tsx`. Show the calculated amounts, schedule, and price cond
 
 import { useState } from "react";
 import { SwapFlow } from "@orbs-network/swap-ui";
-import { DISCLAIMER_URL, Module, useExecution, useOrderForm, useSubmitButton } from "@orbs-network/spot-react";
+import { DISCLAIMER_URL, OrderType, useExecution, useOrderForm, useSubmitButton } from "@orbs-network/spot-react";
 
 export function OrderReview() {
   const [accepted, setAccepted] = useState(false);
@@ -647,15 +694,15 @@ export function OrderReview() {
   const priceInput = form.isInverted ? output : input;
   const priceOutput = form.isInverted ? input : output;
   const orderNames = {
-    [Module.TWAP]: "TWAP",
-    [Module.LIMIT]: "Limit",
-    [Module.STOP_LOSS]: "Stop loss",
-    [Module.TAKE_PROFIT]: "Take profit",
+    [OrderType.TWAP]: "TWAP",
+    [OrderType.LIMIT]: "Limit",
+    [OrderType.STOP_LOSS]: "Stop loss",
+    [OrderType.TAKE_PROFIT]: "Take profit",
   };
 
   return (
     <section className="w-full space-y-4">
-      <h2>Review {orderNames[form.module]} order</h2>
+      <h2>Review {orderNames[form.orderType]} order</h2>
       <SwapFlow.Main
         fromTitle="Pay"
         toTitle="Estimated output"
@@ -664,7 +711,7 @@ export function OrderReview() {
       />
 
       <dl>
-        <dt>Duration from submission</dt>
+        <dt>Duration from final preparation</dt>
         <dd>{formatDuration(form.schedule.durationMillis)}</dd>
 
         {form.triggerPrice.enabled && (
@@ -730,6 +777,7 @@ import { Check, LoaderCircle, TriangleAlert } from "lucide-react";
 import { SwapFlow, SwapStatus } from "@orbs-network/swap-ui";
 import { ExecutionPhase, Steps, type SpotExecutionData, type Token, useExecution, useOrderForm } from "@orbs-network/spot-react";
 import { useConfig } from "wagmi";
+import type { Chain } from "viem";
 import { OrderReview } from "./order-review";
 
 export function OrderFlow() {
@@ -747,7 +795,7 @@ export function OrderFlow() {
       totalSteps={execution.totalSteps}
       components={{
         // Main covers review and every active phase. Results replace it.
-        Main: execution.isExecuting ? <OrderProgress /> : <OrderReview />,
+        Main: execution.isUnconfirmed ? <OrderUnconfirmed /> : execution.isExecuting ? <OrderProgress /> : <OrderReview />,
         Success: <OrderSuccess />,
         Failed: <OrderFailure />,
         SrcTokenLogo: <TokenLogo token={execution.inputToken} />,
@@ -825,6 +873,11 @@ function getProgressContent(phase: ExecutionPhase) {
         title: "Submitting order",
         message: "Your signature is ready. Waiting for the order service to accept the order.",
       };
+    case ExecutionPhase.SETTLING:
+      return {
+        title: "Checking order status",
+        message: "Reconciling the retained attempt with the order service.",
+      };
     default:
       return { title: "Order progress", message: "" };
   }
@@ -841,7 +894,7 @@ function OrderSuccess() {
         body={
           <>
             <p>{form.inputAmount.ui} {execution.inputToken?.symbol}</p>
-            <p>Estimated output: {form.outputAmount.ui} {execution.outputToken?.symbol}</p>
+            <p>Reviewed output estimate: {form.outputAmount.ui} {execution.outputToken?.symbol}</p>
             <p>Your order was accepted. Follow its fills in order history.</p>
           </>
         }
@@ -875,6 +928,23 @@ function OrderFailure() {
   );
 }
 
+function OrderUnconfirmed() {
+  const execution = useExecution();
+
+  return (
+    <div role="status" className="w-full space-y-4">
+      <h2>Order status unconfirmed</h2>
+      <p>{execution.error?.message || "The service has not confirmed the outcome. This order may still complete; check its status or explicitly create another order."}</p>
+      {execution.orderId && <p>Order ID: {execution.orderId}</p>}
+      <button disabled={execution.isCheckingOrderStatus} onClick={() => execution.checkOrderStatus()} type="button">
+        {execution.isCheckingOrderStatus ? "Checking…" : "Check status"}
+      </button>
+      <WrappedFundsNotice />
+      <ExecutionTransactions />
+    </div>
+  );
+}
+
 function WrappedFundsNotice() {
   const { wrapTxHash } = useExecution();
   if (!wrapTxHash) return null;
@@ -886,7 +956,7 @@ function ExecutionTransactions() {
   const { chainId, wrapTxHash, approvalTxHash } = useExecution();
   const { chains } = useConfig();
   // Use the frozen execution chain, even if the connected wallet has changed.
-  const explorer = chains.find((chain) => chain.id === chainId)?.blockExplorers?.default.url;
+  const explorer = chains.find((chain: Chain) => chain.id === chainId)?.blockExplorers?.default.url;
   const transactions = [
     { label: "Wrap transaction", hash: wrapTxHash },
     { label: "Approval transaction", hash: approvalTxHash },
@@ -930,20 +1000,26 @@ function TokenLogo({ token }: { token?: Token }) {
 | `phase === ExecutionPhase.APPROVING` | Approval instructions and allowance confirmation. |
 | `phase === ExecutionPhase.SIGNING` | Wallet EIP-712 signature prompt. |
 | `phase === ExecutionPhase.SUBMITTING` | Waiting for service acceptance; no additional wallet confirmation. |
-| `isSuccess` | Custom order-created summary. Creation success does not mean the order is filled. |
+| `phase === ExecutionPhase.SETTLING` | Checking acceptance of the exact retained attempt. |
+| `isSuccess` | Advanced-order acceptance summary; fills remain available in history. |
+| `isUnconfirmed` | Retained attempt with an uncertain outcome; offer `checkOrderStatus()` and history. An explicit new-order action detaches it for background recovery. |
 | `isFailed` or `isRejected` | Custom error or declined-request screen, completed transaction links, and back-to-review action. |
 
-`SwapFlow` selects `Success` or `Failed` using `getSwapUiStatus()`. Otherwise, `Main` explicitly chooses progress while `isExecuting` and review while idle. This keeps the confirm button and review details out of every active and terminal screen. `StepLayout`, `Loader`, token-logo slots, and the success/failure icons provide the custom UI; the only status conversion is inside this view adapter.
+`SwapFlow` selects `Success` or `Failed` using `getSwapUiStatus()`. Otherwise, `Main` explicitly chooses the unconfirmed recovery screen, active progress, or idle review. `StepLayout`, `Loader`, token-logo slots, and the success/failure icons provide the custom UI; the status conversion stays inside this view adapter.
 
 The SDK builds `executionSteps`: wrapping appears only when needed, approval appears only when allowance is insufficient, and signing/submission share the create-order step. Use its zero-based `currentStepIndex` and `totalSteps`. `useOrderForm()` and the tokens/chain from `useExecution()` retain the active attempt’s snapshot while the DEX’s inputs change.
 
-All close paths respect `canDismiss`. After the dialog exits, success calls `startNewOrder()` and clears the host input; failure or rejection calls `returnToOrderForm()` and preserves the form and reusable completed wrap. “Back to review” performs the latter reset while keeping the modal open. If the host uses another dialog, connect the same reset to its exit-complete callback. Use the host’s number formatter and translations for production display.
+All close paths respect `canDismiss`. After the dialog exits, success calls `startNewOrder()` and clears the host input; failure or rejection calls `returnToOrderForm()` and preserves the editable form. A confirmed wrap remains real; refetch native/wrapped balances before retrying. Form resets clear visible wrap snapshots, and a receipt never establishes the current spendable balance. “Back to review” performs the latter reset while keeping the modal open. If the host uses another dialog, connect the same reset to its exit-complete callback. Use the host’s number formatter and translations for production display.
+
+`canDismiss` also permits closing an unconfirmed result. Keep its provider and attempt mounted, leave the input intact, and expose a way to reopen recovery or history. Closing alone preserves active or unconfirmed state. If the user explicitly chooses to create another order, call `startNewOrder()` and clear the host input only when it returns `true`; captured attempts continue independently. Keep a recovery action visible whenever `hasUnconfirmedExecutions` is true. Provider unmount stops its tasks. A wallet-scope change quietly dismisses obsolete wallet work before submission; submitted or uncertain attempts retain their recovery state. Never automatically retry a timed-out submission or execute a fallback route while acceptance is uncertain.
 
 Callbacks are observers for notifications, field synchronization, and balance refresh. Refetch balances after wrap, creation, fills, progress updates, and cancellation. Callback failures never change a wallet or API result.
 
+`returnToOrderForm()` returns `false` during active or unconfirmed execution; `startNewOrder()` rejects stale callbacks. Success keeps submission disabled with `order-completed` until explicit reset. A failed status lookup or absent history leaves acceptance uncertain even after the signed deadline. Disable recovery actions while `isCheckingOrderStatus` is true and keep the provider mounted so detached callbacks and history updates can complete.
+
 ## Order History and Cancellation
 
-`useOrders()` enables provider-scoped history fetching while mounted. The list and detail files follow the reference app’s filters, selected-order view, fill list, and cancellation feedback. Keep them under `SpotProvider`, including when the DEX renders them in a modal or portal.
+`useOrders()` enables provider-scoped history fetching while mounted. The list and detail files follow the reference app’s filters, selected-order view, fill list, and cancellation feedback. Keep them under `AdvancedOrdersProvider`, including when the DEX renders them in a modal or portal.
 
 ```tsx title="orders-list.tsx"
 "use client";
@@ -1013,6 +1089,7 @@ Create `order-details.tsx`, imported by the history list. Pass the selected hist
 
 import { OrderStatus, type Order, useCancelOrder, useHistoryOrder } from "@orbs-network/spot-react";
 import { useConfig } from "wagmi";
+import type { Chain } from "viem";
 import { useCurrency } from "./use-currency";
 
 export function OrderDetails({ order }: { order: Order }) {
@@ -1022,7 +1099,7 @@ export function OrderDetails({ order }: { order: Order }) {
   const details = useHistoryOrder(order, inputToken, outputToken);
   const cancellation = useCancelOrder(order);
   const { chains } = useConfig();
-  const explorer = chains.find((chain) => chain.id === order.chainId)?.blockExplorers?.default.url;
+  const explorer = chains.find((chain: Chain) => chain.id === order.chainId)?.blockExplorers?.default.url;
 
   if (!details || !inputToken || !outputToken) return <p role="status">Loading token details…</p>;
 
@@ -1073,7 +1150,7 @@ export function OrderDetails({ order }: { order: Order }) {
 
 `useCurrency(address)` is the host’s token-registry hook, returning metadata with `address`, `symbol`, `decimals`, and optional `logoUrl` for the active chain. Its lookup must use the history order’s token addresses. This lets `useHistoryOrder()` format raw amounts and fills correctly even when the swap form displays another pair.
 
-Store `historyKey` as list/selection identity and resolve the current object from `orders.all`; legacy IDs can collide across deployments. `id` remains the protocol display/cancellation value. `useCancelOrder()` handles the wallet request, cancellation state, and cache update; it exposes errors and the confirmed hash without an extra host refetch parameter. For large histories, reuse the DEX’s existing virtualization library.
+Store `historyKey` as list/selection identity and resolve the current object from `orders.all`; legacy IDs can collide across deployments. `id` remains the protocol display/cancellation value. `useCancelOrder()` handles the wallet request, cancellation state, and cache update; it exposes errors and the confirmed hash without an extra host refetch parameter. `disabled` also checks the connected account, chain, partner, and initialized client against the selected order. Cancellation state is shared by `historyKey`, so repeated clicks cannot create duplicate transactions. Confirmed cancellation updates history immediately; a failed background refresh does not turn it into a failed cancellation. For large histories, reuse the DEX’s existing virtualization library.
 
 ## Integration Checklist
 
@@ -1081,20 +1158,20 @@ Store `historyKey` as list/selection identity and resolve the current object fro
 - Pass the host's `wrappedNativeToken`; `spot-react` has no network registry.
 - Pass required `inputBalanceRaw` and `inputTokenUsdPrice`, using `undefined` only while their values are unavailable.
 - Keep current tokens, input, quote freshness, wallet state, controls, navigation, translations, and modal ownership in the DEX.
-- Use `marketQuote.quotedOutputAmountRaw` only for the exact current amount and token pair.
+- Use `marketQuote.quotedOutputAmountRaw` only for the exact current amount and token pair. Keep provider-free swaps in the host wallet flow.
 - Use current prop names: `inputAmountUi`, `marketQuote`, `priceProtectionPercent`, `inputBalanceRaw`, and `*TokenUsdPrice`.
 - Build UI with focused hooks and keep validation visible.
 - Implement all wallet methods, wait for receipts, and preserve SDK-supplied request values and signature bytes.
-- Keep one immutable execution active, close only at a terminal phase, and reset after the exit animation.
+- Keep each attempt immutable, respect `canDismiss`, and reset definitive results after the exit animation. Use explicit `startNewOrder()` to detach an active or unconfirmed attempt, and retain a `checkOrderStatus()` action for background recovery.
 - Use `historyKey` for list identity and keep history/cancellation consumers inside provider scope.
 
 ### End-to-End Acceptance Run
 
-1. Assemble `AdvancedOrderForm`, `useWalletInteractions`, the form controls, `SubmitOrderDialog`, and `OrdersList` from the files created during this guide. Preserve the relative imports between the displayed files.
+1. Render `AdvancedOrderForm` with an `OrderType` such as `OrderType.TWAP`. Assemble it with `useWalletInteractions`, the form controls, `SubmitOrderDialog`, and `OrdersList` from the files created during this guide. Preserve the relative imports between the displayed files.
 2. Replace host-specific wallet/data imports with your application's sources. Use real active-chain tokens and a current full-amount quote. Confirm connect-wallet, unsupported-network, loading, and validation states are visible before testing submission.
 3. Open review and verify it reflects the current calculated form. Confirm once; with insufficient allowance, expect approval to complete before signing. For native input, expect wrapping first. With sufficient allowance, the approval prompt is skipped.
 4. Keep the attempt immutable while execution is active. Display successful submission separately from fill completion, then verify the submitted order appears in provider-scoped history.
 5. Cancel a selected open order through the history flow. Confirm the wallet transaction receipt and refresh the order state; do not mark it cancelled just because a transaction hash exists.
-6. Reject each wallet prompt and test rapid repeated confirmation clicks. Verify one active attempt, an actionable error, and an explicit retry path. Change account/chain before starting a new attempt and verify provider data follows the new context.
+6. Reject each wallet prompt and test rapid repeated confirmation clicks. Verify repeated clicks start only one visible attempt, with an actionable error and explicit retry path. Use “Create another order” to detach an unresolved attempt, then verify “Check unresolved orders” still recovers it. Change account/chain before starting a new attempt and verify provider data follows the new context.
 
 Use a funded development wallet for live ERC-20/native-input tests, with an amount satisfying the partner's minimums. Live orders may fill and spend funds; use mocked wallet/service failures for repeatable recovery checks.

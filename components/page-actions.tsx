@@ -9,11 +9,14 @@ import {
   FileText,
   SquareTerminal,
 } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 
 import { DownloadIntegrationButton } from "@/components/download-integration-button";
+import { IntegrationAgentButton } from "@/features/integration-agent/integration-agent-button";
+import { buildIntegrationAgentPrompt, buildIntegrationInstructionsUrl } from "@/features/integration-agent/integration-agent";
+import { getDocumentationSiteUrl } from "@/lib/site";
 import type { Guide } from "@/lib/guides";
-import type { PartnerDocumentationContext } from "@/features/partner-documentation/partner-documentation";
+import type { PartnerDocumentationContext, PartnerDocumentationRequest } from "@/features/partner-documentation/partner-documentation";
 
 type CopyStatus =
   | "copied-codex"
@@ -21,6 +24,20 @@ type CopyStatus =
   | "copying-page"
   | "failed"
   | "idle";
+
+// The origin stays fixed during client navigation. Separate snapshots keep
+// pre-rendering and hydration consistent before resolving the local browser URL.
+function subscribeToOrigin(): () => void {
+  return () => {};
+}
+
+function getBrowserDocumentationOrigin(): string {
+  return getDocumentationSiteUrl(window.location.origin).origin;
+}
+
+function getDefaultDocumentationOrigin(): string {
+  return getDocumentationSiteUrl().origin;
+}
 
 function getPagePrompt(pagePath: string): string {
   const url = new URL(pagePath, window.location.origin);
@@ -40,12 +57,33 @@ export function PageActions({
   pagePath,
   guide,
   partnerConfig,
+  partnerRequest,
 }: {
   markdownPath: string;
   pagePath: string;
   guide: Guide;
   partnerConfig?: PartnerDocumentationContext;
+  partnerRequest?: PartnerDocumentationRequest;
 }) {
+  const documentationOrigin = useSyncExternalStore(
+    subscribeToOrigin,
+    getBrowserDocumentationOrigin,
+    getDefaultDocumentationOrigin,
+  );
+  // The prompt carries the intended scope while config loads, never contract addresses.
+  const promptPartner = partnerConfig ?? (partnerRequest
+    ? { ...partnerRequest, requestedPartner: partnerRequest.partner }
+    : undefined);
+  const integrationPrompt = buildIntegrationAgentPrompt({
+    guide,
+    siteUrl: documentationOrigin,
+    partnerConfig: promptPartner,
+  });
+  const instructionsUrl = buildIntegrationInstructionsUrl({
+    guide,
+    siteUrl: documentationOrigin,
+    partnerConfig: promptPartner,
+  });
   const menuRef = useRef<HTMLDivElement>(null);
   const menuTriggerRef = useRef<HTMLButtonElement>(null);
   const [menuOpen, setMenuOpen] = useState(false);
@@ -92,7 +130,7 @@ export function PageActions({
 
   const copyForCodex = async () => {
     try {
-      await navigator.clipboard.writeText(getPagePrompt(pagePath));
+      await navigator.clipboard.writeText(integrationPrompt);
       setStatus("copied-codex");
       setMenuOpen(false);
     } catch {
@@ -113,88 +151,96 @@ export function PageActions({
   const copying = status === "copying-page";
 
   return (
-    <div className="page-actions">
-      <DownloadIntegrationButton guide={guide} partnerConfig={partnerConfig} />
-      <button
-        aria-label={
-          copied
-            ? "Documentation page copied"
-            : copying
-              ? "Copying documentation page"
-              : "Copy documentation page as Markdown"
-        }
-        className="page-action-primary"
-        disabled={copying}
-        onClick={() => void copyPage()}
-        type="button"
-      >
-        {copied ? <Check aria-hidden="true" size={14} /> : <Clipboard aria-hidden="true" size={14} />}
-        <span>{copied ? "Copied" : copying ? "Copying…" : "Copy page"}</span>
-      </button>
-      <div
-        className="page-action-menu"
-        onKeyDown={(event) => {
-          if (event.key !== "Escape") return;
-          event.preventDefault();
-          setMenuOpen(false);
-          menuTriggerRef.current?.focus();
-        }}
-        ref={menuRef}
-      >
+    <div className="page-tools">
+      <div className="page-actions">
+        <DownloadIntegrationButton guide={guide} partnerConfig={partnerConfig} />
         <button
-          aria-expanded={menuOpen}
-          aria-haspopup="true"
-          aria-label={menuOpen ? "Close page actions" : "Open page actions"}
-          className="page-action-menu-trigger"
-          onClick={() => setMenuOpen((open) => !open)}
-          ref={menuTriggerRef}
+          aria-label={
+            copied
+              ? "Documentation page copied"
+              : copying
+                ? "Copying documentation page"
+                : "Copy documentation page as Markdown"
+          }
+          className="page-action-primary"
+          disabled={copying}
+          onClick={() => void copyPage()}
           type="button"
         >
-          <ChevronDown aria-hidden="true" size={15} />
+          {copied ? <Check aria-hidden="true" size={14} /> : <Clipboard aria-hidden="true" size={14} />}
+          <span>{copied ? "Copied" : copying ? "Copying…" : "Copy page"}</span>
         </button>
-        {menuOpen ? (
-          <div className="page-action-popover">
-            <a href={markdownPath} rel="noreferrer" target="_blank">
-              <FileText aria-hidden="true" size={17} />
-              <span>
-                <strong>View as Markdown</strong>
-                <small>Open the AI-friendly source</small>
-              </span>
-              <ExternalLink aria-hidden="true" size={13} />
-            </a>
-            <button onClick={openInChatGPT} type="button">
-              <Bot aria-hidden="true" size={17} />
-              <span>
-                <strong>Ask in ChatGPT</strong>
-                <small>Open this page as context</small>
-              </span>
-              <ExternalLink aria-hidden="true" size={13} />
-            </button>
-            <button onClick={() => void copyForCodex()} type="button">
-              {status === "copied-codex" ? (
-                <Check aria-hidden="true" size={17} />
-              ) : (
-                <SquareTerminal aria-hidden="true" size={17} />
-              )}
-              <span>
-                <strong>{status === "copied-codex" ? "Copied for Codex" : "Copy for Codex"}</strong>
-                <small>Paste a context-ready task prompt</small>
-              </span>
-            </button>
-          </div>
-        ) : null}
+        <div
+          className="page-action-menu"
+          onKeyDown={(event) => {
+            if (event.key !== "Escape") return;
+            event.preventDefault();
+            setMenuOpen(false);
+            menuTriggerRef.current?.focus();
+          }}
+          ref={menuRef}
+        >
+          <button
+            aria-expanded={menuOpen}
+            aria-haspopup="true"
+            aria-label={menuOpen ? "Close page actions" : "Open page actions"}
+            className="page-action-menu-trigger"
+            onClick={() => setMenuOpen((open) => !open)}
+            ref={menuTriggerRef}
+            type="button"
+          >
+            <ChevronDown aria-hidden="true" size={15} />
+          </button>
+          {menuOpen ? (
+            <div className="page-action-popover">
+              <a href={markdownPath} rel="noreferrer" target="_blank">
+                <FileText aria-hidden="true" size={17} />
+                <span>
+                  <strong>View as Markdown</strong>
+                  <small>Open the AI-friendly source</small>
+                </span>
+                <ExternalLink aria-hidden="true" size={13} />
+              </a>
+              <button onClick={openInChatGPT} type="button">
+                <Bot aria-hidden="true" size={17} />
+                <span>
+                  <strong>Ask in ChatGPT</strong>
+                  <small>Open this page as context</small>
+                </span>
+                <ExternalLink aria-hidden="true" size={13} />
+              </button>
+              <button onClick={() => void copyForCodex()} type="button">
+                {status === "copied-codex" ? (
+                  <Check aria-hidden="true" size={17} />
+                ) : (
+                  <SquareTerminal aria-hidden="true" size={17} />
+                )}
+                <span>
+                  <strong>{status === "copied-codex" ? "Copied for Codex" : "Copy for Codex"}</strong>
+                  <small>Paste a context-ready task prompt</small>
+                </span>
+              </button>
+            </div>
+          ) : null}
+        </div>
+        <span aria-live="polite" className="sr-only">
+          {status === "copied-page"
+            ? "Documentation page copied as Markdown"
+            : status === "copied-codex"
+              ? "Codex prompt copied"
+              : status === "failed"
+                ? "Copy failed. Open View as Markdown and copy the source manually."
+                : status === "copying-page"
+                  ? "Copying documentation page"
+                : ""}
+        </span>
       </div>
-      <span aria-live="polite" className="sr-only">
-        {status === "copied-page"
-          ? "Documentation page copied as Markdown"
-          : status === "copied-codex"
-            ? "Codex prompt copied"
-            : status === "failed"
-              ? "Copy failed. Open View as Markdown and copy the source manually."
-              : status === "copying-page"
-                ? "Copying documentation page"
-              : ""}
-      </span>
+      <IntegrationAgentButton
+        guideLabel={guide.label}
+        instructionsUrl={instructionsUrl}
+        key={`${guide.id}:${promptPartner?.requestedPartner ?? ""}:${promptPartner?.chainId ?? ""}`}
+        prompt={integrationPrompt}
+      />
     </div>
   );
 }

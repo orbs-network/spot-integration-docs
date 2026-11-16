@@ -10,7 +10,7 @@ import {
 } from "@/features/partner-documentation/partner-documentation";
 import { createPartnerDocumentationHref } from "@/features/partner-documentation/query-state";
 import { GUIDE_SOURCES, type GuideProductId } from "@/lib/guides";
-import { ADVANCED_ORDERS_SKILL_URL, ORBS_SUPPORT_URL, SITE_DESCRIPTION } from "@/lib/site";
+import { ORBS_SUPPORT_URL, SITE_DESCRIPTION, SPOT_INTEGRATION_SKILLS } from "@/lib/site";
 
 export const metadata: Metadata = {
   alternates: { canonical: "/" },
@@ -20,14 +20,14 @@ export const metadata: Metadata = {
 
 const PRODUCTS: readonly {
   description: string;
-  id: GuideProductId;
+  id: Exclude<GuideProductId, "perps">;
   kicker: string;
   title: string;
 }[] = [
   {
     description:
-      "Swap tokens now using an Orbs quote. Add it to your swap form or compare it with your existing DEX route.",
-    id: "liquidity-hub",
+      "Swap tokens using Spot quotes and signed orders. Add Spot to your swap form or compare its protected minimum with your existing DEX route.",
+    id: "swap",
     kicker: "Swap Routing",
     title: "Swap",
   },
@@ -43,7 +43,7 @@ const PRODUCTS: readonly {
 const GUIDE_BADGES: Partial<Record<(typeof GUIDE_SOURCES)[number]["id"], string>> = {
   "advanced-orders-react": "For React",
   "advanced-orders-sdk": "Any Framework",
-  "liquidity-hub": "Recommended",
+  "swap": "Any Framework",
 };
 
 type HomeSearchParams = Promise<Record<string, string | string[] | undefined>>;
@@ -139,20 +139,21 @@ export default async function HomePage({
                           <ArrowRight aria-hidden="true" size={17} />
                         </Link>
                       ))}
-                      {product.id === "advanced-orders" ? (
+                      {SPOT_INTEGRATION_SKILLS[product.id].map((skill) => (
                         <a
                           className="docs-home-guide-link"
-                          href={ADVANCED_ORDERS_SKILL_URL}
+                          href={skill.href}
+                          key={skill.href}
                           rel="noreferrer"
                           target="_blank"
                         >
                           <span>
-                            <strong>MCP Skill</strong>
+                            <strong>{skill.title}</strong>
                             <small>Implementation resources for coding agents</small>
                           </span>
                           <ExternalLink aria-hidden="true" size={17} />
                         </a>
-                      ) : null}
+                      ))}
                     </nav>
                   </article>
                 );

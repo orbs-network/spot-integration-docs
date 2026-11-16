@@ -1,58 +1,55 @@
-# Perps integration review — findings
+# Perps integration review — 16 November 2026
 
-Review date: 25 October 2026 (second pass). Review only; no code was changed.
+## Scope and source
 
-## Scope
+Updated `content/perps-api.md` against the current local `perpetual-hub` partner handoff: `docs/partner-integration/README.md` and chapters `01`–`07`, at repository HEAD `1aa0d643593e8d3ab4bc0934ba55f40dbadcfb89`. The latest commit affecting that handoff is `f7a6ff4ce` (7 November 2026). The source checkout contains unrelated Partner Portal work; it was read only and was not changed by this review.
 
-Uncommitted changes on `main` that add the Perpetual Hub partner API (`orbs-network/perpetual-hub` → `docs/partner-integration/`) as `/perps/api`, plus the site-wide rename from "Spot" to "Orbs". The second pass focused on `/perps/api#reliability-and-acceptance`, alignment with the perpetual-hub docs, and UI consistency with the Spot guides.
+The site retains its eight existing guide steps and local `/perps/api#…` links. Global production remains the site's default; the upstream handoff's Orbs staging deployment is a separate lane and is not substituted into these examples.
 
-## Alignment with the perpetual-hub docs
+## Changes applied
 
-Compared against perpetual-hub `main` at `fddd651`, which matches the remote. `docs/partner-integration` has not changed on `main` since `c1cc5acc` (1 October).
+- Added exact `priceDecimal` / `stopPriceDecimal` request fields for entries, replacements and bracket legs; documented `1e18` signing, decimal response companions, `PRICE_CONFLICT`, and exact snapping for fine ticks. Legacy integer request prices remain `1e6`.
+- Updated `/api/v1/prices` to prefer `priceDecimal`; its deprecated `price` field truncates at `1e6`.
+- Documented order-placement request-ID replay for market and resting orders, replayed `201` responses, `REQUEST_IN_PROGRESS`, `REQUEST_ALREADY_FAILED`, `REQUEST_ID_REUSED` and `ORDER_OUTCOME_UNKNOWN`. Cancellation and withdrawal retries retain their separate reconciliation requirements.
+- Added pending-order `executionStatus` and `lastRefusal` semantics and refusal-code guidance. These observations are process-local display information, not replacements for committed order status.
+- Updated streaming behavior for committed fills, closed positions, system cancellations, non-replayed notifications and REST reconciliation. WebSocket `FILL.fillId` identifies the corresponding REST trade `id`; each execution counts once across both transports.
+- Documented non-retryable `UNSUPPORTED_SYMBOL`, corrected the Global subscription acknowledgement's `partnerId`, and extended the integration acceptance checklist for exact prices, order replay, fill identity and pending execution observations.
 
-- **Reliability and Acceptance:** identical to `07-reliability.md` except for two lane-specific lines in the acceptance checklist (the intro paragraph and the "Unit conversion" row), which now name Global instead of Orbs staging.
-- **Whole guide:** apart from headings, the removed Prev/Next nav lines and the rewritten cross-links, the only differences are the deliberate switch from the `orbs:42161` staging lane to the `global:42161` production lane. The switch is applied consistently; no `orbs:42161`, staging URL or staging contract is left in the guide.
-- **Production values:** read-only `GET /api/v1/config`, `/markets` and `/risk-config` on `https://perps-api.orbs.network` with `X-Partner-Chain-Key: global:42161` returned HTTP 200. Config returned chain `42161`, contract `0xd2c8793397036f6D2F60A93D3eB28295a3F1B102` and USDC `0xaf88d065e77c8cC2239327C5EDb3A432268e5831`, as documented.
+Signing types, session duration and roles, funding and withdrawal units, payout lifecycle, history schemas, history pagination bounds and current funding-rate fields were compared with all current handoff chapters. Existing guidance for those contracts remains applicable.
 
-### Content differences to confirm
+## Source inconsistencies resolved locally
 
-1. **Production by default, no staging lane documented.** The source handoff is a staging (`orbs:42161`) guide. The site version documents only Global production with real USDC, so partners no longer have a documented test lane. perpetual-hub's changelog (2026-10-13) still lists funded Global deposit, trade and withdrawal acceptance as a follow-up "after lane activation".
-2. **Softer deposit warning.** The source said "We will confirm when funded flows are open; do not deposit before that confirmation." The site now says "Confirm current funding instructions … before running funded flows." Check that the softer wording is intended.
-3. **Global chosen over a production Orbs lane.** The source describes partner ID `orbs` as "the same partner ID is used in production, on a different contract". The site uses `global` instead, which matches the 2026-10-13 changelog decision for the Orbs frontend. Worth confirming for partners too.
-4. **Upcoming source changes.** Two unmerged perpetual-hub branches edit the partner docs and will need re-syncing once merged:
-   - `codex/effective-funding-rates` (`ae332e8c`): funding rates in `06-streaming.md` (+48 lines), `01-connection.md`, `README.md`.
-   - `codex/orbs-agent-sdk` (`1a35565f`): new `08-sdk.md` and `11-acceptance.md`.
+The handoff itself contains stale paragraphs that conflict with newer source or chapters. This site corrects them rather than reproducing them:
 
-## UI
+| Issue in the source handoff | Resolution and source evidence |
+|---|---|
+| Trading precision still says all HTTP prices are `1e6`, although Connection and Signing document exact decimal fields | Both encodings are documented throughout. Checked API request/response types, input validation and `backend/internal/api/order_decimal_prices_test.go`, including its legacy-zero allowance and `PRICE_CONFLICT` cases |
+| Reliability still says WebSocket and REST fills have no join | Uses WebSocket `fillId` = REST trade `id`, matching the current Streaming chapter and committed publishers in API order/administrative-close handlers |
+| Trading retry prose treats every new timestamp/signature as a new order | Distinguishes controlled same-ID order replay from new intent and from withdrawal/cancellation retries, matching `order_request_replay.go` and `market_order_request_replay.go` |
+| The numerical-encoding table is split by the new exact-price subsection | All encoding rows remain in one table before that subsection |
+| The pending-order refusal example is a bare JSON member | Wrapped it as a valid JSON object; all 28 JSON examples parse |
 
-### Issues
+No changes were made to `perpetual-hub` code or its upstream docs.
 
-1. **(Fixed) Callout links go to a private repo.** In the Ready-to-Implement callout, both "View Source" and "View partner API guide" (`components/docs-shell.tsx:77-79`) link to `github.com/orbs-network/perpetual-hub`, which returns 404 for anyone without access. Every Spot guide links to public resources. Point these at `/perps/api.md` or another public resource, or remove them.
-2. **(Fixed) Cross-links only reach the top of a step.** In Reliability, both "Connection" and "deployment readiness" go to `/perps/api#connection-and-conventions`. The "Deployment readiness" subsection is far down that step, so the second link doesn't land where it says. The site doesn't give anchors to subsections, so this needs either subsection anchors or reworded link text.
-3. **Tables are cut off at narrow content widths.** Tables have a site-wide `min-width: 660px` (`app/globals.css:1795`). With a 610px content column (an 800px window), the second column is clipped and needs horizontal scrolling. This is existing behavior, but Perps has 25 tables against 3–12 in the other guides, and the long text cells in Reliability make it noticeable.
-4. **Different sidebar structure.** Under Spot, the sidebar goes category → product card (title and description) → variant. Under Perps it goes straight to the "Direct API" variant, with no product card. This works with one guide, but it looks different from Spot and needs reworking if Perps gets a second guide.
+## Public read-only verification
 
-### Consistent with the Spot guides
+On 16 November 2026, requests to `https://perps-api.orbs.network` with `X-Partner-Chain-Key: global:42161` returned HTTP 200 from `/api/v1/config`, `/api/v1/markets` and `/api/v1/risk-config`.
 
-- Step badge ("Perps · Direct API · Step 8 of 8"), title, Copy page menu, progress bar, Previous footer and Ready-to-Implement callout all render as in the Spot guides.
-- Section headings render at the same levels as the Spot guides, and the sidebar highlights the active step (8).
-- On a 375px mobile viewport there is no horizontal page overflow, and the sticky step bar shows "Perps · 8. Reliability and Acceptance".
-- No "Download integration" button, which is intended for an API-only guide.
-- "Direct API" matches the Swap variant label. Advanced Orders uses "API Only"; that difference was already there.
+Configuration returned:
 
-## Engineering checks (first pass)
+- Chain ID: `42161`.
+- Global contract: `0xd2c8793397036f6D2F60A93D3eB28295a3F1B102`.
+- Collateral: native Arbitrum USDC, `0xaf88d065e77c8cC2239327C5EDb3A432268e5831`.
 
-- `tsc --noEmit` is clean.
-- `yarn lint` has no errors, and the guide navigation, framework-neutral and integration-download checks pass. The only warnings are in `.playwright-cli/` files outside this change.
+The market response included SOLUSDT with tick `0.0100`, and 1000SATSUSDT/DOGSUSDT with tick `0.00000001`. This confirms why display precision and the legacy `1e6` price form cannot cover every executable price.
 
-## Other issues (first pass)
+These reads do not verify funded deposits, trading, withdrawals, session registration, private WebSocket acceptance or deployment support for every newly documented mutation. No signed, funded or other mutating requests were sent. Confirm the assigned lane, risk configuration, funding instructions and agreed origin before funded acceptance.
 
-1. **Dev port mismatch:** `package.json` changed `next dev` from port 3004 to 3001, but `.claude/launch.json` still uses 3004. Port 3004 is used by `orbs-explorer/apps/ops`.
-2. **Guide order:** `perps-api` is the first entry in `GUIDE_SOURCES` (`lib/guides.ts`), so Perps is listed before Swap and Advanced Orders in `/llms.txt` and the sitemap.
-3. **Hard-coded Perps section:** the home-page section (`app/page.tsx:174`) and the sidebar accordion (`components/docs-shell.tsx:309`) are written out separately instead of going through `PRODUCTS`.
+## Validation and remaining coverage
 
-## Fixed since the first pass
+- Guide navigation passed: seven guides, internal links, aliases and interactive-example references.
+- All 28 fenced Perps JSON examples parse.
+- All eight top-level Perps step headings remain stable.
+- Public configuration, market and risk reads passed as described above.
 
-- The Ready-to-Implement callout no longer says "confirm staging readiness". It now reads "Use Global by default, or obtain your assigned partner-chain configuration from the Orbs team."
-- The callout now links "View Source" to `content/perps-api.md` in the public `orbs-network/spot-integration-docs` repo and "Open Markdown Reference" to `/perps/api.md`. The GitHub link returns 404 until this change is pushed to `main`.
-- The two "deployment readiness" links (Account and History intro, Reliability checklist intro) now link "Connection and Conventions" and name the Deployment readiness notes in plain text.
+Existing navigation checks catch broken local routes and anchors, but cannot establish protocol correctness or funded acceptance. The previous content was a dated manual copy; those checks did not compare it to the evolving partner API contract. Future refreshes must compare every handoff chapter and reconcile conflicting statements against API source. A deployed acceptance run should cover the exact-price, request replay and fill-identity scenarios now listed in the guide.

@@ -20,8 +20,6 @@ function filesFor(guide) {
     const example = REFERENCE_EXAMPLES[`${guide.id}:${step.id}`];
     return (example?.files ?? []).filter(f => ['typescript', 'ts'].includes(f.language) && !f.kind);
   });
-  if (guide.id === 'liquidity-hub') files.push(...snippets(guide).filter(file => file.name.startsWith('fetch-quote-')));
-  if (guide.id === 'liquidity-hub-direct') files.push({ name: 'fetch-quote.ts', code: REFERENCE_EXAMPLES['liquidity-hub-direct:fetch-quote'].files[0].code });
   const unique = new Map();
   for (const file of files) {
     if (unique.has(file.name) && unique.get(file.name).code !== file.code) {

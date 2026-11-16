@@ -19,838 +19,116 @@ export interface ReferenceExample {
   title: string;
 }
 
-// Generated from efficientfrontier's developer-tool formatter functions and
-// sample data. The Liquidity Hub SDK references track the public package API
-// and the repository examples in packages/liquidity-hub-ui/examples/react.
-const LIQUIDITY_HUB_QUOTE_REQUEST_CODE = `import type { Address } from "viem";
+// Swap examples use the public Spot client and the host's wallet services.
+const SPOT_QUOTE_CODE = `import type {
+  ClientGetQuoteParams, SpotClient, SwapQuote,
+} from "@orbs-network/spot-ui";
 
-import type { LiquidityHubQuote } from "./types";
-
-// The connected wallet arrives as an argument. Read it from whatever the host
-// already uses - viem's getAddresses(), an EIP-1193 provider, or wagmi's
-// useAccount() in a React host - and pass it in.
-export async function fetchLiquidityHubQuote(account: Address): Promise<LiquidityHubQuote> {
-  // Native currency is not supported as input. Use the wrapped ERC-20 token
-  // address as inToken and wrap the required funds before submission.
-  const response = await fetch(
-    "https://hub.orbs.network/quote?chainId=137",
-    {
-      method: "POST",
-      headers: {
-        Accept: "application/json",
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        inToken: "0x1111111111111111111111111111111111111111",
-        outToken: "0x6666666666666666666666666666666666666666",
-        inAmount: "1000000000000000000",
-        outAmount: "2480000000",
-        user: account,
-        slippage: 0.5,
-        qs: "%3FinputCurrency%3D0x1111%26outputCurrency%3D0x6666",
-        // Use the partner identifier supplied by Orbs; otherwise use "external".
-        partner: "external",
-      }),
-    },
-  );
-
-  const quote = (await response.json()) as LiquidityHubQuote;
-
-  if (!response.ok) {
-    throw new Error(
-      \`Liquidity Hub quote request failed (\${response.status})\`,
-    );
-  }
-
-  return quote;
+export function fetchSpotQuote(
+  client: SpotClient,
+  params: ClientGetQuoteParams,
+): Promise<SwapQuote> {
+  return client.getQuote(params);
 }`;
 
-const LIQUIDITY_HUB_QUOTE_REQUEST_CURL = `curl --request POST \\
-  --url 'https://hub.orbs.network/quote?chainId=137' \\
-  --header 'Accept: application/json' \\
-  --header 'Content-Type: application/json' \\
-  --data '{
+const SPOT_QUOTE_RESPONSE_CODE = `{
+  "request": {
+    "chainId": 137,
+    "partner": "external",
     "inToken": "0x1111111111111111111111111111111111111111",
     "outToken": "0x6666666666666666666666666666666666666666",
     "inAmount": "1000000000000000000",
-    "outAmount": "2480000000",
     "user": "0x5555555555555555555555555555555555555555",
     "slippage": 0.5,
-    "qs": "%3FinputCurrency%3D0x1111%26outputCurrency%3D0x6666",
-    "partner": "external"
-  }'`;
-
-const LIQUIDITY_HUB_SDK_QUOTE_REQUEST_CODE = `import { createClient, type Quote } from "@orbs-network/liquidity-hub-sdk";
-
-const chainId = 137;
-// Use the partner identifier supplied by Orbs; otherwise use "external".
-const partner = "external";
-const liquidityHubClient = createClient({ chainId, partner });
-
-export async function fetchLiquidityHubQuote(
-  account: \`0x\${string}\`,
-  dexMinAmountOut: string,
-): Promise<Quote> {
-  return liquidityHubClient.getQuote({
-    fromToken: "0x1111111111111111111111111111111111111111",
-    toToken: "0x6666666666666666666666666666666666666666",
-    inAmount: "1000000000000000000",
-    dexMinAmountOut,
-    account,
-    slippage: 0.5,
-  });
-}`;
-
-const LIQUIDITY_HUB_QUOTE_TYPES_CODE = `export interface Eip712Field {
-  name: string;
-  type: string;
-}
-
-export interface Eip712Domain {
-  name?: string;
-  version?: string;
-  chainId?: number;
-  verifyingContract?: \`0x\${string}\`;
-  salt?: \`0x\${string}\`;
-}
-
-export interface QuotePermitData {
-  domain: Eip712Domain;
-  types: Record<string, Eip712Field[]>;
-  values: Record<string, unknown>;
-  primaryType?: string;
-}
-
-export interface QuoteEip712 {
-  domain: Eip712Domain;
-  types: Record<string, Eip712Field[]>;
-  primaryType: string;
-  message: Record<string, unknown>;
-}
-
-// Matches Quote from @orbs-network/liquidity-hub-sdk.
-export interface LiquidityHubQuote {
-  inToken: string;
-  outToken: string;
-  inAmount: string;
-  outAmount: string;
-  user: \`0x\${string}\`;
-  slippage: number;
-  qs: string;
-  partner: string;
-  exchange: string;
-  sessionId: string;
-  serializedOrder: string;
-  permitData: QuotePermitData;
-  eip712: QuoteEip712;
-  minAmountOut: string;
-  error?: string;
-  gasAmountOut?: string;
-  referencePrice?: string;
-  userMinOutAmountWithGas: string;
-  outAmountWsMinusGas: string;
-  outAmountWS: string;
-  timestamp: number;
-}`;
-
-const LIQUIDITY_HUB_SUBMIT_SWAP_CODE = `import { createPublicClient, createWalletClient, custom, erc20Abi, http, type Address, type Hash, type TransactionReceipt } from "viem";
-import { polygon } from "viem/chains";
-import type { LiquidityHubQuote } from "./types";
-
-// Use the Viem chain connected in the host wallet; Polygon is only an example.
-const chain = polygon;
-const chainId = chain.id;
-const permit2Address = "0x000000000022D473030F116dDEE9F6B43aC78BA3";
-const publicClient = createPublicClient({ chain, transport: http() });
-const walletProvider = (window as unknown as { ethereum: Parameters<typeof custom>[0] }).ethereum;
-const walletClient = createWalletClient({ chain, transport: custom(walletProvider) });
-
-export async function submitLiquidityHubSwap(quote: LiquidityHubQuote, account: Address, refetchQuote: () => Promise<LiquidityHubQuote>): Promise<TransactionReceipt> {
-  // quote.inToken must be an ERC-20 address. Wrap native funds before this flow.
-  const requiredAllowance = BigInt(quote.inAmount);
-  const allowance = await publicClient.readContract({
-    address: quote.inToken as Address,
-    abi: erc20Abi,
-    functionName: "allowance",
-    args: [account, permit2Address],
-  });
-
-  if (allowance < requiredAllowance) {
-    const approvalHash = await walletClient.writeContract({
-      account,
-      address: quote.inToken as Address,
-      abi: erc20Abi,
-      functionName: "approve",
-      args: [permit2Address, requiredAllowance],
-      chain: walletClient.chain,
-    });
-    const approvalReceipt = await publicClient.waitForTransactionReceipt({
-      hash: approvalHash,
-    });
-
-    if (approvalReceipt.status !== "success") {
-      throw new Error("Permit2 approval reverted");
-    }
-  }
-
-  // Approval may take long enough for prices and available liquidity to move.
-  // Refresh quotes older than 60 seconds immediately before signing.
-  const freshQuote = isQuoteFresh(quote) ? quote : await refetchQuote();
-
-  const signature = await walletClient.signTypedData({
-    account,
-    domain: freshQuote.eip712.domain,
-    types: freshQuote.eip712.types,
-    primaryType: freshQuote.eip712.primaryType,
-    message: freshQuote.eip712.message,
-  });
-
-  const submission = submitSignedQuote(freshQuote, signature);
-  const pollingController = new AbortController();
-  const polledHash = pollForTransactionHash({
-    account,
-    chainId,
-    sessionId: freshQuote.sessionId,
-    signal: pollingController.signal,
-  });
-  const submittedHash = submission.then((txHash) => txHash ?? polledHash);
-
-  let txHash: Hash;
-  try {
-    txHash = await Promise.race([submittedHash, polledHash]);
-  } finally {
-    // Promise.race observes both rejections; abort stops unnecessary requests.
-    pollingController.abort();
-  }
-  const receipt = await publicClient.waitForTransactionReceipt({ hash: txHash });
-
-  if (receipt.status !== "success") {
-    throw new Error("Liquidity Hub transaction reverted");
-  }
-
-  return receipt;
-}
-
-async function pollForTransactionHash({
-  account,
-  chainId,
-  sessionId,
-  signal,
-}: {
-  account: \`0x\${string}\`;
-  chainId: number;
-  sessionId: string;
-  signal: AbortSignal;
-}): Promise<\`0x\${string}\`> {
-  for (let attempt = 0; attempt < 30; attempt += 1) {
-    signal.throwIfAborted();
-    await new Promise<void>((resolve, reject) => {
-      const onAbort = () => { clearTimeout(timer); reject(signal.reason); };
-      const timer = setTimeout(() => {
-        signal.removeEventListener("abort", onAbort);
-        resolve();
-      }, 2_000);
-      signal.addEventListener("abort", onAbort, { once: true });
-    });
-    signal.throwIfAborted();
-
-    const response = await fetch(
-      \`https://hub.orbs.network/swap/status/\${sessionId}?chainId=\${chainId}\`,
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Accept: "application/json",
-        },
-        body: JSON.stringify({ user: account }),
-        signal,
-      },
-    );
-    const status = await response.json();
-
-    if (!response.ok || status.error) {
-      throw new Error(
-        status.error || \`Status request failed (\${response.status})\`,
-      );
-    }
-    if (status.txHash) return status.txHash;
-  }
-
-  throw new Error("Timed out waiting for the transaction hash");
-}
-
-async function submitSignedQuote(
-  quote: LiquidityHubQuote,
-  signature: Hash,
-): Promise<Hash | undefined> {
-  const response = await fetch(
-    \`https://hub.orbs.network/swap-async?chainId=\${chainId}\`,
-    {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Accept: "application/json",
-      },
-      body: JSON.stringify({ ...quote, signature }),
-    },
-  );
-  const result = (await response.json()) as { error?: string; txHash?: Hash };
-
-  if (!response.ok || result.error) {
-    throw new Error(
-      result.error || \`Swap request failed (\${response.status})\`,
-    );
-  }
-
-  return result.txHash;
-}
-
-function isQuoteFresh(quote: LiquidityHubQuote): boolean {
-  const age = Date.now() - quote.timestamp;
-  return Number.isFinite(quote.timestamp) && age >= 0 && age < 60_000;
-}`;
-
-const LIQUIDITY_HUB_SDK_QUOTE_RESPONSE_CODE = `{
-  "inToken": "0x1111111111111111111111111111111111111111",
-  "outToken": "0x6666666666666666666666666666666666666666",
-  "inAmount": "1000000000000000000",
-  "outAmount": "2495000000",
-  "user": "0x5555555555555555555555555555555555555555",
-  "slippage": 0.5,
-  "qs": "%3FinputCurrency%3D0x1111%26outputCurrency%3D0x6666%26swapType%3D1",
-  "partner": "external",
-  "exchange": "lh",
-  "sessionId": "example-session_137",
-  "serializedOrder": "0x1234",
-  "permitData": {
-    "domain": {
-      "name": "Permit2",
-      "chainId": 137,
-      "verifyingContract": "0x000000000022D473030F116dDEE9F6B43aC78BA3"
-    },
-    "types": {
-      "PermitWitnessTransferFrom": [
-        {
-          "name": "permitted",
-          "type": "TokenPermissions"
-        },
-        {
-          "name": "spender",
-          "type": "address"
-        },
-        {
-          "name": "nonce",
-          "type": "uint256"
-        },
-        {
-          "name": "deadline",
-          "type": "uint256"
-        },
-        {
-          "name": "witness",
-          "type": "ExclusiveDutchOrder"
-        }
-      ],
-      "TokenPermissions": [
-        {
-          "name": "token",
-          "type": "address"
-        },
-        {
-          "name": "amount",
-          "type": "uint256"
-        }
-      ],
-      "ExclusiveDutchOrder": [
-        {
-          "name": "info",
-          "type": "OrderInfo"
-        },
-        {
-          "name": "decayStartTime",
-          "type": "uint256"
-        },
-        {
-          "name": "decayEndTime",
-          "type": "uint256"
-        },
-        {
-          "name": "exclusiveFiller",
-          "type": "address"
-        },
-        {
-          "name": "exclusivityOverrideBps",
-          "type": "uint256"
-        },
-        {
-          "name": "inputToken",
-          "type": "address"
-        },
-        {
-          "name": "inputStartAmount",
-          "type": "uint256"
-        },
-        {
-          "name": "inputEndAmount",
-          "type": "uint256"
-        },
-        {
-          "name": "outputs",
-          "type": "DutchOutput[]"
-        }
-      ],
-      "OrderInfo": [
-        {
-          "name": "reactor",
-          "type": "address"
-        },
-        {
-          "name": "swapper",
-          "type": "address"
-        },
-        {
-          "name": "nonce",
-          "type": "uint256"
-        },
-        {
-          "name": "deadline",
-          "type": "uint256"
-        },
-        {
-          "name": "additionalValidationContract",
-          "type": "address"
-        },
-        {
-          "name": "additionalValidationData",
-          "type": "bytes"
-        }
-      ],
-      "DutchOutput": [
-        {
-          "name": "token",
-          "type": "address"
-        },
-        {
-          "name": "startAmount",
-          "type": "uint256"
-        },
-        {
-          "name": "endAmount",
-          "type": "uint256"
-        },
-        {
-          "name": "recipient",
-          "type": "address"
-        }
-      ]
-    },
-    "values": {
-      "permitted": {
-        "token": "0x1111111111111111111111111111111111111111",
-        "amount": {
-          "type": "BigNumber",
-          "hex": "0x0de0b6b3a7640000"
-        }
-      },
-      "spender": "0x2222222222222222222222222222222222222222",
-      "nonce": {
-        "type": "BigNumber",
-        "hex": "0x2a"
-      },
-      "deadline": 1788220800,
-      "witness": {
-        "info": {
-          "reactor": "0x2222222222222222222222222222222222222222",
-          "swapper": "0x5555555555555555555555555555555555555555",
-          "nonce": {
-            "type": "BigNumber",
-            "hex": "0x2a"
-          },
-          "deadline": 1788220800,
-          "additionalValidationContract": "0x7777777777777777777777777777777777777777",
-          "additionalValidationData": "0x"
-        },
-        "decayStartTime": 1788217200,
-        "decayEndTime": 1788217260,
-        "exclusiveFiller": "0x3333333333333333333333333333333333333333",
-        "exclusivityOverrideBps": {
-          "type": "BigNumber",
-          "hex": "0x00"
-        },
-        "inputToken": "0x1111111111111111111111111111111111111111",
-        "inputStartAmount": {
-          "type": "BigNumber",
-          "hex": "0x0de0b6b3a7640000"
-        },
-        "inputEndAmount": {
-          "type": "BigNumber",
-          "hex": "0x0de0b6b3a7640000"
-        },
-        "outputs": [
-          {
-            "token": "0x6666666666666666666666666666666666666666",
-            "startAmount": {
-              "type": "BigNumber",
-              "hex": "0x0f4240"
-            },
-            "endAmount": {
-              "type": "BigNumber",
-              "hex": "0x0f4240"
-            },
-            "recipient": "0x4444444444444444444444444444444444444444"
-          },
-          {
-            "token": "0x6666666666666666666666666666666666666666",
-            "startAmount": {
-              "type": "BigNumber",
-              "hex": "0x94b6adc0"
-            },
-            "endAmount": {
-              "type": "BigNumber",
-              "hex": "0x93f85348"
-            },
-            "recipient": "0x5555555555555555555555555555555555555555"
-          }
-        ]
-      }
-    }
+    "dexMinAmountOut": "2480000000"
   },
-  "eip712": {
-    "domain": {
-      "name": "Permit2",
-      "chainId": 137,
-      "verifyingContract": "0x000000000022D473030F116dDEE9F6B43aC78BA3"
-    },
-    "types": {
-      "PermitWitnessTransferFrom": [
-        {
-          "name": "permitted",
-          "type": "TokenPermissions"
-        },
-        {
-          "name": "spender",
-          "type": "address"
-        },
-        {
-          "name": "nonce",
-          "type": "uint256"
-        },
-        {
-          "name": "deadline",
-          "type": "uint256"
-        },
-        {
-          "name": "witness",
-          "type": "ExclusiveDutchOrder"
-        }
-      ],
-      "TokenPermissions": [
-        {
-          "name": "token",
-          "type": "address"
-        },
-        {
-          "name": "amount",
-          "type": "uint256"
-        }
-      ],
-      "ExclusiveDutchOrder": [
-        {
-          "name": "info",
-          "type": "OrderInfo"
-        },
-        {
-          "name": "decayStartTime",
-          "type": "uint256"
-        },
-        {
-          "name": "decayEndTime",
-          "type": "uint256"
-        },
-        {
-          "name": "exclusiveFiller",
-          "type": "address"
-        },
-        {
-          "name": "exclusivityOverrideBps",
-          "type": "uint256"
-        },
-        {
-          "name": "inputToken",
-          "type": "address"
-        },
-        {
-          "name": "inputStartAmount",
-          "type": "uint256"
-        },
-        {
-          "name": "inputEndAmount",
-          "type": "uint256"
-        },
-        {
-          "name": "outputs",
-          "type": "DutchOutput[]"
-        }
-      ],
-      "OrderInfo": [
-        {
-          "name": "reactor",
-          "type": "address"
-        },
-        {
-          "name": "swapper",
-          "type": "address"
-        },
-        {
-          "name": "nonce",
-          "type": "uint256"
-        },
-        {
-          "name": "deadline",
-          "type": "uint256"
-        },
-        {
-          "name": "additionalValidationContract",
-          "type": "address"
-        },
-        {
-          "name": "additionalValidationData",
-          "type": "bytes"
-        }
-      ],
-      "DutchOutput": [
-        {
-          "name": "token",
-          "type": "address"
-        },
-        {
-          "name": "startAmount",
-          "type": "uint256"
-        },
-        {
-          "name": "endAmount",
-          "type": "uint256"
-        },
-        {
-          "name": "recipient",
-          "type": "address"
-        }
-      ]
-    },
-    "primaryType": "PermitWitnessTransferFrom",
-    "message": {
-      "permitted": {
-        "token": "0x1111111111111111111111111111111111111111",
-        "amount": "1000000000000000000"
-      },
-      "spender": "0x2222222222222222222222222222222222222222",
-      "nonce": "1788217200123",
-      "deadline": 1788220800,
-      "witness": {
-        "info": {
-          "reactor": "0x2222222222222222222222222222222222222222",
-          "swapper": "0x5555555555555555555555555555555555555555",
-          "nonce": "1788217200123",
-          "deadline": 1788220800,
-          "additionalValidationContract": "0x7777777777777777777777777777777777777777",
-          "additionalValidationData": "0x"
-        },
-        "decayStartTime": 1788217200,
-        "decayEndTime": 1788217260,
-        "exclusiveFiller": "0x3333333333333333333333333333333333333333",
-        "exclusivityOverrideBps": "0",
-        "inputToken": "0x1111111111111111111111111111111111111111",
-        "inputStartAmount": "1000000000000000000",
-        "inputEndAmount": "1000000000000000000",
-        "outputs": [
-          {
-            "token": "0x6666666666666666666666666666666666666666",
-            "startAmount": "1000000",
-            "endAmount": "1000000",
-            "recipient": "0x4444444444444444444444444444444444444444"
-          },
-          {
-            "token": "0x6666666666666666666666666666666666666666",
-            "startAmount": "2495000000",
-            "endAmount": "2482525000",
-            "recipient": "0x5555555555555555555555555555555555555555"
-          }
-        ]
-      }
-    }
-  },
-  "outAmountWS": "2495000000",
-  "outAmountWsMinusGas": "2494000000",
-  "minAmountOut": "2482525000",
-  "amountOutUI": "-1",
-  "inTokenUsd": 2500,
-  "outTokenUsd": 1,
-  "gasAmountOut": "1000000",
-  "referencePrice": "2495000000",
-  "userMinOutAmountWithGas": "2482525000",
-  "timestamp": 1788217200000
+  "receivedAt": 1794222000000,
+  "amountOut": "2500000000",
+  "netAmountOut": "2495000000",
+  "minimumAmountOut": "2482525000",
+  "feeAmount": "5000000",
+  "inputAmountUsd": "2500",
+  "netAmountOutUsd": "2495",
+  "minimumAmountOutUsd": "2482.525",
+  "priceImpactPercentage": "-0.2"
 }`;
 
-const LIQUIDITY_HUB_SDK_FULL_FLOW_CODE = `import { createClient, isFreshQuote, isNativeAddress, permit2Address, type Quote } from "@orbs-network/liquidity-hub-sdk";
-import { createPublicClient, createWalletClient, custom, erc20Abi, http, parseAbi, type Address, type Hash, type Hex, type PublicClient, type TransactionReceipt, type WalletClient } from "viem";
-import { polygon } from "viem/chains";
+const SPOT_SUBMIT_SWAP_CODE = `import type {
+  Address, Eip712TypedData, Hex, Order, PreparedSwap, SpotClient, SwapQuote,
+} from "@orbs-network/spot-ui";
 
-// Use the partner identifier supplied by Orbs; otherwise use "external".
-const partner = "external";
-// Use the active Viem chain from the connected wallet; Polygon is only an example.
-const chain = polygon;
-const liquidityHubClient = createClient({ chainId: chain.id, partner });
-const wrappedNativeAbi = parseAbi(["function deposit() payable"]);
-
-export interface ExecuteLiquidityHubSwapParams {
-  // Quote previously selected by the host against its DEX route.
-  selectedQuote: Quote;
-  // Host-selected token before native input is replaced with its wrapped token.
-  inputTokenAddress: Address;
-  account: Address;
-  // Reuses the host's current quote inputs when the selected quote is stale.
-  refetchQuote: () => Promise<Quote>;
-  // Optional host DEX target and calldata forwarded as dexTx by the SDK.
-  dexRouterData?: { data?: Hex; to?: Address };
+// Example host services, not an SDK wallet-adapter interface.
+export interface SwapWallet {
+  getAllowance(token: string, spender: Address): Promise<string>;
+  // Both writes must resolve only after a successful receipt.
+  wrapNativeToken(amountRaw: string): Promise<Hex>;
+  approveToken(token: string, spender: Address, amountRaw: string): Promise<Hex>;
+  signTypedData(params: Eip712TypedData & { account: Address }): Promise<Hex>;
 }
 
-export async function executeLiquidityHubSwap({
-  selectedQuote,
-  inputTokenAddress,
-  account,
-  refetchQuote,
-  dexRouterData,
-}: ExecuteLiquidityHubSwapParams): Promise<TransactionReceipt> {
-  const walletProvider = (
-    window as unknown as { ethereum: Parameters<typeof custom>[0] }
-  ).ethereum;
-  const publicClient = createPublicClient({ chain, transport: http() });
-  const walletClient = createWalletClient({
-    chain,
-    transport: custom(walletProvider),
-  });
+// Keep this state outside a transient modal, scoped to one reviewed attempt.
+export interface SwapAttempt {
+  wrapTxHash?: Hex;
+  approvalTxHash?: Hex;
+  prepared?: PreparedSwap;
+  signature?: Hex;
+  order?: Order;
+}
 
-  if (isNativeAddress(inputTokenAddress)) {
-    await wrapNativeInput({
-      account,
-      amount: BigInt(selectedQuote.inAmount),
-      publicClient,
-      token: selectedQuote.inToken as Address,
-      walletClient,
-    });
+// Call once under the host's execution lock. Resolves at acceptance, before fill.
+export async function executeSpotSwap(
+  params: {
+    client: SpotClient;
+    quote: SwapQuote;
+    account: Address;
+    wallet: SwapWallet;
+    nativeInput: boolean;
+    attempt: SwapAttempt;
+    signal?: AbortSignal;
+    // Throw if the captured account, chain, pair, or review is obsolete.
+    assertCurrent: () => void;
+    // Freeze final quote amounts and slippage in the host's review UI.
+    onPrepared: (prepared: PreparedSwap) => void;
+  },
+): Promise<Order> {
+  const { client, account, wallet, attempt, signal } = params;
+  const quote = { ...params.quote, request: { ...params.quote.request } };
+  const token = quote.request.inToken; // Wrapped ERC-20 for native input.
+  const amount = quote.request.inAmount;
+  const spender = client.spenderAddress;
+  const check = () => { signal?.throwIfAborted(); params.assertCurrent(); };
+  check();
+  let allowance = await wallet.getAllowance(token, spender);
+  check();
+  if (params.nativeInput) {
+    attempt.wrapTxHash = await wallet.wrapNativeToken(amount);
+    check();
   }
-
-  await approvePermit2IfNeeded({
-    account,
-    amount: BigInt(selectedQuote.inAmount),
-    publicClient,
-    token: selectedQuote.inToken as Address,
-    walletClient,
-  });
-
-  // Refresh after 60 seconds because market prices and available liquidity may
-  // have moved enough that the old quote is no longer safely executable.
-  const quote = isFreshQuote(selectedQuote, 60)
-    ? selectedQuote
-    : await refetchQuote();
-
-  const signature = await walletClient.signTypedData({
-    ...quote.eip712,
-    account,
-  });
-
-  const txHash = await liquidityHubClient.swap(quote, signature, dexRouterData);
-  const receipt = await waitForSuccessfulReceipt(publicClient, txHash as Hash);
-
-  return receipt;
-}
-
-interface PrepareInputParams {
-  account: Address;
-  amount: bigint;
-  publicClient: PublicClient;
-  token: Address;
-  walletClient: WalletClient;
-}
-
-async function wrapNativeInput({
-  account,
-  amount,
-  publicClient,
-  token,
-  walletClient,
-}: PrepareInputParams): Promise<void> {
-  const hash = await walletClient.writeContract({
-    account,
-    address: token,
-    abi: wrappedNativeAbi,
-    functionName: "deposit",
-    value: amount,
-    chain: walletClient.chain,
-  });
-  await waitForSuccessfulReceipt(publicClient, hash);
-}
-
-async function approvePermit2IfNeeded({
-  account,
-  amount,
-  publicClient,
-  token,
-  walletClient,
-}: PrepareInputParams): Promise<void> {
-  const allowance = await publicClient.readContract({
-    address: token,
-    abi: erc20Abi,
-    functionName: "allowance",
-    args: [account, permit2Address as Address],
-  });
-  if (allowance >= amount) return;
-
-  const hash = await walletClient.writeContract({
-    account,
-    address: token,
-    abi: erc20Abi,
-    functionName: "approve",
-    args: [permit2Address as Address, amount],
-    chain: walletClient.chain,
-  });
-  await waitForSuccessfulReceipt(publicClient, hash);
-}
-
-async function waitForSuccessfulReceipt(
-  publicClient: PublicClient,
-  hash: Hash,
-): Promise<TransactionReceipt> {
-  const receipt = await publicClient.waitForTransactionReceipt({ hash });
-  if (receipt.status !== "success") {
-    throw new Error("Transaction reverted");
+  if (BigInt(allowance) < BigInt(amount)) {
+    attempt.approvalTxHash = await wallet.approveToken(token, spender, amount);
+    check();
+    allowance = await wallet.getAllowance(token, spender);
+    check();
   }
-  return receipt;
+  if (BigInt(allowance) < BigInt(amount)) {
+    throw new Error("Confirmed approval is still insufficient");
+  }
+  attempt.prepared = await client.prepareSwap({ quote, account, signal });
+  check();
+  params.onPrepared(attempt.prepared);
+  check();
+  const { signerAddress, typedData } = attempt.prepared.signingRequest;
+  attempt.signature = await wallet.signTypedData({ ...typedData, account: signerAddress });
+  check();
+  attempt.order = await client.submitSwap(attempt.prepared.order, attempt.signature, { signal });
+  return attempt.order;
 }
 
-/*
-Key values
-
-- liquidityHubClient: SDK client bound to the active chain and partner.
-- publicClient: created when execution starts; reads allowances and confirms
-  transaction receipts for the active chain.
-- walletClient: created when execution starts from the connected provider; sends
-  wrap/approval transactions and signs the quote.
-- selectedQuote: Liquidity Hub quote chosen during route selection.
-- inputTokenAddress: token originally selected by the user. It may be a native
-  token placeholder even though selectedQuote.inToken is its wrapped ERC-20.
-- account: connected wallet that requested and signs the quote.
-- refetchQuote: callback from the host quote layer. It is called only when the
-  selected quote is stale and already knows the current tokens, amount, account,
-  slippage, and DEX minimum output.
-- 60-second freshness: limits exposure to price and liquidity changes between
-  quote selection and signing. A stale quote is refreshed before it is signed.
-- dexRouterData: optional host DEX transaction target and calldata in the shape
-  { to?: Address; data?: Hex }. The SDK forwards it as dexTx with the swap
-  request. Leave it undefined when there is no DEX router transaction to attach.
-- receipt: successful on-chain transaction receipt returned to the caller. Read
-  receipt.transactionHash when the host only needs the confirmed hash.
-*/`;
+// The host polls client.getOrder({ orderId: attempt.order.id, signal }) serially
+// until OrderStatus.Completed or another terminal outcome. Missing lookup data
+// or a stopped poller does not prove failure. Preserve prepared/signature when
+// acceptance is uncertain; reconcile before a replacement or DEX fallback.
+`;
 
 const ORDER_HISTORY_REQUEST_CODE = `export async function fetchOrderHistory() {
   const search = new URLSearchParams({
@@ -882,55 +160,12 @@ const ORDER_HISTORY_REQUEST_CURL = `curl --get 'https://order-sink-v2.orbs.netwo
   --data-urlencode 'exchange=external'`;
 
 const ADVANCED_ORDER_CREATE_FILE = {
-    "code": "import { createPublicClient, createWalletClient, custom, erc20Abi, parseAbi } from \"viem\";\n\nimport type { Address, CreateOrderResponse, OrderInput, OrderResponse, PermitData, PermitOrder, Signature, SignedOrder } from \"./order-types\";\n\n// Example wallet values. Use the connected account and active chain from your host.\n// Refresh these values when the wallet account or network changes.\nconst account: Address = \"0x1111111111111111111111111111111111111111\";\nconst chainId = 137;\n\n// Use the connected EIP-1193 provider from your host wallet integration.\nconst walletProvider = (window as unknown as { ethereum: Parameters<typeof custom>[0] }).ethereum;\nconst publicClient = createPublicClient({ transport: custom(walletProvider) });\nconst walletClient = createWalletClient({ account, transport: custom(walletProvider) });\n\nconst wrappedNativeAbi = parseAbi([\"function deposit() payable\"]);\n\nexport async function submitOrdersSinkOrder({\n  orderInput,\n  wTokenAddress,\n}: {\n  // Derived swap data owned by the host's form and state layer.\n  orderInput: OrderInput;\n  // Wrapped native token for the active chain, supplied by the host.\n  wTokenAddress: Address;\n}): Promise<OrderResponse> {\n  // 1. Fetch the trusted default template for this partner and active chain.\n  const permitData = await fetchDefaultPermitData(\"external\", chainId);\n\n  // 2. Prepare the complete source amount before asking for a signature.\n  // Allowance belongs to RePermit, not to order.spender (the reactor).\n  const spender = permitData.domain.verifyingContract;\n  const inputTokenAddress = orderInput.sourceIsNative ? wTokenAddress : orderInput.inputToken.address;\n  // Reject invalid amounts and strategy fields before any wallet transaction.\n  validateOrderInput(orderInput, inputTokenAddress);\n  const requiredAmount = BigInt(orderInput.totalInputAmount);\n\n  if (orderInput.sourceIsNative) {\n    // Wrap the complete amount, then use WToken everywhere in the signed order.\n    const wrapHash = await walletClient.writeContract({\n      address: wTokenAddress,\n      abi: wrappedNativeAbi,\n      functionName: \"deposit\",\n      value: requiredAmount,\n      account,\n      chain: walletClient.chain,\n    });\n    const wrapReceipt = await publicClient.waitForTransactionReceipt({ hash: wrapHash });\n    if (wrapReceipt.status !== \"success\") throw new Error(\"Native token wrap reverted\");\n  }\n\n  const allowance = await publicClient.readContract({\n    address: inputTokenAddress,\n    abi: erc20Abi,\n    functionName: \"allowance\",\n    args: [account, spender],\n  });\n\n  if (allowance < requiredAmount) {\n    // This direct-integration reference grants only the complete order amount.\n    // A maximum allowance must be an explicit host security decision.\n    const approveHash = await walletClient.writeContract({\n      address: inputTokenAddress,\n      abi: erc20Abi,\n      functionName: \"approve\",\n      args: [spender, requiredAmount],\n      account,\n      chain: walletClient.chain,\n    });\n    const approveReceipt = await publicClient.waitForTransactionReceipt({ hash: approveHash });\n    if (approveReceipt.status !== \"success\") throw new Error(\"Token approval reverted\");\n  }\n\n  // 3. Build and sign using the same permit data fetched above.\n  const { order, signature } = await signOrder({\n    orderInput,\n    permitData,\n    inputTokenAddress,\n  });\n  return submitOrder(order, signature);\n}\n\nasync function submitOrder(\n  order: PermitOrder,\n  signature: Signature,\n): Promise<OrderResponse> {\n  const body: SignedOrder = { signature, order, status: \"pending\" };\n  const response = await fetch(\"https://order-sink-v2.orbs.network/orders/new\", {\n    method: \"POST\",\n    headers: {\n      Accept: \"application/json\",\n      \"Content-Type\": \"application/json\",\n    },\n    body: JSON.stringify(body),\n  });\n  const result = (await response.json().catch(() => ({}))) as CreateOrderResponse;\n\n  if (!response.ok || !result.success) {\n    const message = \"message\" in result ? result.message : undefined;\n    throw new Error(message ?? response.statusText ?? \"Order creation failed\");\n  }\n\n  return result.signedOrder;\n}\n\n/*\nCreate order flow\n\n1. Fetch and validate the default permit template for the partner and active chain.\n2. Validate amounts and strategy fields, then check allowance, wrap native input when needed, and approve RePermit when\n   allowance does not cover the complete order amount.\n3. Pass the fetched permit data, derived values, and resolved input token\n   to signOrder(). It builds and signs using that same template.\n4. Submit the exact signed order and require HTTP and API success, then keep the returned signedOrder\n   for progress, history, fills, and cancellation.\n\nUse the connected account, chain, and wallet provider from the host for the\nsetup above. Recreate the clients when the wallet connection changes.\nThe flow itself stays framework-neutral.\n*/\n\nasync function signOrder({\n  orderInput,\n  permitData,\n  inputTokenAddress,\n}: {\n  orderInput: OrderInput;\n  permitData: PermitData;\n  inputTokenAddress: Address;\n}): Promise<{ order: PermitOrder; signature: Signature }> {\n  const { order } = buildOrderFromDerivedValues({\n    orderInput,\n    permitData,\n    inputTokenAddress,\n  });\n  const signTypedDataArgs = {\n    account,\n    domain: permitData.domain,\n    message: order,\n    primaryType: permitData.primaryType,\n    types: permitData.types,\n  } as const;\n\n  // Keep the complete EIP-712 hex signature returned by the wallet.\n  const signature = await walletClient.signTypedData(signTypedDataArgs);\n\n  // Preserve the exact object that was signed for POST /orders/new.\n  return { signature, order };\n}\n\nfunction buildOrderFromDerivedValues({\n  orderInput,\n  permitData,\n  inputTokenAddress,\n}: {\n  // Derived swap data owned by the host's form and state layer.\n  orderInput: OrderInput;\n  // Resolved ERC-20 input address; use the wrapped token for native input.\n  inputTokenAddress: Address;\n  // Fresh template fetched for this partner and active chain.\n  permitData: PermitData;\n}): { order: PermitOrder; permitData: PermitData } {\n  validatePermitData(permitData, chainId);\n  const currentTimeMillis = Date.now();\n  const { epoch, freshness, deadline } = validateOrderInput(orderInput, inputTokenAddress, currentTimeMillis);\n  const nonce = currentTimeMillis.toString();\n  const start = Math.floor(currentTimeMillis / 1_000).toString();\n  const order = {\n    permitted: {\n      token: inputTokenAddress,\n      amount: orderInput.totalInputAmount,\n    },\n    spender: permitData.order.spender,\n    nonce,\n    deadline,\n    witness: {\n      reactor: permitData.order.witness.reactor,\n      executor: permitData.order.witness.executor,\n      exchange: {\n        adapter: permitData.order.witness.exchange.adapter,\n        ref: permitData.order.witness.exchange.ref,\n        share: permitData.order.witness.exchange.share,\n        data: permitData.order.witness.exchange.data,\n      },\n      swapper: account,\n      nonce,\n      start,\n      deadline,\n      chainid: chainId,\n      exclusivity: permitData.order.witness.exclusivity,\n      epoch,\n      slippage: orderInput.slippageBps,\n      freshness,\n      input: {\n        token: inputTokenAddress,\n        amount: orderInput.srcAmountPerFill,\n        maxAmount: orderInput.totalInputAmount,\n      },\n      output: {\n        token: orderInput.dstToken,\n        limit: orderInput.dstMinAmountPerFill,\n        triggerLower: orderInput.triggerLower,\n        triggerUpper: orderInput.triggerUpper,\n        recipient: account,\n      },\n    },\n  } satisfies PermitOrder;\n\n  return { order, permitData };\n}\n\nexport async function fetchDefaultPermitData(\n  partnerId: string,\n  chainId: number,\n): Promise<PermitData> {\n  const query = new URLSearchParams({\n    partner: partnerId,\n    chain: String(chainId),\n  });\n  const response = await fetch(`https://order-sink-v2.orbs.network/config?${query}`, {\n    headers: { Accept: \"application/json\" },\n  });\n  if (!response.ok) {\n    throw new Error(\"Failed to fetch default permit data (\" + response.status + \")\");\n  }\n\n  const data: unknown = await response.json();\n  validatePermitData(data, chainId);\n  return data;\n}\n\nfunction requireRecord(value: unknown): Record<string, unknown> {\n  if (!value || typeof value !== \"object\" || Array.isArray(value)) {\n    throw new Error(\"Invalid configuration: expected an object\");\n  }\n  return value as Record<string, unknown>;\n}\n\nfunction validateAddress(value: unknown, field: string, allowZero = false): void {\n  if (typeof value !== \"string\" || !/^0x[0-9a-fA-F]{40}$/.test(value)\n    || (!allowZero && /^0x0{40}$/i.test(value))) {\n    throw new Error(`${field} must be a valid ${allowZero ? \"\" : \"non-zero \"}address`);\n  }\n}\n\nfunction validateUint32(value: unknown, field: string, max = 0xffffffff): asserts value is number {\n  if (typeof value !== \"number\" || !Number.isInteger(value) || value < 0 || value > max) {\n    throw new Error(`${field} must be an integer between 0 and ${max}`);\n  }\n}\n\nfunction validatePermitData(value: unknown, expectedChainId: number): asserts value is PermitData {\n  const data = requireRecord(value);\n  const domain = requireRecord(data.domain);\n  const order = requireRecord(data.order);\n  const witness = requireRecord(order.witness);\n  const exchange = requireRecord(witness.exchange);\n  if (!Number.isSafeInteger(expectedChainId) || expectedChainId <= 0\n    || domain.chainId !== expectedChainId || witness.chainid !== expectedChainId) {\n    throw new Error(\"Configuration domain and witness chain IDs must match the connected chain\");\n  }\n  for (const [field, address] of Object.entries({\n    \"domain.verifyingContract\": domain.verifyingContract,\n    \"order.spender\": order.spender,\n    \"witness.reactor\": witness.reactor,\n    \"witness.executor\": witness.executor,\n    \"exchange.adapter\": exchange.adapter,\n  })) validateAddress(address, field);\n  if ((order.spender as string).toLowerCase() !== (witness.reactor as string).toLowerCase()) {\n    throw new Error(\"Configuration spender must match the reactor\");\n  }\n  validateAddress(exchange.ref, \"exchange.ref\", true);\n  validateUint32(exchange.share, \"exchange.share\", 10_000);\n  validateUint32(witness.exclusivity, \"witness.exclusivity\");\n  if (typeof exchange.data !== \"string\" || !/^0x(?:[0-9a-fA-F]{2})*$/.test(exchange.data)) {\n    throw new Error(\"Configuration exchange.data must be hex bytes\");\n  }\n  const types = requireRecord(data.types);\n  const primaryFields = types.RePermitWitnessTransferFrom;\n  if (typeof domain.name !== \"string\" || !domain.name\n    || typeof domain.version !== \"string\" || !domain.version\n    || data.primaryType !== \"RePermitWitnessTransferFrom\"\n    || !Array.isArray(primaryFields) || primaryFields.length === 0) {\n    throw new Error(\"Configuration must include the EIP-712 domain, primary type, and type definitions\");\n  }\n  for (const name of [\"Order\", \"Exchange\", \"Input\", \"Output\", \"TokenPermissions\"]) {\n    if (!Array.isArray(types[name]) || types[name].length === 0) {\n      throw new Error(`Configuration is missing EIP-712 type ${name}`);\n    }\n  }\n  for (const fields of Object.values(types)) {\n    if (!Array.isArray(fields) || fields.some((field: unknown) => {\n      const entry = requireRecord(field);\n      return typeof entry.name !== \"string\" || !entry.name || typeof entry.type !== \"string\" || !entry.type;\n    })) throw new Error(\"Configuration contains invalid EIP-712 type definitions\");\n  }\n}\n\nfunction rawAmount(value: string, field: string): bigint {\n  if (typeof value !== \"string\" || !/^\\d+$/.test(value)) {\n    throw new Error(`${field} must be an unsigned integer string in token base units`);\n  }\n  const amount = BigInt(value);\n  if (amount > (1n << 256n) - 1n) throw new Error(`${field} exceeds uint256`);\n  return amount;\n}\n\nfunction validateOrderInput(orderInput: OrderInput, inputTokenAddress: Address, now = Date.now()) {\n  validateAddress(inputTokenAddress, \"Input token\");\n  validateAddress(orderInput.dstToken, \"Output token\");\n  if (inputTokenAddress.toLowerCase() === orderInput.dstToken.toLowerCase()) {\n    throw new Error(\"Input and output tokens must differ\");\n  }\n  if (!Number.isSafeInteger(orderInput.totalTrades) || orderInput.totalTrades < 1) {\n    throw new Error(\"totalTrades must be a positive safe integer\");\n  }\n  const total = rawAmount(orderInput.totalInputAmount, \"totalInputAmount\");\n  const perFill = rawAmount(orderInput.srcAmountPerFill, \"srcAmountPerFill\");\n  if (total === 0n || perFill === 0n || total !== perFill * BigInt(orderInput.totalTrades)) {\n    throw new Error(\"Total input must equal a positive per-fill amount multiplied by totalTrades\");\n  }\n  rawAmount(orderInput.dstMinAmountPerFill, \"dstMinAmountPerFill\");\n  const lower = rawAmount(orderInput.triggerLower, \"triggerLower\");\n  const upper = rawAmount(orderInput.triggerUpper, \"triggerUpper\");\n  const isTwap = orderInput.totalTrades > 1;\n  if ((isTwap && (lower !== 0n || upper !== 0n)) || (lower !== 0n && upper !== 0n)) {\n    throw new Error(\"TWAP requires zero triggers; one-fill strategies use at most one trigger\");\n  }\n  if (!Number.isSafeInteger(orderInput.fillDelayMillis) || orderInput.fillDelayMillis < 0\n    || orderInput.fillDelayMillis % 1_000 !== 0\n    || (!isTwap && orderInput.fillDelayMillis !== 0)) {\n    throw new Error(\"fillDelayMillis must use whole seconds, or 0 for a single fill\");\n  }\n  const epoch = isTwap ? orderInput.fillDelayMillis / 1_000 : 0;\n  validateUint32(epoch, \"epoch\");\n  if (isTwap && epoch < 2) throw new Error(\"TWAP epoch must allow a positive freshness shorter than the interval\");\n  const freshness = orderInput.freshnessSeconds ?? 60;\n  validateUint32(freshness, \"freshnessSeconds\");\n  if (freshness === 0 || (isTwap && freshness >= epoch)) {\n    throw new Error(\"Freshness must be positive and strictly less than the TWAP epoch\");\n  }\n  validateUint32(orderInput.slippageBps, \"slippageBps\", 5_000);\n  if (!Number.isSafeInteger(orderInput.deadlineMillis) || orderInput.deadlineMillis <= 0) {\n    throw new Error(\"Deadline must be a positive safe integer timestamp in milliseconds\");\n  }\n  const start = BigInt(Math.floor(now / 1_000));\n  const deadline = BigInt(Math.floor(orderInput.deadlineMillis / 1_000));\n  const lastFill = start + BigInt(epoch) * BigInt(orderInput.totalTrades - 1);\n  if (deadline <= start || deadline < lastFill) {\n    throw new Error(\"Deadline must allow every scheduled fill and be in the future\");\n  }\n  return { epoch, freshness, deadline: deadline.toString() };\n}\n",
+    "code": "import { createPublicClient, createWalletClient, custom, erc20Abi, parseAbi } from \"viem\";\n\nimport type { Address, CreateOrderResponse, OrderInput, OrderResponse, PermitData, PermitOrder, Signature, SignedOrder } from \"./order-types\";\n\n// Example wallet values. Use the connected account and active chain from your host.\n// Refresh these values when the wallet account or network changes.\nconst account: Address = \"0x1111111111111111111111111111111111111111\";\nconst chainId = 137;\n\n// Use the connected EIP-1193 provider from your host wallet integration.\nconst walletProvider = (window as unknown as { ethereum: Parameters<typeof custom>[0] }).ethereum;\nconst publicClient = createPublicClient({ transport: custom(walletProvider) });\nconst walletClient = createWalletClient({ account, transport: custom(walletProvider) });\n\nconst wrappedNativeAbi = parseAbi([\"function deposit() payable\"]);\n\nexport async function submitOrdersSinkOrder({\n  orderInput,\n  wTokenAddress,\n}: {\n  // Derived swap data owned by the host's form and state layer.\n  orderInput: OrderInput;\n  // Wrapped native token for the active chain, supplied by the host.\n  wTokenAddress: Address;\n}): Promise<OrderResponse> {\n  // 1. Fetch the trusted default template for this partner and active chain.\n  const permitData = await fetchDefaultPermitData(\"external\", chainId);\n\n  // 2. Prepare the complete source amount before asking for a signature.\n  // Allowance belongs to RePermit, not to order.spender (the reactor).\n  const spender = permitData.domain.verifyingContract;\n  const inputTokenAddress = orderInput.sourceIsNative ? wTokenAddress : orderInput.inputToken.address;\n  // Reject invalid amounts and strategy fields before any wallet transaction.\n  validateOrderInput(orderInput, inputTokenAddress);\n  const requiredAmount = BigInt(orderInput.totalInputAmount);\n\n  let allowance = await publicClient.readContract({\n    address: inputTokenAddress,\n    abi: erc20Abi,\n    functionName: \"allowance\",\n    args: [account, spender],\n  });\n\n  if (orderInput.sourceIsNative) {\n    // Wrap the complete amount, then use WToken everywhere in the signed order.\n    const wrapHash = await walletClient.writeContract({\n      address: wTokenAddress,\n      abi: wrappedNativeAbi,\n      functionName: \"deposit\",\n      value: requiredAmount,\n      account,\n      chain: walletClient.chain,\n    });\n    const wrapReceipt = await publicClient.waitForTransactionReceipt({ hash: wrapHash });\n    if (wrapReceipt.status !== \"success\") throw new Error(\"Native token wrap reverted\");\n  }\n\n  if (allowance < requiredAmount) {\n    // This direct-integration reference grants only the complete order amount.\n    // A maximum allowance must be an explicit host security decision.\n    const approveHash = await walletClient.writeContract({\n      address: inputTokenAddress,\n      abi: erc20Abi,\n      functionName: \"approve\",\n      args: [spender, requiredAmount],\n      account,\n      chain: walletClient.chain,\n    });\n    const approveReceipt = await publicClient.waitForTransactionReceipt({ hash: approveHash });\n    if (approveReceipt.status !== \"success\") throw new Error(\"Token approval reverted\");\n    allowance = await publicClient.readContract({\n      address: inputTokenAddress,\n      abi: erc20Abi,\n      functionName: \"allowance\",\n      args: [account, spender],\n    });\n  }\n  if (allowance < requiredAmount) {\n    throw new Error(\"Confirmed approval is still insufficient\");\n  }\n\n  // 3. Build and sign using the same permit data fetched above.\n  const { order, signature } = await signOrder({\n    orderInput,\n    permitData,\n    inputTokenAddress,\n  });\n  return submitOrder(order, signature);\n}\n\nasync function submitOrder(\n  order: PermitOrder,\n  signature: Signature,\n): Promise<OrderResponse> {\n  const body: SignedOrder = { signature, order, status: \"pending\" };\n  const response = await fetch(\"https://order-sink-v2.orbs.network/orders/new\", {\n    method: \"POST\",\n    headers: {\n      Accept: \"application/json\",\n      \"Content-Type\": \"application/json\",\n    },\n    body: JSON.stringify(body),\n  });\n  const result = (await response.json().catch(() => ({}))) as CreateOrderResponse;\n\n  if (!response.ok || !result.success) {\n    const message = \"message\" in result ? result.message : undefined;\n    throw new Error(message ?? response.statusText ?? \"Order creation failed\");\n  }\n\n  return result.signedOrder;\n}\n\n/*\nCreate order flow\n\n1. Fetch and validate the default permit template for the partner and active chain.\n2. Validate amounts and strategy fields, then check allowance, wrap native input when needed, and approve RePermit when\n   allowance does not cover the complete order amount.\n3. Pass the fetched permit data, derived values, and resolved input token\n   to signOrder(). It builds and signs using that same template.\n4. Submit the exact signed order and require HTTP and API success, then keep the returned signedOrder\n   for progress, history, fills, and cancellation.\n\nUse the connected account, chain, and wallet provider from the host for the\nsetup above. Recreate the clients when the wallet connection changes.\nThe flow itself stays framework-neutral.\n*/\n\nasync function signOrder({\n  orderInput,\n  permitData,\n  inputTokenAddress,\n}: {\n  orderInput: OrderInput;\n  permitData: PermitData;\n  inputTokenAddress: Address;\n}): Promise<{ order: PermitOrder; signature: Signature }> {\n  const { order } = buildOrderFromDerivedValues({\n    orderInput,\n    permitData,\n    inputTokenAddress,\n  });\n  const signTypedDataArgs = {\n    account,\n    domain: permitData.domain,\n    message: order,\n    primaryType: permitData.primaryType,\n    types: permitData.types,\n  } as const;\n\n  // Keep the complete EIP-712 hex signature returned by the wallet.\n  const signature = await walletClient.signTypedData(signTypedDataArgs);\n\n  // Preserve the exact object that was signed for POST /orders/new.\n  return { signature, order };\n}\n\nfunction buildOrderFromDerivedValues({\n  orderInput,\n  permitData,\n  inputTokenAddress,\n}: {\n  // Derived swap data owned by the host's form and state layer.\n  orderInput: OrderInput;\n  // Resolved ERC-20 input address; use the wrapped token for native input.\n  inputTokenAddress: Address;\n  // Fresh template fetched for this partner and active chain.\n  permitData: PermitData;\n}): { order: PermitOrder; permitData: PermitData } {\n  validatePermitData(permitData, chainId);\n  const currentTimeMillis = Date.now();\n  const { epoch, freshness, deadline } = validateOrderInput(orderInput, inputTokenAddress, currentTimeMillis);\n  const nonce = currentTimeMillis.toString();\n  const start = Math.floor(currentTimeMillis / 1_000).toString();\n  const order = {\n    permitted: {\n      token: inputTokenAddress,\n      amount: orderInput.totalInputAmount,\n    },\n    spender: permitData.order.spender,\n    nonce,\n    deadline,\n    witness: {\n      reactor: permitData.order.witness.reactor,\n      executor: permitData.order.witness.executor,\n      exchange: {\n        adapter: permitData.order.witness.exchange.adapter,\n        ref: permitData.order.witness.exchange.ref,\n        share: permitData.order.witness.exchange.share,\n        data: permitData.order.witness.exchange.data,\n      },\n      swapper: account,\n      nonce,\n      start,\n      deadline,\n      chainid: chainId,\n      exclusivity: permitData.order.witness.exclusivity,\n      epoch,\n      slippage: orderInput.slippageBps,\n      freshness,\n      input: {\n        token: inputTokenAddress,\n        amount: orderInput.srcAmountPerFill,\n        maxAmount: orderInput.totalInputAmount,\n      },\n      output: {\n        token: orderInput.dstToken,\n        limit: orderInput.dstMinAmountPerFill,\n        triggerLower: orderInput.triggerLower,\n        triggerUpper: orderInput.triggerUpper,\n        recipient: account,\n      },\n    },\n  } satisfies PermitOrder;\n\n  return { order, permitData };\n}\n\nexport async function fetchDefaultPermitData(\n  partnerId: string,\n  chainId: number,\n): Promise<PermitData> {\n  const query = new URLSearchParams({\n    partner: partnerId,\n    chain: String(chainId),\n  });\n  const response = await fetch(`https://order-sink-v2.orbs.network/config?${query}`, {\n    headers: { Accept: \"application/json\" },\n  });\n  if (!response.ok) {\n    throw new Error(\"Failed to fetch default permit data (\" + response.status + \")\");\n  }\n\n  const data: unknown = await response.json();\n  validatePermitData(data, chainId);\n  return data;\n}\n\nfunction requireRecord(value: unknown): Record<string, unknown> {\n  if (!value || typeof value !== \"object\" || Array.isArray(value)) {\n    throw new Error(\"Invalid configuration: expected an object\");\n  }\n  return value as Record<string, unknown>;\n}\n\nfunction validateAddress(value: unknown, field: string, allowZero = false): void {\n  if (typeof value !== \"string\" || !/^0x[0-9a-fA-F]{40}$/.test(value)\n    || (!allowZero && /^0x0{40}$/i.test(value))) {\n    throw new Error(`${field} must be a valid ${allowZero ? \"\" : \"non-zero \"}address`);\n  }\n}\n\nfunction validateUint32(value: unknown, field: string, max = 0xffffffff): asserts value is number {\n  if (typeof value !== \"number\" || !Number.isInteger(value) || value < 0 || value > max) {\n    throw new Error(`${field} must be an integer between 0 and ${max}`);\n  }\n}\n\nfunction validatePermitData(value: unknown, expectedChainId: number): asserts value is PermitData {\n  const data = requireRecord(value);\n  const domain = requireRecord(data.domain);\n  const order = requireRecord(data.order);\n  const witness = requireRecord(order.witness);\n  const exchange = requireRecord(witness.exchange);\n  if (!Number.isSafeInteger(expectedChainId) || expectedChainId <= 0\n    || domain.chainId !== expectedChainId || witness.chainid !== expectedChainId) {\n    throw new Error(\"Configuration domain and witness chain IDs must match the connected chain\");\n  }\n  for (const [field, address] of Object.entries({\n    \"domain.verifyingContract\": domain.verifyingContract,\n    \"order.spender\": order.spender,\n    \"witness.reactor\": witness.reactor,\n    \"witness.executor\": witness.executor,\n    \"exchange.adapter\": exchange.adapter,\n  })) validateAddress(address, field);\n  if ((order.spender as string).toLowerCase() !== (witness.reactor as string).toLowerCase()) {\n    throw new Error(\"Configuration spender must match the reactor\");\n  }\n  validateAddress(exchange.ref, \"exchange.ref\", true);\n  validateUint32(exchange.share, \"exchange.share\", 10_000);\n  validateUint32(witness.exclusivity, \"witness.exclusivity\");\n  if (typeof exchange.data !== \"string\" || !/^0x(?:[0-9a-fA-F]{2})*$/.test(exchange.data)) {\n    throw new Error(\"Configuration exchange.data must be hex bytes\");\n  }\n  const types = requireRecord(data.types);\n  const primaryFields = types.RePermitWitnessTransferFrom;\n  if (typeof domain.name !== \"string\" || !domain.name\n    || typeof domain.version !== \"string\" || !domain.version\n    || data.primaryType !== \"RePermitWitnessTransferFrom\"\n    || !Array.isArray(primaryFields) || primaryFields.length === 0) {\n    throw new Error(\"Configuration must include the EIP-712 domain, primary type, and type definitions\");\n  }\n  for (const name of [\"Order\", \"Exchange\", \"Input\", \"Output\", \"TokenPermissions\"]) {\n    if (!Array.isArray(types[name]) || types[name].length === 0) {\n      throw new Error(`Configuration is missing EIP-712 type ${name}`);\n    }\n  }\n  for (const fields of Object.values(types)) {\n    if (!Array.isArray(fields) || fields.some((field: unknown) => {\n      const entry = requireRecord(field);\n      return typeof entry.name !== \"string\" || !entry.name || typeof entry.type !== \"string\" || !entry.type;\n    })) throw new Error(\"Configuration contains invalid EIP-712 type definitions\");\n  }\n}\n\nfunction rawAmount(value: string, field: string): bigint {\n  if (typeof value !== \"string\" || !/^\\d+$/.test(value)) {\n    throw new Error(`${field} must be an unsigned integer string in token base units`);\n  }\n  const amount = BigInt(value);\n  if (amount > (1n << 256n) - 1n) throw new Error(`${field} exceeds uint256`);\n  return amount;\n}\n\nfunction validateOrderInput(orderInput: OrderInput, inputTokenAddress: Address, now = Date.now()) {\n  validateAddress(inputTokenAddress, \"Input token\");\n  validateAddress(orderInput.dstToken, \"Output token\");\n  if (inputTokenAddress.toLowerCase() === orderInput.dstToken.toLowerCase()) {\n    throw new Error(\"Input and output tokens must differ\");\n  }\n  if (!Number.isSafeInteger(orderInput.totalTrades) || orderInput.totalTrades < 1) {\n    throw new Error(\"totalTrades must be a positive safe integer\");\n  }\n  const total = rawAmount(orderInput.totalInputAmount, \"totalInputAmount\");\n  const perFill = rawAmount(orderInput.srcAmountPerFill, \"srcAmountPerFill\");\n  if (total === 0n || perFill === 0n || total !== perFill * BigInt(orderInput.totalTrades)) {\n    throw new Error(\"Total input must equal a positive per-fill amount multiplied by totalTrades\");\n  }\n  rawAmount(orderInput.dstMinAmountPerFill, \"dstMinAmountPerFill\");\n  const lower = rawAmount(orderInput.triggerLower, \"triggerLower\");\n  const upper = rawAmount(orderInput.triggerUpper, \"triggerUpper\");\n  const isTwap = orderInput.totalTrades > 1;\n  if ((isTwap && (lower !== 0n || upper !== 0n)) || (lower !== 0n && upper !== 0n)) {\n    throw new Error(\"TWAP requires zero triggers; one-fill strategies use at most one trigger\");\n  }\n  if (!Number.isSafeInteger(orderInput.fillDelayMillis) || orderInput.fillDelayMillis < 0\n    || orderInput.fillDelayMillis % 1_000 !== 0\n    || (!isTwap && orderInput.fillDelayMillis !== 0)) {\n    throw new Error(\"fillDelayMillis must use whole seconds, or 0 for a single fill\");\n  }\n  const epoch = isTwap ? orderInput.fillDelayMillis / 1_000 : 0;\n  validateUint32(epoch, \"epoch\");\n  if (isTwap && epoch < 2) throw new Error(\"TWAP epoch must allow a positive freshness shorter than the interval\");\n  const freshness = orderInput.freshnessSeconds ?? 60;\n  validateUint32(freshness, \"freshnessSeconds\");\n  if (freshness === 0 || (isTwap && freshness >= epoch)) {\n    throw new Error(\"Freshness must be positive and strictly less than the TWAP epoch\");\n  }\n  validateUint32(orderInput.slippageBps, \"slippageBps\", 5_000);\n  if (!Number.isSafeInteger(orderInput.deadlineMillis) || orderInput.deadlineMillis <= 0) {\n    throw new Error(\"Deadline must be a positive safe integer timestamp in milliseconds\");\n  }\n  const start = BigInt(Math.floor(now / 1_000));\n  const deadline = BigInt(Math.floor(orderInput.deadlineMillis / 1_000));\n  const lastFill = start + BigInt(epoch) * BigInt(orderInput.totalTrades - 1);\n  if (deadline <= start || deadline < lastFill) {\n    throw new Error(\"Deadline must allow every scheduled fill and be in the future\");\n  }\n  return { epoch, freshness, deadline: deadline.toString() };\n}\n",
     "language": "typescript",
     "name": "create-order-flow.ts"
   } as const satisfies ReferenceFile;
 
 const REFERENCE_EXAMPLES_BASE = {
-  "liquidity-hub-direct:fetch-quote": {
-    format: "request-response",
-    includePartnerContextFile: false,
-    files: [
-      {
-        code: LIQUIDITY_HUB_QUOTE_REQUEST_CODE,
-        curl: LIQUIDITY_HUB_QUOTE_REQUEST_CURL,
-        kind: "request",
-        language: "typescript",
-        method: "POST",
-        name: "quote-request.json",
-      },
-      {
-        code: LIQUIDITY_HUB_SDK_QUOTE_RESPONSE_CODE,
-        language: "json",
-        kind: "response",
-        name: "quote-response.json",
-      },
-    ],
-    help: "The Request tab is the raw POST /quote contract. The Response tab shows the complete wallet-bound quote, including wallet-ready eip712, legacy permitData, pricing metadata, and timestamp.",
-    label: "Direct API Request / Response",
-    purpose: "Request a wallet-bound Liquidity Hub candidate over HTTP and preserve its execution payload.",
-    title: "Fetch Quote",
-  },
-  "liquidity-hub-direct:submit-swap": {
-    includePartnerContextFile: false,
-    files: [
-      {
-        code: LIQUIDITY_HUB_SUBMIT_SWAP_CODE,
-        language: "typescript",
-        name: "submit-swap.ts",
-      },
-      {
-        code: LIQUIDITY_HUB_QUOTE_TYPES_CODE,
-        language: "typescript",
-        name: "types.ts",
-      },
-    ],
-    help: "Submit Swap checks and approves the ERC-20 input token for Permit2 when needed, refreshes a quote older than 60 seconds through the supplied callback, then signs, submits, polls, and confirms it. The separate Fetch Quote section shows where the quote comes from; types.ts declares its shape.",
-    label: "Direct API Submit Swap",
-    purpose: "Approve the ERC-20 input when needed, then sign, submit, poll, and confirm the executable quote.",
-    title: "Submit Swap",
-  },
   "advanced-orders-direct:fetch-config": {
   "format": "request-response",
   "includePartnerContextFile": false,
@@ -965,8 +200,8 @@ const REFERENCE_EXAMPLES_BASE = {
     "name": "order-types.ts"
   }
 ],
-    "help": "The main flow calls useSignOrder() without arguments. The supporting tabs fetch the default permit data, build the order from current DEX-derived values, and preserve the signed order for submission.",
-    "label": "Optional Wagmi v3 Reference",
+    "help": "Call submitOrdersSinkOrder with the reviewed order inputs and wrapped-token address. The supporting files fetch the default permit data, build and sign the exact order, and preserve it for submission.",
+    "label": "TypeScript / Viem Reference",
     "purpose": "Create, fund, sign, and submit one order from live host inputs.",
     "title": "Create an Order End-to-End"
   },
@@ -1020,7 +255,7 @@ const REFERENCE_EXAMPLES_BASE = {
   }
 ],
     "help": "Cancel a RePermit order on-chain using order.metadata.repermitDigest, then wait for the transaction receipt.",
-    "label": "Optional Wagmi v3 Reference",
+    "label": "TypeScript / Viem Reference",
     "purpose": "Verify ownership and chain, submit the on-chain digest cancellation, then refresh history.",
     "title": "Cancel Order Example"
   },
@@ -1028,41 +263,25 @@ const REFERENCE_EXAMPLES_BASE = {
 
 export const REFERENCE_EXAMPLES = {
   ...REFERENCE_EXAMPLES_BASE,
-  "liquidity-hub:fetch-quote": {
-    format: "request-response",
+  "swap:fetch-quote": {
     includePartnerContextFile: false,
     files: [
-      {
-        code: LIQUIDITY_HUB_SDK_QUOTE_REQUEST_CODE,
-        kind: "request",
-        language: "typescript",
-        method: "POST",
-        name: "Request",
-      },
-      {
-        code: LIQUIDITY_HUB_SDK_QUOTE_RESPONSE_CODE,
-        kind: "response",
-        language: "json",
-        name: "Response",
-      },
+      { code: SPOT_QUOTE_CODE, language: "typescript", name: "fetch-quote.ts" },
+      { code: SPOT_QUOTE_RESPONSE_CODE, kind: "response", language: "json", name: "quote-response.json" },
     ],
-    help: "The Request tab uses the active-chain client and calls getQuote() with QuoteArgs. The Response tab shows the complete wallet-bound quote, including wallet-ready eip712, legacy permitData, pricing metadata, and the SDK timestamp.",
-    label: "SDK Request / Response",
-    purpose: "Fetch and validate a wallet-bound Liquidity Hub candidate without blocking the host DEX quote.",
+    help: "Pass the current quote inputs to the initialized Spot client. The response is an illustrative SDK result; use minimumAmountOut unchanged.",
+    label: "Spot SDK Quote Reference",
+    purpose: "Fetch a Spot quote for the current tokens and input amount.",
     title: "Fetch Quote",
   },
-  "liquidity-hub:submit-swap": {
+  "swap:submit-swap": {
     includePartnerContextFile: false,
     files: [
-      {
-        code: LIQUIDITY_HUB_SDK_FULL_FLOW_CODE,
-        language: "typescript",
-        name: "submit-swap.ts",
-      },
+      { code: SPOT_SUBMIT_SWAP_CODE, language: "typescript", name: "submit-swap.ts" },
     ],
-    help: "The TypeScript reference contains the complete execution flow: prepare funds, refresh and sign the quote, submit it, and return the successful transaction receipt.",
-    label: "SDK Submit Swap",
-    purpose: "Prepare, sign, submit, and confirm the selected Liquidity Hub route.",
+    help: "Use the host wallet and receipt services, prepare and sign the exact order, then retain acceptance before polling for fills.",
+    label: "Spot SDK Submit Swap",
+    purpose: "Confirm host wallet steps, prepare, sign, and submit a swap for acceptance.",
     title: "Submit Swap",
   },
 } as const satisfies Record<string, ReferenceExample>;

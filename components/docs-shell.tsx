@@ -52,7 +52,7 @@ import type {
   GuideSummary,
 } from "@/lib/guides";
 import { hasReferenceExample } from "@/lib/reference-keys";
-import { ADVANCED_ORDERS_SKILL_URL } from "@/lib/site";
+import { SPOT_INTEGRATION_SKILLS } from "@/lib/site";
 
 const InteractiveReference = dynamic(() =>
   import("@/components/interactive-reference").then(
@@ -78,27 +78,21 @@ const RESOURCES: Record<
     primaryLabel: "Open Markdown Reference",
     sourceHref: "https://github.com/orbs-network/spot-integration-docs/blob/main/content/perps-api.md",
   },
-  "liquidity-hub-shared": {
+  "swap-shared": {
     primaryHref: "https://orbs-spot.vercel.app/?devMode=true",
     primaryLabel: "Open Interactive Example",
-    sourceHref: "https://github.com/orbs-network/spot-ui/tree/master/packages/liquidity-hub-ui",
+    sourceHref: "https://github.com/orbs-network/spot-ui/tree/master/packages/spot-ui",
   },
   "advanced-orders-shared": {
     primaryHref: "https://swap.orbs.network/dev?tab=twap",
     primaryLabel: "Open TypeScript SDK Example",
     sourceHref: "https://github.com/orbs-network/spot/blob/master/config.json",
   },
-  "liquidity-hub": {
+  "swap": {
     primaryHref: "https://orbs-spot.vercel.app/?devMode=true",
     primaryLabel: "Open Interactive Example",
     sourceHref:
-      "https://github.com/orbs-network/spot-ui/tree/master/packages/liquidity-hub-ui",
-  },
-  "liquidity-hub-direct": {
-    primaryHref: "https://orbs-spot.vercel.app/?devMode=true",
-    primaryLabel: "Open Interactive Example",
-    sourceHref:
-      "https://github.com/orbs-network/spot-ui/tree/master/packages/liquidity-hub-ui/src/lib",
+      "https://github.com/orbs-network/spot-ui/blob/master/packages/spot-ui/examples/router-swap.ts",
   },
   "advanced-orders-direct": {
     primaryHref: "https://orbs-spot.vercel.app/?devMode=true",
@@ -233,8 +227,8 @@ function GuideNavigation({
 }) {
   const products = [
     {
-      description: "Best-price swap routing",
-      id: "liquidity-hub" as const,
+      description: "Spot quotes and swap execution",
+      id: "swap" as const,
       label: "Swap",
     },
     {
@@ -277,18 +271,19 @@ function GuideNavigation({
                       {children}
                     </GuideVariant>
                   ))}
-                  {product.id === "advanced-orders" ? (
+                  {SPOT_INTEGRATION_SKILLS[product.id].map((skill) => (
                     <a
                       className="variant-link"
-                      href={ADVANCED_ORDERS_SKILL_URL}
+                      href={skill.href}
+                      key={skill.href}
                       rel="noreferrer"
                       target="_blank"
                     >
                       <span aria-hidden="true" className="variant-link-marker" />
-                      <span>MCP Skill</span>
+                      <span>{skill.title}</span>
                       <ExternalLink aria-hidden="true" size={12} />
                     </a>
-                  ) : null}
+                  ))}
                 </div>
               </details>
             );
@@ -738,7 +733,7 @@ function DocsShellContent({
             <summary>
               <span>
                 <small>
-                  {activeGuide.product === "liquidity-hub"
+                  {activeGuide.product === "swap"
                     ? "Swap"
                     : activeGuide.product === "perps" ? "Perps" : "Advanced Orders"}
                 </small>
@@ -818,6 +813,7 @@ function DocsShellContent({
                 <PageActions
                   guide={activeGuide}
                   partnerConfig={partnerConfig}
+                  partnerRequest={partnerRequest}
                   markdownPath={`${activeGuide.route}.md`}
                   pagePath={activeGuide.route}
                 />

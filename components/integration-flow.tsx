@@ -24,15 +24,15 @@ const FLOWS: Record<GuideProductId, {
       { owner: "Your backend · RPC", title: "Reconcile & withdraw", detail: "Resolve pending actions and confirm the final wallet payout." },
     ],
   },
-  "liquidity-hub": {
+  swap: {
     title: "How a swap completes",
-    note: "Wrap and approve only when needed. Show success after the swap receipt confirms—not after signing or receiving a transaction hash.",
+    note: "Wrap and approve only when needed. Keep the accepted order pending until Spot confirms its fill.",
     steps: [
       { owner: "Your app", title: "Get a quote", detail: "Choose tokens and amount. Request a current quote." },
       { owner: "Your app", title: "Select the route", detail: "Compare protected output if you also use a DEX router." },
-      { owner: "Wallet", title: "Prepare & sign", detail: "Wrap or approve if needed. Refresh a stale quote, then sign." },
-      { owner: "Liquidity Hub", title: "Submit the swap", detail: "Send the signed quote and obtain its transaction hash." },
-      { owner: "Your app · RPC", title: "Confirm success", detail: "Wait for a successful receipt, then refresh balances." },
+      { owner: "Wallet", title: "Prepare & sign", detail: "Confirm wrapping and approval, check the quote minimum, then sign the prepared order." },
+      { owner: "Spot · Order Sink", title: "Submit the order", detail: "Send the signed order and retain its accepted identifier." },
+      { owner: "Your app · Solvers", title: "Confirm the fill", detail: "Track the accepted order until completed, then refresh balances." },
     ],
   },
   "advanced-orders": {

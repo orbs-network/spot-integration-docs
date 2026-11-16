@@ -38,7 +38,8 @@ export const metadata: Metadata = {
   description: SITE_DESCRIPTION,
   keywords: [
     "Orbs",
-    "Liquidity Hub",
+    "Spot",
+    "Swap quotes",
     "Advanced Orders",
     "DEX integration",
     "DeFi",

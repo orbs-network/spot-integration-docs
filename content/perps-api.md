@@ -7,7 +7,7 @@ Start with the overview, then follow the connection, signing, funding, and tradi
 ## Overview & Setup
 
 **API version:** v1  
-**Guide updated:** 25 October 2026
+**Guide updated:** 16 November 2026
 
 **Default deployment:** Arbitrum One, Global lane (`global:42161`)
 
@@ -133,7 +133,7 @@ Configure your own account/session signing credentials separately as described i
 
 #### Deployment readiness
 
-Read-only checks on 25 October 2026 against `https://perps-api.orbs.network` with `X-Partner-Chain-Key: global:42161` returned HTTP 200 from `/api/v1/config`, `/api/v1/markets`, and `/api/v1/risk-config`. Configuration returned chain `42161`, Global contract `0xd2c8793397036f6D2F60A93D3eB28295a3F1B102`, and Arbitrum USDC `0xaf88d065e77c8cC2239327C5EDb3A432268e5831`, matching the shared Global partner configuration.
+Read-only checks on 16 November 2026 against `https://perps-api.orbs.network` with `X-Partner-Chain-Key: global:42161` returned HTTP 200 from `/api/v1/config`, `/api/v1/markets`, and `/api/v1/risk-config`. Configuration returned chain `42161`, Global contract `0xd2c8793397036f6D2F60A93D3eB28295a3F1B102`, and Arbitrum USDC `0xaf88d065e77c8cC2239327C5EDb3A432268e5831`, matching the shared Global partner configuration.
 
 These public reads do not establish completed deposit, trade, withdrawal, or WebSocket acceptance. Confirm current funding instructions, the agreed origin, lane limits, and the integration acceptance plan before running funded flows. If a configuration endpoint returns an error, stop and resolve it rather than substituting a different lane.
 
@@ -162,7 +162,7 @@ An allowed origin does not replace the documented wallet/session signatures or p
 
 #### GET `/api/v1/config`
 
-Global configuration response observed on 25 October 2026:
+Global configuration response observed on 16 November 2026:
 
 ```json
 {
@@ -231,19 +231,28 @@ Use integer or decimal-string arithmetic. Never round monetary values through Ja
 | Field family | Encoding | Example |
 |---|---|---|
 | Order request `quantity` and signed quantity | Integer string / `uint256`, scale `1e8` | `"500000000"` = 5 base units |
-| Order request `price`, `stopPrice` and bracket prices | Integer string, scale `1e6` | `"2000000"` = price 2 |
-| Signed order/bracket `price`, `stopPrice` and leg prices | `uint256`, scale `1e18` | JSON request price multiplied by `1e12` |
-| Returned order, position and trade prices | Integer string, scale `1e18` | `"2000000000000000000"` = price 2 |
+| Legacy order request `price`, `stopPrice` and bracket prices | Integer string, scale `1e6` | `"2000000"` = price 2 |
+| Exact B2 request `priceDecimal`, `stopPriceDecimal` and bracket fields | Exact decimal string | `"0.0000095"` |
+| Signed order/bracket `price`, `stopPrice` and leg prices | `uint256`, scale `1e18` | Exact decimal request parsed at 1e18 |
+| Returned order, position and trade raw price fields | Integer string, scale `1e18` | `"2000000000000000000"` = price 2 |
+| Returned `…PriceDecimal` fields | Exact decimal string | `"0.0000095"` |
 | Account balances, fees, PnL, funding amounts, REST withdrawal amounts | Integer string, scale `1e6` | `"50000000"` = 50 account units |
 | Contract deposit/payout token amounts | Integer, token-native decimals | 50 tokens is `50 × 10^COLLATERAL_DECIMALS` |
-| `/prices` mark price | Integer string, scale `1e6` | `"2000000"` = price 2 |
+| `/prices` mark price `price` (deprecated) | Integer string, scale `1e6`, truncated below 1e-6 | `"2000000"` = price 2 |
+| `/prices` mark price `priceDecimal` | Exact decimal string | `"0.0000095"` |
 | `/api/v1/market-data` and `market_data` WebSocket prices/rates | Human-readable decimal strings | `"2.0000"`, funding rate `"0.0001"` |
 | Leverage | Whole-number multiplier | `5` means 5× |
 | Basis points (`Bps`) | Integer basis points | `5` = 0.05% |
 | Timestamps | Unix milliseconds | Generate with `Date.now()` |
 | REST order ID | Decimal string | Preserve `"123456"`; use `BigInt` when signing |
 
-Do not send a returned `1e18` price unchanged into a new order request: convert it to `1e6` and verify the result is representable on the symbol's price grid.
+#### Exact order prices (B2)
+
+Order create and atomic replacement requests accept optional exact decimal strings alongside the unchanged legacy integer fields: `priceDecimal`, `stopPriceDecimal`, and, inside `bracket.takeProfit` / `bracket.stopLoss`, `priceDecimal` and `stopPriceDecimal`. Decimal strings are parsed exactly at 1e18 and checked against the symbol tick. If a nonzero legacy value and its decimal companion are both supplied, they must represent the same value or the API returns HTTP 400 (`PRICE_CONFLICT`). Omit the legacy field or use `"0"` when the decimal field supplies the price. Existing clients can continue using legacy 1e6 integers.
+
+For example, a 1000SATSUSDT limit entry on a `0.00000001` tick can carry `priceDecimal: "0.0000095"`. A DOGSUSDT stop can carry `stopPriceDecimal: "0.0000451"`. In an attached bracket leg, use the same `priceDecimal` and `stopPriceDecimal` names inside `takeProfit` or `stopLoss`. Include the exact price in the existing EIP-712 `uint256` fields at 1e18 when signing. The typed order shape and TEE verification do not change. Order and position response payloads retain their raw integer price fields and expose decimal companions for the corresponding fields (including `priceDecimal`, `stopPriceDecimal`, `entryPriceDecimal`, `markPriceDecimal`, and `liquidationPriceDecimal`). These companion names apply to those response types; they are not present on every API, operation, or WebSocket message. `/api/v1/prices` separately retains legacy `price` and adds `priceDecimal`.
+
+For a legacy request field, convert the returned `1e18` integer to `1e6` only when it is exactly representable. To preserve a finer value, format the returned integer as a plain decimal and send it in the matching `…Decimal` field; never round it to fit the legacy field.
 
 Example conversions using the same integer conventions:
 
@@ -252,6 +261,8 @@ import { parseUnits, formatUnits } from 'viem';
 
 const quantity = parseUnits('5', 8);       // 500000000n
 const requestPrice = parseUnits('2', 6);   // 2000000n
+const fineTickPrice = '0.0000095';          // 1000SATSUSDT priceDecimal
+const fineTickStop = '0.0000451';           // DOGSUSDT stopPriceDecimal
 const withdrawal = parseUnits('10', 6);    // 10000000n
 const displayedFillPrice = formatUnits(2000000000000000000n, 18);
 ```
@@ -660,23 +671,23 @@ async function registerSession() {
 async function buildLimitOrder() {
   const timestamp = Date.now();
   const quantity = parseUnits('5', 8);
-  const apiPrice = parseUnits('2', 6);
-  const apiStopPrice = 0n;
+  const priceDecimal = '2'; // Validate and snap to the symbol tick first.
+  const signedPrice = parseUnits(priceDecimal, 18);
   const fields = {
     user, symbol: 'XRPUSDT', orderType: 'LIMIT', side: 'BUY',
     reduceOnly: false, closePosition: false, timeInForce: 'GTC',
   };
   const signature = await sign(session, 'Order', {
     ...fields, quantity,
-    price: apiPrice * 1_000_000_000_000n,
-    stopPrice: apiStopPrice * 1_000_000_000_000n,
+    price: signedPrice,
+    stopPrice: 0n,
     timestamp: BigInt(timestamp),
   });
   return {
     requestId: randomUUID(),
     order: {
       ...fields, quantity: quantity.toString(),
-      price: apiPrice.toString(), stopPrice: apiStopPrice.toString(),
+      priceDecimal, stopPrice: '0',
       timestamp, signature,
     },
   };
@@ -703,7 +714,7 @@ A request timeout is an uncertain outcome, not permission to submit a newly sign
 | Withdraw | `Withdrawal` | Account, recipient equal to account, amount, `isMax`, timestamp |
 | Private subscription | `WebSocketAuth` | Account and timestamp |
 
-For **all order/bracket price fields**, multiply the REST integer at `1e6` by `1e12` before signing. Quantity remains at `1e8`. Withdrawal amounts remain at `1e6`. Zero-valued unused prices remain zero.
+For **all order/bracket price fields**, sign the exact domain price at `1e18` in the existing EIP-712 `uint256` fields. The REST request may carry an exact `priceDecimal` / `stopPriceDecimal` string (including the corresponding bracket leg fields); the backend converts it to that same 1e18 value before signature verification. Legacy REST integer fields remain 1e6 and retain their existing interpretation. If both forms contain nonzero prices, they must agree. Quantity remains at `1e8`; withdrawal amounts remain at `1e6`; zero-valued unused prices remain zero.
 
 For a bracket order, sign the `BracketOrder` type once. Put that same signature in both `order.signature` and `order.bracket.bracketSignature`. An absent TP or SL leg is represented in the typed message by type `""`, stop price `0` and price `0`; omit that leg from the REST `bracket` object. Do not replace the bracket signature with a plain `Order` signature.
 
@@ -1026,23 +1037,24 @@ Paths below are relative to your assigned API origin. Replace `<ACCOUNT_ADDRESS>
 
 ### Precision
 
-Send financial values as integer strings. Do not pass them through floating-point arithmetic.
+Send quantities and legacy prices as integer strings; use exact decimal strings for `priceDecimal` and `stopPriceDecimal`. Do not pass financial values through floating-point arithmetic.
 
 | Field | Request scale | Response scale |
 |---|---|---|
 | `quantity` | 100,000,000 units per base-asset unit | Same |
-| `price`, `stopPrice`, bracket prices | 1,000,000 units per quote-currency unit | 1,000,000,000,000,000,000 units per quote-currency unit |
+| Legacy `price`, `stopPrice`, bracket prices | 1,000,000 units per quote-currency unit | 1,000,000,000,000,000,000 units per quote-currency unit |
+| `priceDecimal`, `stopPriceDecimal`, including bracket legs | Exact decimal string at up to 18 decimal places | Exact decimal companion fields where available |
 | `fee` | Not supplied when ordering | 1,000,000 units per collateral unit |
 | `timestamp` | Unix milliseconds | Unix milliseconds |
 | `orderId` | Decimal identifier string in URL/replacement | Decimal identifier string |
 
-Signing uses `1e18` prices: multiply the `1e6` request price/stop price by `1e12` when constructing the Order or BracketOrder typed message, including bracket leg prices. Keep HTTP request prices at `1e6`; see [Signing](/perps/api#signing-and-sessions).
+Signing uses `1e18` prices in the existing Order and BracketOrder fields, including bracket legs. For exact decimal request fields, parse the same decimal at `1e18`; for legacy `1e6` integer fields, multiply by `1e12`. Prefer exact decimal fields for fine ticks. If a nonzero legacy value and its decimal companion are both supplied, they must agree; otherwise the API returns `400 PRICE_CONFLICT`. See [Signing](/perps/api#signing-and-sessions).
 
-For example, 0.01 base units is `"1000000"`; a 50,000 quote-unit limit is `"50000000000"` in a request but `"50000000000000000000000"` in an order response. Do not copy response prices into a new request without converting the scale. Keep identifiers as strings even if they contain only digits. Market precision, minimum sizes and permitted instruments must come from the `tickSize`, `stepSize`, `minQty` and `minNotional` fields of [`GET /api/v1/markets`](/perps/api#connection-and-conventions); the examples below do not establish valid order sizes for every instrument.
+For example, 0.01 base units is `"1000000"`; a 50,000 quote-unit limit is `"50000000000"` in a request but `"50000000000000000000000"` in an order response. Do not copy raw response prices into a new legacy request without converting the scale. Use the decimal companion or format the raw `1e18` value as an exact decimal when the price cannot be represented at `1e6`. Keep identifiers as strings even if they contain only digits. Market precision, minimum sizes and permitted instruments must come from the `tickSize`, `stepSize`, `minQty` and `minNotional` fields of [`GET /api/v1/markets`](/perps/api#connection-and-conventions); the examples below do not establish valid order sizes for every instrument.
 
 #### Snapping prices and quantities to the lane filters
 
-Executable limit, stop and bracket prices must be an exact multiple of the symbol's `tickSize`; non-market quantities must be an exact multiple of its `stepSize` (and at least `minQty`). Do this in integer arithmetic at the request scale before signing, because the signed values cannot be changed by the server:
+Executable limit, stop and bracket prices must be an exact multiple of the symbol's `tickSize`; non-market quantities must be an exact multiple of its `stepSize` (and at least `minQty`). Do this in integer arithmetic before signing, because the signed values cannot be changed by the server. For exact decimal prices, use `1e18` internally: `tickScaled = tickSize × 1e18`, snap the price on that grid, then format it back to a plain decimal for `priceDecimal` or `stopPriceDecimal`. The following legacy example applies only when the tick is exactly representable at `1e6`:
 
 1. Convert the filter to the request scale: `tickScaled = tickSize × 1e6` and `stepScaled = stepSize × 1e8`. For SOLUSDT, `tickSize` `"0.0100"` becomes `10000` and `stepSize` `"0.01"` becomes `1000000`.
 2. Snap: `price = floor(price / tickScaled) × tickScaled` for buys (or `ceil` for sells, if you prefer not to cross your own limit), and `quantity = floor(quantity / stepScaled) × stepScaled`.
@@ -1080,14 +1092,14 @@ Illustrative limit order:
 
 | Field | Meaning |
 |---|---|
-| `requestId` | Your correlation identifier. Use a new identifier for each new intent and retain it with the signed payload. It is not an exchange-style client order ID or a promise of safe HTTP retries. |
+| `requestId` | Your correlation identifier and this order's idempotency key in the partner-chain context. Use a new identifier for each new intent and retain it with the signed payload. Resending the same order under the same `requestId`, even re-signed, never places a second order; see [Request IDs and retries](/perps/api#reliability-and-acceptance). It is not an exchange-style client order ID. |
 | `user` | Partner-owned account address. |
 | `symbol` | Exact supported market identifier; obtain it from the market list. |
 | `orderType` | Exact supported type from the table below. The signed spelling must equal the submitted spelling. |
 | `side` | `BUY` or `SELL`. |
 | `quantity` | Requested base-asset quantity in integer units. For fixed-size orders use a positive quantity. |
-| `price` | Limit price; use `"0"` for a market order. |
-| `stopPrice` | Trigger price for protective orders; use `"0"` for ordinary market/limit orders. |
+| `price`, `priceDecimal` | Limit price: legacy integer at `1e6` or an exact decimal string. Omit the legacy field or use `"0"` when the decimal field supplies the price. A market order uses zero for its unused price. |
+| `stopPrice`, `stopPriceDecimal` | Protective trigger price in the corresponding encoding; ordinary market/limit orders use zero for the unused trigger. |
 | `reduceOnly` | Restricts the order to reducing an existing position. |
 | `closePosition` | Closes the applicable existing position rather than specifying a fixed-size reduction. See below. |
 | `timeInForce` | Execution policy included in the signed order. Use `GTC` for resting/protective orders unless your selected order family supports another policy. |
@@ -1136,7 +1148,7 @@ There is no separate close-position endpoint. A full close is a signed order and
 
 #### Attached take-profit and stop-loss
 
-Attach `bracket` to an entry order to associate exits with that entry. Supply one or both legs. Each leg has `orderType`, `stopPrice`, optional `price`, and optional `timeInForce`. For an attached bracket, use the BracketOrder signature in both `order.signature` and `order.bracket.bracketSignature`; do not sign a separate plain Order message for that request. See [Signing](/perps/api#signing-and-sessions).
+Attach `bracket` to an entry order to associate exits with that entry. Supply one or both legs. Each leg has `orderType`, a trigger (`stopPrice` or exact `stopPriceDecimal`), an optional limit (`price` or exact `priceDecimal`), and optional `timeInForce`. For an attached bracket, use the BracketOrder signature in both `order.signature` and `order.bracket.bracketSignature`; do not sign a separate plain Order message for that request. See [Signing](/perps/api#signing-and-sessions).
 
 Illustrative fragment for an entry around 50,000:
 
@@ -1213,9 +1225,78 @@ To cancel, send `DELETE /api/v1/order/<ORDER_ID>` with a JSON body, as in the ex
 
 The path identifies the order; omit the redundant body `orderId`. The cancellation signature binds the account and target order as described in [Signing](/perps/api#signing-and-sessions). A successful transport response does not undo a fill that already occurred. Refresh account state and history after races, rejection, or an interrupted response.
 
+### Why a pending order is not executing
+
+Pending orders in `GET /api/v1/user/<ACCOUNT_ADDRESS>` (`pendingOrders[]`) may carry two optional, display-only fields. Both are observations of the backend's matcher, kept in memory and reset by a restart. Neither changes `status`, cancellation, or what the risk engine decides. They appear only there: order placement, cancellation and history responses never carry them.
+
+- `executionStatus`: the matcher's attempt state, when it has one: `EXECUTING`, `ATTEMPT_FAILED`, `OUTCOME_UNKNOWN`, `NO_FILL_RETRY_PENDING`, `NO_FILL_ATTEMPTS_EXHAUSTED`, `NO_MORE_ATTEMPTS`.
+- `lastRefusal`: why the order was last held back. It is omitted while `executionStatus` is `EXECUTING` or `OUTCOME_UNKNOWN`, because `executionStatus` is authoritative then.
+
+```json
+{
+  "lastRefusal": {
+    "code": "PRICE_AGREEMENT",
+    "message": "Waiting for the Binance price and the oracle mark price to agree within the allowed band.",
+    "since": 1790000030000,
+    "lastAt": 1790000037000,
+    "heldSince": 1790000000000,
+    "count": 38,
+    "reference": {
+      "basis": "bookAsk",
+      "bookPrice": "51600",
+      "markPrice": "50000",
+      "markAt": 1790000036900,
+      "orderPrice": "52000",
+      "orderPriceKind": "limit",
+      "deviationBps": "320",
+      "bandBps": "250"
+    }
+  }
+}
+```
+
+Field meanings:
+
+- Times are Unix milliseconds.
+- `since` is when the current `code` started. Show "`message` · for {now − `since`}".
+- `heldSince` and `count` describe the whole hold-up across codes ("held back `count` times since `heldSince`").
+- Optional fields:
+  - `detail` is a short machine value from a fixed list (for example a risk-engine reject code such as `INVALID_REQUEST`, or a settlement reason such as `busy`). It is never free text.
+  - `nextAttemptAt` appears only when a retry time is known (after a risk-engine refusal or a Binance no-fill).
+  - `attempt` and `maxAttempts` appear only for no-fill retries.
+  - `reference` carries prices as exact decimal strings, like the order `priceDecimal` fields (for example `"0.0000095"`): `basis` (`bookBid` or `bookAsk`), `bookPrice`, `markPrice`, `markAt`, `orderPrice`, `orderPriceKind` (`limit` or `trigger`), and for `PRICE_AGREEMENT` also `deviationBps` and `bandBps`.
+- Key on `code`; the message text may change. Treat unknown codes as "temporarily held back".
+
+| `code` | Meaning |
+|---|---|
+| `WAITING_FOR_BOOK` | The mark price crossed the order, but the Binance best bid/ask has not. Orders execute against the book. |
+| `PRICE_AGREEMENT` | The Binance price and the oracle mark are too far apart for the risk engine to accept the fill yet. |
+| `WAITING_FOR_MARK` | A stop/take-profit limit's trigger was reached on the book, but not yet by the oracle mark. |
+| `INSUFFICIENT_MARGIN` | The risk engine found too little available margin for the fill at the current price. |
+| `TEE_REJECTED` | The risk engine refused the fill for another reason (`detail` names its code). |
+| `TEE_BACKOFF` | Waiting before re-checking after a risk-engine refusal. |
+| `SETTLEMENT_BUSY` | The settlement queue for the market group is busy. |
+| `RESIDUAL_FENCE` | A hedge repair is in progress for this market. |
+| `FUNDING_SETTLEMENT` | A funding settlement on this market must finish first. |
+| `SYMBOL_NOT_READY` | The market is warming up. |
+| `TICK_OR_STEP` | The execution price cannot be placed on Binance's price grid right now. |
+| `VENUE_CAPACITY` | Binance request capacity is temporarily exhausted. |
+| `VENUE_NO_FILL` | Binance did not have enough liquidity at the order's price; the order is re-attempted automatically. For a limit order, `detail` says how the all-or-nothing price was chosen: `depth-widened` (the price went deeper into the book to cover the full quantity, and still did not fill), `depth-insufficient` (the visible book does not hold the full quantity), or `depth-cap-bounded:<reason>` (it could not go deeper; `reason` is `user` for your limit price, `band` or `filter` for Binance's price limits, `tolerance` for the risk engine's price tolerance, `grid` for the price grid, `stale-band` or `stale-mark` when Binance's band or mark data was not fresh). Otherwise `detail` names the no-fill evidence (`fok_rejected`, `expired_zero` or `capacity_refused`). |
+| `NO_FILL_EXHAUSTED` | Repeated no-fills; no further automatic attempt in this session. `detail` uses the same values as `VENUE_NO_FILL`, for the last attempt. |
+| `VENUE_REJECTED` | Binance refused the hedge order; no further automatic attempt in this session. |
+| `TEE_FILL_REJECTED` | The fill was refused after hedging and was reversed. |
+| `ACTIVATION_FAILED` | A triggered stop/take-profit limit could not be activated yet. |
+| `LANE_BUSY` | Another operation in the market group is running. |
+| `CLOSE_QUEUED` | Another close order on the same position runs first. |
+| `LANE_BLOCKED` | Execution in the market group is paused for an operator check. |
+| `PARKED` | The order will not execute automatically in this session; it can still be canceled. |
+| `RETRYING` | A temporary system condition. |
+
 ### Leverage
 
 `GET /api/v1/leverage/allowed?symbol=<SYMBOL>` returns `symbol`, `allowedLeverage`, `symbolMaxLeverage`, `tierMaxLeverage`, `aggregateNotional`, `tierIndex`, and `tierMaxNotional`. Leverage values are integers; notional fields are integer strings in collateral units with scale `1e6`. The allowed value is a current cap, not reserved capacity.
+
+A symbol that is not configured on your partner lane gets `400 UNSUPPORTED_SYMBOL`. That answer does not change on retry: ask only for symbols listed by `GET /api/v1/markets`, and do not retry it.
 
 `POST /api/v1/leverage` changes the account's preference for one symbol:
 
@@ -1233,7 +1314,7 @@ The response contains `symbol`, `leverage`, and optional `stateRoot`/`sequenceNu
 
 ### Reconciliation and retries
 
-Retain the exact signed request and correlation ID until its outcome is resolved. After an uncertain response, use the account snapshot, pending orders, fills, and `GET /api/v1/user/<ACCOUNT_ADDRESS>/request/<REQUEST_ID>` described in [Account and history](/perps/api#account-and-history). This lookup preserves a recorded success over later rejected retries. Its top-level status is admission status; optional `orderExecution` describes subsequent evidence and is not a complete-fill guarantee. Use fills and the current position to reconcile execution. A `404` is not proof that no effect could have occurred. Creating a new timestamp/signature changes the trading intent and can create another order. Do not automatically re-sign a timed-out mutation.
+Retain the exact signed request and correlation ID until its outcome is resolved. After an uncertain response, use the account snapshot, pending orders, fills, and `GET /api/v1/user/<ACCOUNT_ADDRESS>/request/<REQUEST_ID>` described in [Account and history](/perps/api#account-and-history). This lookup preserves a recorded success over later rejected retries. Its top-level status is admission status; optional `orderExecution` describes subsequent evidence and is not a complete-fill guarantee. Use fills and the current position to reconcile execution. A `404` is not proof that no effect could have occurred. For order retries, preserve the same `requestId` and order intent; use the controlled replay/re-sign procedure in [Reliability](/perps/api#reliability-and-acceptance). A new request ID can create another order. Cancellation and withdrawal retries do not inherit that order-placement guarantee.
 
 ## Account and History
 
@@ -1287,7 +1368,7 @@ Illustrative response for a funded account with no open exposure:
 | `user.nonce` | Returned account metadata; do not use it as a substitute for the timestamp/signing requirements of trading requests. |
 | `user.feeTier` | Current account fee-tier identifier, when included. |
 | `positions` | Current positions, described below. |
-| `pendingOrders` | Open/dormant order representations using the response fields and scales in [Trading](/perps/api#trading). |
+| `pendingOrders` | Open/dormant order representations using the response fields and scales in [Trading](/perps/api#trading). Each may also carry the display-only `executionStatus` and `lastRefusal` (why it is not executing); see [Why a pending order is not executing](/perps/api#trading). |
 | `pendingWithdrawals` | Accepted withdrawals still awaiting release; each has `withdrawalId`, `recipient`, `amount`, `requestedAt`, `availableAt`. Amount is payout in `1e6`; both timestamps are Unix milliseconds. Absence from this array alone does not prove receipt in the wallet. |
 | `availableBalance` | Current available collateral estimate after margin commitments. |
 | `marginUsed` | Initial margin committed to exposure and pending orders. |
@@ -1510,12 +1591,12 @@ Returns the latest cached mark prices:
 ```json
 {
   "prices": [
-    { "symbol": "XRPUSDT", "price": "2000000", "timestamp": 1800000000000 }
+    { "symbol": "XRPUSDT", "price": "2000000", "priceDecimal": "2", "timestamp": 1800000000000 }
   ]
 }
 ```
 
-Prices here use `1e6`; timestamps are Unix milliseconds. An empty list or missing symbol means no value is currently available. It does not mean the price is zero. Check freshness before using a value.
+`priceDecimal` is the exact mark as a decimal string (for example `"0.0000095"` for 1000SATSUSDT); use it. `price` is deprecated: it is the same mark as a `1e6` integer, truncated, so it reads `"9"` for 0.0000095 and loses everything below 0.000001. Timestamps are Unix milliseconds. An empty list or missing symbol means no value is currently available. It does not mean the price is zero. Check freshness before using a value.
 
 #### GET `/api/v1/market-data`
 
@@ -1602,7 +1683,7 @@ Expected acknowledgement:
 {
   "type": "SUBSCRIBED",
   "partnerChainKey": "global:42161",
-  "partnerId": "orbs",
+  "partnerId": "global",
   "chainId": "42161",
   "channels": ["market_data"]
 }
@@ -1691,6 +1772,18 @@ Account events use this envelope:
 | `FILL` / `fills` | `fillId`, `orderId`, `user`, `symbol`, `side`, `quantity`, `price`, `fee`, optional `realizedPnl`, `timestamp` |
 | `LIQUIDATION` / `liquidations` | `liquidationId`, `user`, `symbol`, `liquidatedQuantity`, `liquidationPrice`, `penalty`, `remainingCollateral`, `timestamp` |
 
+`FILL.fillId` is the ID of the corresponding REST trade-history row. Treat the WebSocket notification and that REST row as the same execution; never count both. Fills are emitted for executions only when the committed execution is present in REST trade history. Administrative closes (liquidation, force close, and delisting settlement) therefore emit a fill only when their history row was committed; their `orderId` is `"0"` because no user order owns the execution. Compensation and rollback legs do not emit fills.
+
+If the UI shows a fill toast from both the order response and WebSocket, de-duplicate that execution by `fillId`: a `FILLED` REST response can stand in for its matching WebSocket toast, but a `NEW` resting-order response does not suppress the later fill toast. Distinct partial fills have distinct `fillId` values and each gets one toast; duplicate delivery of the same `fillId` stays quiet.
+
+`LIQUIDATION.liquidatedQuantity` is a positive quantity. The current liquidation operation closes a whole position and emits one event for each closed position.
+
+`ORDER_UPDATE.quantity` is the order's original requested quantity, not its remaining quantity. Statuses currently emitted are `NEW`, `PENDING_ACTIVATION`, `PARTIALLY_FILLED`, `FILLED`, `CANCELED`, and `REJECTED`. The publisher reports order creation/results, explicit user cancellations, matching activation and fills, and TEE-reported system cancellations. There is no `TRIGGERED` status in the order state model; activated trigger orders become `NEW`. Events are not replayed after reconnect.
+
+`POSITION_UPDATE` carries the committed position values. A close is represented by `quantity: "0"`, `entryPrice: "0"`, and the final `accumulatedFunding` and original `openTimestamp`. Funding rounds can affect many positions. Notifications can be dropped under load; reconcile from REST because this stream has no replay facility.
+
+After a successful TEE commit, staged position notifications are flushed even when the force-close history database is unavailable or a liquidation position has no publishable price. In those cases the committed position update can still be delivered without a corresponding `FILL` or public `LIQUIDATION` event; fills remain conditional on a committed REST history row.
+
 Quantities use `1e8`. These account-event prices use `1e18`. Fees, PnL, funding amounts and collateral use `1e6`. These scales differ from the public decimal-string `market_data` channel.
 
 Events are notifications, not complete account snapshots. An order update does not contain every TP/SL field, and a position update does not contain every balance/risk field. Refresh account REST state when needed. Never count an event and its corresponding historical fill as two trades.
@@ -1751,7 +1844,7 @@ Serialize conflicting actions on the same symbol/order, and coordinate account s
 
 ### Request IDs and retries
 
-`requestId` is a correlation field, not a general exactly-once API contract. Use a different ID for each new intent. A new signature/timestamp can create a new action even if a previous HTTP request timed out.
+`requestId` is a correlation field, not a general exactly-once API contract. Use a different ID for each new intent. Only order placement answers a reused `requestId` from the first request (below). For a cancellation or a withdrawal, a new signature/timestamp can create a new action even if a previous HTTP request timed out.
 
 For an uncertain order, cancellation or withdrawal outcome:
 
@@ -1762,9 +1855,28 @@ For an uncertain order, cancellation or withdrawal outcome:
 5. If the deployed lookup returns its documented JSON request-not-found `404`, allow time for visibility and continue reconciliation. A missing record does not by itself prove nothing happened.
 6. If the result remains uncertain, stop automatic resubmission and contact the onboarding support channel with correlation identifiers.
 
-WebSocket `fillId` and REST trade `id` are different identifier fields; this API does not expose a universal join between them. Keep event deduplication separate from the reconciled REST trade ledger.
+WebSocket `FILL.fillId` identifies the corresponding REST trade `id`. Deduplicate by that ID within the same partner-chain/account context, so a notification and the reconciled history row count as one execution. Distinct partial fills have distinct IDs.
 
 The lookup preserves successful admission over later rejected attempts using the same request ID. It is not a full retry-attempt log. Signing a new payload should be a deliberate new action after reconciliation.
+
+An order that reuses a `requestId` this context already accepted is never executed or placed a second time. Leading and trailing whitespace is not part of a `requestId`: `" id-1 "` and `"id-1"` are the same request. This covers immediate market orders (including a market close) and resting orders: `LIMIT`, `STOP`, `STOP_MARKET`, `TAKE_PROFIT`, `TAKE_PROFIT_MARKET`, with or without attached take-profit/stop-loss legs. The answer depends on the first request, even if the retry was re-signed with a new timestamp:
+
+- The same order (same user, symbol, side, type, quantity, prices, flags, time-in-force, attached legs and replaced order) that was accepted returns the original `201` result again with `"replayed": true`. The replay carries the original `orderId`, `stateRoot`, `sequenceNumber` and `teeSignature`.
+  - For a market order it omits `entryPrice`; read the fill price from trade history.
+  - For a resting order it reports the order as accepted (`"status": "NEW"`), not its current state; read open orders or order history to see whether it has since filled or been cancelled.
+- The same order that is still executing (market), still being placed (resting), or whose outcome is not yet known returns `409 REQUEST_IN_PROGRESS`. The order may exist. Reconcile with positions, open orders, order history and the request lookup, and keep retrying with the **same** `requestId`. Do not send it under a new `requestId` while the outcome is unknown: that could place it twice. For a resting order whose outcome is unknown (the TEE's answer was lost), `REQUEST_IN_PROGRESS` stays until the outcome is reconciled; it does not clear by itself. Check the request lookup and open orders: if the order is there, it was placed. Keep the same `requestId`, and contact support if `REQUEST_IN_PROGRESS` persists. Support settles the request from the platform's durable records. After that, the next retry under the same `requestId` either returns the original order (`201`, `"replayed": true`) if it was placed, or places it, exactly once, if it was not. Retry with a re-signed order (new timestamp) so that a placement can be accepted.
+- The same order that definitely failed (market: finished without a committed fill; resting: explicitly rejected by the TEE, nothing placed) returns `409 REQUEST_ALREADY_FAILED`. Only this answer means a corrected order may be sent under a new `requestId` and signature.
+- A different order under that `requestId`, including a market order under a resting order's `requestId` or the reverse, returns `409 REQUEST_ID_REUSED`. Market and resting orders share one `requestId` namespace per partner-chain context.
+
+Two sends with the same `requestId` that arrive together place at most one order, also when one is a market order and the other a resting order. One gets the `201`, the other `409 REQUEST_IN_PROGRESS`, `409 REQUEST_ID_REUSED` or the replayed `201`.
+
+What the first send of a resting order answers when it does not succeed:
+
+- `503 ORDER_OUTCOME_UNKNOWN`: the TEE's answer was lost (for example a timeout), so the order may have been placed. Reconcile as for `REQUEST_IN_PROGRESS`; never switch to a new `requestId`.
+- `400 TEE_ERROR`: the TEE explicitly rejected the order, or it never reached the TEE. A retry under the same `requestId` answers `409 REQUEST_ALREADY_FAILED` in the first case. In the second case it places the order normally (re-sign it with a new timestamp; a byte-identical resend gets `DUPLICATE_ORDER`).
+- A request refused before it was placed (for example by margin pre-validation, any other `4xx`/`503`) records nothing, so it can be retried under the same `requestId`.
+
+The request lookup above remains the way to reconcile; these answers only make a retry safe and its response explicit.
 
 Login and leverage do not accept a client `requestId` in their documented bodies. Confirm those through the successful login response and the symbol's account leverage, respectively. Do not append an invented request ID field and expect request-status lookup to track it.
 
@@ -1785,7 +1897,8 @@ Standard JSON error shape:
 
 | Status / representative code | Client action |
 |---|---|
-| `400 INVALID_REQUEST`, `INVALID_QUANTITY`, `INVALID_PRICE`, `INVALID_STOP_PRICE` | Correct request shape, integer encoding or value. Re-sign any changed signed values. |
+| `400 INVALID_REQUEST`, `INVALID_QUANTITY`, `INVALID_PRICE`, `INVALID_STOP_PRICE` | Correct request shape, numeric encoding or value. Re-sign any changed signed values. |
+| `400 PRICE_CONFLICT` | A nonzero legacy price and its decimal companion disagree. Send one representation or matching values, then sign that exact price. |
 | `400 INVALID_TIMESTAMP`, `TIMESTAMP_EXPIRED` | Check the signing clock and delay. Resolve any original uncertain submission before creating a new signed intent. |
 | `400 INVALID_PARTNER_CHAIN_KEY` | Verify routing and onboarding values. Do not fall back to another context. |
 | `401 INVALID_SIGNATURE` | Verify signer role, domain, partner hash, exact fields and price scaling. Signature failures can also appear as a validation error from the action endpoint. |
@@ -1793,7 +1906,12 @@ Standard JSON error shape:
 | `404 USER_NOT_FOUND`, `ORDER_NOT_FOUND` | Check context/address/ID. For an order, reconcile fills and cancellation history before assuming it never existed. |
 | `404` from request lookup | No recorded request found at this read. Follow the uncertain-outcome procedure above. |
 | `400 INVALID_PAGINATION` | Correct the offset. Do not retry the same unsupported page. |
+| `400 UNSUPPORTED_SYMBOL` | The symbol is not configured on your partner lane (for example a Binance symbol absent from `GET /api/v1/markets`). Do not retry; use only listed symbols. |
 | `409 DUPLICATE_ORDER` | Reconcile the existing intent; do not blindly replace the request ID. |
+| `409 REQUEST_IN_PROGRESS` | The first order with this `requestId` is still executing, awaiting reconciliation, being placed, or its outcome is not yet known. Poll the request lookup, positions and open orders, and retry only with the same `requestId` (re-signed); do not create a new intent or a new `requestId` while the outcome is unknown. For a resting order whose outcome is unknown it stays until reconciled; contact support if it persists. |
+| `503 ORDER_OUTCOME_UNKNOWN` | The TEE's answer for this resting order was lost; it may have been placed. Reconcile as for `REQUEST_IN_PROGRESS` and retry only with the same `requestId`. |
+| `409 REQUEST_ALREADY_FAILED` | The first order with this `requestId` definitely failed: finished without a committed fill (market) or explicitly rejected by the TEE (resting). Check the position and open orders, then a corrected order may use a new `requestId` and signature. |
+| `409 REQUEST_ID_REUSED` | This `requestId` already belongs to a different order. Use a unique `requestId` for every order. |
 | `413` or body-size validation error | Keep public API JSON bodies at or below 64 KiB and within their endpoint's schema. Do not send a batch as one order. |
 | `429 RATE_LIMITED` | Respect `Retry-After` if present, reduce concurrency and apply backoff. |
 | `502`, `503`, other `5xx`, or network timeout | Back off on reads. Mutations require outcome reconciliation before retry. |
@@ -1827,7 +1945,8 @@ Run read-only checks against the default `global:42161` lane first. Global uses 
 | Scenario | Expected verification |
 |---|---|
 | Configuration | HTTPS routing, RPC chain, deposit contract, verifying contract and collateral match onboarding |
-| Unit conversion | Global Arbitrum USDC uses six native decimals and `1e6` REST balances; order HTTP prices are `1e6`, signed prices `1e18`. Verify eighteen-decimal token conversion separately if adding another deployment |
+| Unit conversion | Global Arbitrum USDC uses six native decimals and `1e6` REST balances; legacy HTTP order prices use `1e6`, exact `…Decimal` fields use plain decimals, and signed prices use `1e18`. Verify eighteen-decimal token conversion separately if adding another deployment |
+| Exact price | Fine-tick entry, trigger and bracket prices survive signing and round-trip reads without truncation; conflicting legacy/decimal values return `PRICE_CONFLICT` |
 | Session registration | Wallet login succeeds; trading and private streaming use the registered session |
 | Session renewal | New session is usable; workers reconnect/re-sign using it |
 | Deposit | Approval and deposit receipts succeed; account credit becomes visible before trading |
@@ -1842,7 +1961,9 @@ Run read-only checks against the default `global:42161` lane first. Global uses 
 | Leverage change | Read-after-write shows the requested permitted leverage; rejected change does not appear as success |
 | Public stream | Snapshot and updates merge correctly; missing values are not replaced by zeros |
 | Private stream reconnect | Account and history are reconciled after a disconnect; events are not double-counted |
-| Submission timeout | Client polls original request and account state rather than creating duplicate exposure |
+| Submission timeout | Client reconciles the original order request and retries only its same `requestId`; replay and in-progress responses never create duplicate exposure |
+| Fill identity | WebSocket `fillId` and matching REST trade `id` count once; distinct partial fills remain distinct |
+| Pending execution | Optional `executionStatus` and `lastRefusal` explain matcher observations without replacing order status or triggering duplicate submissions |
 | History boundary | Client stops at supported pagination bounds and discloses incomplete older history |
 | Funding | Market rate display is separate from signed account amount convention in recorded history |
 | Withdrawal | Payout plus actual fee counted once; eligibility, release confirmation and wallet transfer are distinguished |
