@@ -25,14 +25,14 @@ const PROMPTS = {
     references: ["/swap/shared", "/swap"],
     skill: "spot-swap-integration",
     implementation:
-      "Use the TypeScript client flow for any framework; React apps may import the same public client APIs from spot-react without a swap provider. Keep the host's quote competition, wallet, forms, and progress UI. Quote exactly one input amount or output target, then capture the resolved fixed input spend. Implement protected-minimum review, confirmed wrapping/approval, prepareSwap, inline signing, submitSwap, and host-owned getOrder polling. Acceptance stays pending until OrderStatus.Completed.",
+      "Use the TypeScript client flow for any framework; React apps may import the same public client APIs from spot-react without a swap provider. Keep the host's quote competition, resolved auto/custom slippage, wallet, forms, and progress UI. Quote exactly one input amount or output target, then capture the resolved fixed input spend. Implement protected-minimum review, confirmed wrapping/approval, prepareSwap, inline signing, submitSwap, and host-owned getOrder polling. The reviewed quote percentage becomes integer basis points in signed witness.slippage; preserve minimumAmountOut unchanged. Acceptance stays pending until OrderStatus.Completed.",
   },
   swap: {
     goal: "Integrate Orbs Spot swaps using the TypeScript SDK in my existing application.",
     references: ["/swap/shared", "/swap"],
     skill: "spot-swap-integration",
     implementation:
-      "Keep the existing router and wallet flow. Use client.getQuote with exactly one inAmount or outAmount, capture its resolved request.inAmount, and preserve minimumAmountOut unchanged; dexMinAmountOut is a local input-only comparison threshold. Use standalone getTokenUsd and synchronous getSwapSlippage with host-computed amountUsd when needed; keep effective slippage consistent between display, quote, and final review. Confirm wrapping and sufficient allowance for client.spenderAddress, then prepareSwap, sign its exact signingRequest, and submitSwap. Retain the signed attempt and accepted order; poll getOrder until OrderStatus.Completed. Reconcile uncertain acceptance before another submission or fallback.",
+      "Keep the existing router and wallet flow. Use client.getQuote with exactly one inAmount or outAmount, capture its resolved request.inAmount, and preserve minimumAmountOut unchanged; dexMinAmountOut is a local input-only comparison threshold. Reuse the host's resolved auto/custom slippage. Use standalone getTokenUsd for missing USD prices and synchronous getSwapSlippage with host-computed amountUsd when adding automatic policy. Keep effective slippage consistent between display, quote, and final review; the reviewed quote percentage becomes integer basis points in signed witness.slippage. Confirm wrapping and sufficient allowance for client.spenderAddress, then prepareSwap, sign its exact signingRequest, and submitSwap. Retain the signed attempt and accepted order; poll getOrder until OrderStatus.Completed. Reconcile uncertain acceptance before another submission or fallback.",
   },
   "advanced-orders-shared": {
     goal: "Add Orbs Spot advanced orders to my existing application.",
@@ -155,6 +155,9 @@ export function buildIntegrationAgentPrompt({
     definition.implementation,
     guide.id === "swap" || guide.id === "swap-shared"
       ? "If the app already imports these client APIs from spot-react, keep that package. The swap skill is bundled with its spot-ui dependency, so resolve that dependency's node_modules/@orbs-network/spot-ui/dist/integration-skills/spot-swap-integration/SKILL.md and matching manifest.json.sdkVersion without adding a separate core dependency."
+      : undefined,
+    guide.id === "swap" || guide.id === "swap-shared"
+      ? "If an existing @orbs-network/liquidity-hub-sdk swap path is present, also read node_modules/@orbs-network/spot-ui/dist/integration-skills/liquidity-hub-to-spot-swap-migration/SKILL.md and verify its manifest.json.sdkVersion against the resolved core package. React hosts use the same core dependency. If that bundle is absent, use https://github.com/orbs-network/spot-ui/tree/master/skills/liquidity-hub-to-spot-swap-migration checked against the installed release. Migrate allowances, signing, submission, and settlement together. Preserve staged wallet actions, resolved DEX slippage, and recovery for pending legacy attempts using their original protocol identity."
       : undefined,
     "Implement the integration, run the relevant local checks and mocked failure/recovery cases, then summarize the changes and any remaining setup. Leave deployment and live signatures, transactions, and trades for me.",
   ].filter((section): section is string => section !== undefined).join("\n\n");

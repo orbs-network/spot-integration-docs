@@ -89,7 +89,7 @@ export const GUIDE_SOURCES = [
     route: "/swap/shared",
     segments: ["swap", "shared"],
     stepOrder: [],
-    updatedAt: "2026-11-16",
+    updatedAt: "2026-11-17",
     variantLabel: "Overview & Setup",
   },
   {
@@ -150,7 +150,7 @@ export const GUIDE_SOURCES = [
     route: "/swap",
     segments: ["swap"],
     stepOrder: [],
-    updatedAt: "2026-11-16",
+    updatedAt: "2026-11-17",
     variantLabel: "TypeScript SDK",
   },
   {

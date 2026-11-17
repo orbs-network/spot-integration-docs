@@ -53,7 +53,7 @@ When starting without trading services, build only the missing wallet connection
 | --- | --- |
 | Typed amount | Decimal string, for example `"1.25"`. |
 | Raw token amount | Integer base-unit string: `"1250000"` for 1.25 tokens with 6 decimals. |
-| Quote `slippage` | Percentage: `0.5` means 0.5%; the SDK converts to integer basis points. |
+| Quote `slippage` | Percentage: `0.5` means 0.5%; the SDK converts it to `50` integer basis points for the quote API and signed `witness.slippage`. |
 | `minimumAmountOut` | Returned output-token base units; preserve unchanged. |
 | `quote.receivedAt`, `prepared.values` timestamps, accepted `Order.deadline` | Unix milliseconds. |
 | `prepared.order.deadline` | Protocol seconds in the signed payload. Preserve the SDK value unchanged. |
@@ -73,6 +73,8 @@ The React package re-exports the core SDK helpers. Router-only React application
 
 Use the installed version-matched skill at `node_modules/@orbs-network/spot-ui/dist/integration-skills/spot-swap-integration/SKILL.md` when available, and compare its adjacent `manifest.json.sdkVersion` with the installed package. React swaps follow the same swap skill; the two advanced-order skills cover separate form/provider workflows. Read documentation under `dist` without importing SDK code from private paths.
 
+For an existing `@orbs-network/liquidity-hub-sdk` swap path, also follow the migration handoff at `node_modules/@orbs-network/spot-ui/dist/integration-skills/liquidity-hub-to-spot-swap-migration/SKILL.md`, using the same package-version check. React hosts resolve it through their core dependency. It covers replacing legacy allowances, signing, submission, and settlement together while preserving the host's resolved slippage, staged wallet actions, and recovery for pending legacy attempts. If that release lacks the bundle, use the [repository migration handoff](https://github.com/orbs-network/spot-ui/tree/master/skills/liquidity-hub-to-spot-swap-migration) after checking its contracts against the installed release.
+
 ### Integration Resources
 
 - [Spot TypeScript SDK and examples](https://github.com/orbs-network/spot-ui/tree/master/packages/spot-ui)
@@ -80,6 +82,7 @@ Use the installed version-matched skill at `node_modules/@orbs-network/spot-ui/d
 - [Quote and inline-signing example](https://github.com/orbs-network/spot-ui/blob/master/packages/spot-ui/examples/swap.ts)
 - [Spot React SDK](https://github.com/orbs-network/spot-ui/tree/master/packages/spot-react)
 - [Spot swap integration skill](https://github.com/orbs-network/spot-ui/tree/master/skills/spot-swap-integration) — applies to TypeScript and React swaps without a provider.
+- [Liquidity Hub to Spot migration skill](https://github.com/orbs-network/spot-ui/tree/master/skills/liquidity-hub-to-spot-swap-migration) — for replacing an existing Liquidity Hub swap integration.
 - [Example application](https://swap.orbs.network/?module=swap)
 
 ## How It Works
@@ -104,7 +107,7 @@ Use the installed version-matched skill at `node_modules/@orbs-network/spot-ui/d
 4. Call `client.prepareSwap({ quote, account, signal })`, freeze the final quote in the review, and sign its unmodified `signingRequest.typedData` using `signerAddress`.
 5. Submit the exact `prepared.order` and original signature with `client.submitSwap`. Retain the accepted order and poll `client.getOrder({ orderId, signal })` through the host's existing status service. Show success after `OrderStatus.Completed`.
 
-The SDK reuses quotes within its default 20-second window or refreshes their resolved fixed input before signing, including for output targets. It never increases spending. A lower refreshed minimum requires another review. Swaps expire three minutes after final preparation, after wrapping and approval. The SDK owns quote and prepared-order validation; the host owns wallet actions, receipt confirmation, context checks, duplicate guards, and polling.
+The SDK reuses quotes within its default 20-second window or refreshes their resolved fixed input before signing, including for output targets. It never increases spending. A lower refreshed minimum requires another review. Swaps expire three minutes after final preparation, after wrapping and approval. The reviewed quote percentage sets signed `witness.slippage` in integer basis points, and the quoted minimum remains unchanged in signed `witness.output.limit`. The SDK owns quote and prepared-order validation; the host owns wallet actions, receipt confirmation, context checks, duplicate guards, and polling.
 
 ### Wallet Actions and Completion
 
@@ -136,7 +139,7 @@ Quote the host's wrapped-native token when native currency is selected. The host
 
 Use the executable amounts returned by the quote. `netAmountOut` is the net output and `minimumAmountOut` is its protected minimum; do not subtract slippage or a display fee again. Confirm partner fee terms with Orbs before showing a fixed rate. Wrapping and approval have separate network gas costs that belong in the host's review.
 
-Quote USD totals are optional decimal strings for the complete amount. Standalone `getTokenUsd({ tokenAddress, chainId, signal })` returns USD per whole token from the default production price service. Compute the total USD amount with the host's decimal library and pass it to synchronous `getSwapSlippage({ amountUsd, slippage })` for automatic policy. Custom mode selects its percentage directly. Use the effective percentage for both display and quote requests. See [USD prices and slippage](/swap#fetch-quote). Router integrations keep their existing trade and gas policy.
+Quote USD totals are optional decimal strings for the complete amount. Standalone `getTokenUsd({ tokenAddress, chainId, signal })` returns USD per whole token from the default production price service. If the host needs automatic slippage policy, compute the total USD amount with its decimal library and pass it to synchronous `getSwapSlippage({ amountUsd, slippage })`. Custom mode selects its percentage directly. Use the effective percentage for both display and quote requests. See [USD prices and slippage](/swap#fetch-quote). Router integrations can reuse their resolved auto/custom slippage and keep their existing trade and gas policy.
 
 ### Partner Configuration
 

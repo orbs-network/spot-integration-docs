@@ -18,11 +18,12 @@ The SDK and API guides below cover integration methods for these products.
 - Advanced Orders React SDK: `AdvancedOrdersProvider`, `OrderType`, focused hooks, execution lifecycle, and order history with `@orbs-network/spot-react`.
 - Perps Direct API: connection, EIP-712 signing and sessions, deposits and withdrawals, trading, account history, streaming, and reliability at `/perps/api`.
 
-The Spot handoffs follow the `spot-ui` checkout at `2471c5d` (SDK manifests `2.2.4`, reviewed 16 November 2026). Use the skill bundled with the installed SDK version and verify `manifest.json.sdkVersion` before adapting examples:
+The Spot handoffs follow GitHub `spot-ui` master at `9278795a70a152b5272e67dd469aab8e55d2b534` (both SDK manifests `2.2.6`, reviewed 17 November 2026). This identifies the reviewed source, not which APIs are already published to npm. Use the skill bundled with the installed SDK version and verify `manifest.json.sdkVersion` before adapting examples:
 
 | Integration | Bundled skill |
 | --- | --- |
 | Swap, including React hosts | `@orbs-network/spot-ui/dist/integration-skills/spot-swap-integration/SKILL.md` |
+| Existing Liquidity Hub swap migration | `@orbs-network/spot-ui/dist/integration-skills/liquidity-hub-to-spot-swap-migration/SKILL.md` |
 | Advanced Orders TypeScript | `@orbs-network/spot-ui/dist/integration-skills/spot-advanced-orders-integration/SKILL.md` |
 | Advanced Orders React | `@orbs-network/spot-react/dist/integration-skills/spot-advanced-orders-react-integration/SKILL.md` |
 

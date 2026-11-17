@@ -24,6 +24,8 @@ Your app supplies wallet access, token metadata, balances, and the chain's wrapp
 
 Inspect the installed package and lockfile before changing dependencies. Read the version-matched `node_modules/@orbs-network/spot-ui/dist/integration-skills/spot-swap-integration/SKILL.md` and its references; its adjacent `manifest.json.sdkVersion` must match the installed package. For a release without that bundle, use the [swap integration skill](https://github.com/orbs-network/spot-ui/tree/master/skills/spot-swap-integration) from a matching release or checkout. Import SDK code only from the public package root; documentation under `dist` is safe to read. Keep a compatible installation and use the host's package manager.
 
+For an existing `@orbs-network/liquidity-hub-sdk` swap path, start with the [Liquidity Hub migration handoff](/swap/shared#integration-options) before adapting this flow.
+
 ## Fetch Quote
 
 Copy the displayed quote example as `fetch-quote.ts` and pass the current swap inputs:
@@ -137,7 +139,7 @@ The host owns live account/chain checks, balances and gas, receipt waiting, prog
 
 After wallet prerequisites finish, `await client.prepareSwap({ quote, account, signal })` returns `prepared.order`, `signingRequest`, `approvalRequest`, final `quote`, and timestamps. A quote with a valid local receipt age from zero through 20 seconds is reused; older, invalid, or future receipt times refresh the resolved fixed input. For output targets this never repeats the target calculation or increases spending. A lower refreshed minimum throws `QUOTE_MINIMUM_DECREASED` and requires fresh review. Swaps expire three minutes after final preparation.
 
-The signed order uses independent 500 bps oracle price protection in `witness.slippage`. The user's quote tolerance is enforced by the unchanged protected minimum in `witness.output.limit`; do not copy the quote percentage into the signed oracle field.
+The SDK converts the reviewed DEX percentage to integer basis points in signed `witness.slippage`: `0.5` percent becomes `50` bps, and `2.345` percent rounds to `235` bps. It preserves `prepared.quote.minimumAmountOut` unchanged in `witness.output.limit`. Sign the prepared payload unchanged; do not apply slippage to the minimum again or replace the signed tolerance with a fixed value.
 
 Quotes can remain live through wrapping and approval. Before opening the signature prompt, freeze the displayed amounts and slippage from `prepared.quote`. Submit the unchanged `prepared.order` and original signature through `client.submitSwap(prepared.order, signature, { signal })`. Preparation performs no wallet calls; submission does not wait for a fill.
 
