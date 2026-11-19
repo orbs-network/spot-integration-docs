@@ -29,6 +29,8 @@ The Spot handoffs follow GitHub `spot-ui` master at `9278795a70a152b5272e67dd469
 
 Paths are relative to the resolved package under `node_modules`; React's swap skill ships with its `spot-ui` dependency. Older releases without the bundle need the named repository skill from a matching release or checkout. API-only guides do not require an SDK skill.
 
+The Perps API has no SDK. Its integration skill lives in this repository at [`skills/perps-api-integration/SKILL.md`](skills/perps-api-integration/SKILL.md), with a condensed reference of the guide in `references/api-reference.md`. When `content/perps-api.md` changes, update that reference in the same change.
+
 ## Local Development
 
 ```bash

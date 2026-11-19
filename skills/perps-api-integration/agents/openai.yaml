@@ -1,0 +1,3 @@
+interface:
+  display_name: "Perps API Integration"
+  short_description: "Call, sign and reconcile Perpetual Hub perps API requests"
